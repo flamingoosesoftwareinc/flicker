@@ -14,177 +14,11 @@ Flicker uses [tcell](https://github.com/gdamore/tcell) for direct terminal acces
 
 Bubble Tea remains a good choice for a future editor/preview tool built *on top of* Flicker.
 
-## Iteration 1: A Square on Screen
+## Iteration 1: A Square on Screen (complete)
 
-The goal is the simplest possible proof of life: a rectangle rendered to the terminal via a scene graph, a transform, a geometry component, and a direct cell buffer. No materials, no effects, no scripting.
+Entity/component world, canvas buffer, scene graph traversal, and terminal flush. A rectangle rendered to the terminal via a transform, a geometry component, and a direct cell buffer.
 
-### Core Types
-
-```go
-// Entity is just an ID.
-type Entity uint64
-
-// World holds all entities and their components.
-type World struct {
-    next       Entity
-    transforms map[Entity]*Transform
-    geometries map[Entity]*Geometry
-    children   map[Entity][]Entity
-    roots      []Entity
-}
-
-func (w *World) Spawn() Entity
-func (w *World) Attach(e Entity, parent Entity)
-func (w *World) AddTransform(e Entity, t *Transform)
-func (w *World) AddGeometry(e Entity, g *Geometry)
-```
-
-### Transform
-
-Position in cell-space. Float64 internally for sub-cell precision.
-
-```go
-type Transform struct {
-    Position fmath.Vec2
-}
-```
-
-Kept deliberately minimal. Scale, rotation, and anchor points come later when there's a reason for them.
-
-### Geometry
-
-Describes what to draw. For iteration 1, just a filled rectangle.
-
-```go
-type GeometryKind int
-
-const (
-    GeoRect GeometryKind = iota
-)
-
-type Geometry struct {
-    Kind   GeometryKind
-    Width  int
-    Height int
-    Rune   rune  // fill character
-}
-```
-
-### Canvas
-
-The cell buffer. This is the core rendering target. Everything draws to this.
-
-```go
-type Cell struct {
-    Rune rune
-    FG   Color
-    BG   Color
-}
-
-type Canvas struct {
-    Width, Height int
-    Cells         [][]Cell
-}
-
-func NewCanvas(w, h int) *Canvas
-func (c *Canvas) Set(x, y int, cell Cell)
-func (c *Canvas) Get(x, y int) Cell
-func (c *Canvas) Clear()
-```
-
-### Render System
-
-Walks the scene graph, resolves transforms, writes to the canvas.
-
-```go
-func Render(world *World, canvas *Canvas) {
-    for _, root := range world.roots {
-        renderEntity(world, canvas, root, 0, 0)
-    }
-}
-
-func renderEntity(w *World, c *Canvas, e Entity, ox, oy float64) {
-    t := w.transforms[e]
-    if t == nil {
-        return
-    }
-
-    ax, ay := ox+t.X, oy+t.Y
-
-    if g := w.geometries[e]; g != nil {
-        drawGeometry(c, g, int(ax), int(ay))
-    }
-
-    for _, child := range w.children[e] {
-        renderEntity(w, c, child, ax, ay)
-    }
-}
-
-func drawGeometry(c *Canvas, g *Geometry, x, y int) {
-    for dy := 0; dy < g.Height; dy++ {
-        for dx := 0; dx < g.Width; dx++ {
-            c.Set(x+dx, y+dy, Cell{Rune: g.Rune})
-        }
-    }
-}
-```
-
-### Terminal Output
-
-Flush the canvas to the terminal. For iteration 1, this can be raw ANSI via tcell or even just `fmt.Print`.
-
-```go
-func Flush(canvas *Canvas, screen tcell.Screen) {
-    for y := 0; y < canvas.Height; y++ {
-        for x := 0; x < canvas.Width; x++ {
-            cell := canvas.Get(x, y)
-            screen.SetContent(x, y, cell.Rune, nil, tcell.StyleDefault)
-        }
-    }
-    screen.Show()
-}
-```
-
-### Main
-
-```go
-func main() {
-    screen, _ := tcell.NewScreen()
-    screen.Init()
-    defer screen.Fini()
-
-    w, h := screen.Size()
-    canvas := NewCanvas(w, h)
-    world := &World{ /* init maps */ }
-
-    box := world.Spawn()
-    world.AddTransform(box, &Transform{X: 10, Y: 5})
-    world.AddGeometry(box, &Geometry{
-        Kind:   GeoRect,
-        Width:  20,
-        Height: 10,
-        Rune:   '█',
-    })
-    world.roots = append(world.roots, box)
-
-    // render once
-    canvas.Clear()
-    Render(world, canvas)
-    Flush(canvas, screen)
-
-    // wait for quit
-    for {
-        ev := screen.PollEvent()
-        if _, ok := ev.(*tcell.EventKey); ok {
-            return
-        }
-    }
-}
-```
-
-## What This Gives You
-
-A running program that puts a white rectangle on screen. More importantly, the foundational abstractions: entity/component world, canvas buffer, scene graph traversal, and terminal flush. Everything that comes next (color, materials, animation, particles) layers onto these primitives without replacing them.
+The `Screen` interface decouples rendering from the terminal backend. `TcellScreen` drives a real terminal; `SimScreen` captures frames in-memory for golden tests (using `goldie/v2`).
 
 ## What Comes Next
 
@@ -216,10 +50,13 @@ flicker/
     interpolation.go // Lerp, InverseLerp, Remap, cubic bezier, spring solver
     easing.go      // Easing functions: linear, quad, cubic, elastic, bounce (all func(t float64) float64)
   terminal/
-    screen.go      // tcell init, teardown, canvas flush, input polling
+    screen.go      // Screen interface, TcellScreen (tcell backend)
+    simscreen.go   // SimScreen (in-memory backend for testing)
   cmd/
     flicker/
       main.go      // Wire everything, run the loop
+  golden_test.go   // Integration golden tests
+  testdata/        // Golden files
 ```
 
 `fmath` depends on nothing. `core` depends on `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all three.
