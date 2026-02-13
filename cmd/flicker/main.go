@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -10,8 +11,6 @@ import (
 	"flicker/terminal"
 	"github.com/gdamore/tcell/v2"
 )
-
-const targetFPS = 60
 
 func main() {
 	screen, err := terminal.NewTcellScreen()
@@ -33,14 +32,28 @@ func main() {
 		Width:  20,
 		Height: 10,
 		Rune:   '█',
+		FG:     core.Color{R: 100, G: 149, B: 237}, // cornflower blue
+		BG:     core.Color{R: 0, G: 0, B: 40},
 	})
 	world.AddRoot(box)
 
-	elapsed := 0.0
-	world.AddBehavior(box, func(dt float64, e core.Entity, w *core.World) {
-		elapsed += dt
-		v := fmath.Triangle(elapsed / 2.0)
+	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+		v := fmath.Triangle(t.Total / 2.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 5, 50, v)
+	})
+
+	world.AddMaterial(box, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		// Vertical gradient that pulses with time.
+		_, bh := 20, 10
+		gradient := float64(y) / float64(bh-1)
+		pulse := (math.Sin(2*math.Pi*t.Total) + 1) / 2 // [0, 1]
+		brightness := gradient*0.5 + pulse*0.5
+		cell.FG = core.Color{
+			R: uint8(float64(cell.FG.R) * brightness),
+			G: uint8(float64(cell.FG.G) * brightness),
+			B: uint8(float64(cell.FG.B) * brightness),
+		}
+		return cell
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
@@ -51,8 +64,8 @@ func main() {
 		}
 	}()
 
-	frameBudget := time.Second / targetFPS
-	last := time.Now()
+	start := time.Now()
+	last := start
 
 	for {
 		// Drain events (non-blocking).
@@ -69,20 +82,17 @@ func main() {
 		}
 
 		now := time.Now()
-		dt := now.Sub(last).Seconds()
+		t := core.Time{
+			Total: now.Sub(start).Seconds(),
+			Delta: now.Sub(last).Seconds(),
+		}
 		last = now
 
-		core.UpdateBehaviors(world, dt)
+		core.UpdateBehaviors(world, t)
 
 		canvas.Clear()
 		canvas.DrawBorder()
-		core.Render(world, canvas)
+		core.Render(world, canvas, t)
 		screen.Flush(canvas)
-
-		// Sleep remainder of frame budget.
-		elapsed := time.Since(now)
-		if sleep := frameBudget - elapsed; sleep > 0 {
-			time.Sleep(sleep)
-		}
 	}
 }

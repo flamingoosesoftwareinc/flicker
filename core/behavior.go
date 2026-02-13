@@ -1,12 +1,12 @@
 package core
 
-// Behavior is a per-entity update function. It receives the time delta since
-// the last tick and can read/write the entity's components through the World.
-type Behavior func(dt float64, e Entity, w *World)
+// Behavior is a per-entity update function. It receives the engine Time
+// and can read/write the entity's components through the World.
+type Behavior func(t Time, e Entity, w *World)
 
 // UpdateBehaviors runs every entity's Behavior component once per tick.
-func UpdateBehaviors(world *World, dt float64) {
+func UpdateBehaviors(world *World, t Time) {
 	for e, b := range world.behaviors {
-		b(dt, e, world)
+		b(t, e, world)
 	}
 }

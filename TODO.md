@@ -24,16 +24,19 @@ The `Screen` interface decouples rendering from the terminal backend. `TcellScre
 
 Tick loop (`update → render → flush` at 60 FPS) with goroutine-pumped non-blocking input. `Behavior` component — a per-entity update function `func(dt, Entity, *World)` — iterated by `UpdateBehaviors`. Wave functions in `fmath` (`Saw`, `Sine`, `Triangle`, `Square`, `Pulse`) with period 1.0, composable with `Remap`. Demo: box seesaws horizontally via `Triangle`. Multi-frame golden test with deterministic fixed `dt`.
 
+## Iteration 3: Color, Alpha, and Materials (planned)
+
+Color plumbing end-to-end (FG/BG through to tcell). Cell-level `Alpha float64` for transparency. Per-entity `Material` component `func(x, y int, t float64, cell Cell) Cell` — a fragment shader applied during render. Time passed into `Render`. Uncap framerate.
+
+## Iteration 4: Layers and Compositing (planned)
+
+Ordered canvas layers. Entities target a layer. Back-to-front compositing with alpha blending. Post-process passes per layer before compositing.
+
 ## What Comes Next
 
-Rough ordering for future iterations, not a commitment:
-
-- **Color**: `FG`/`BG` on `Cell`, style propagation through `Drawable` or a new `Style` component
 - **Animation**: `Tween` system that interpolates component fields over time
-- **Materials**: cell transform functions `(x, y, time, cell) → cell`
 - **Text rendering**: bitmap font rasterization → braille/block mapping
-- **Particles**: `ParticleEmitter` component, particle pool, attractor targets
-- **Post-processing**: bloom as a canvas-to-canvas pass
+- **Particles**: point clouds, emitters, attractor targets
 - **Scenes/slides**: ordered scene list, transitions
 - **Scripting**: Lua bindings over the Go API
 - **Playback/recording**: VHS / asciinema integration

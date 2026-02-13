@@ -34,7 +34,7 @@ func TestBasicExample(t *testing.T) {
 	canvas := core.NewCanvas(w, h)
 	canvas.Clear()
 	canvas.DrawBorder()
-	core.Render(world, canvas)
+	core.Render(world, canvas, core.Time{})
 	screen.Flush(canvas)
 
 	// Build golden text from captured frames.
@@ -73,18 +73,22 @@ func TestAnimatedBehavior(t *testing.T) {
 	world.AddRoot(box)
 
 	elapsed := 0.0
-	world.AddBehavior(box, func(dt float64, e core.Entity, w *core.World) {
-		elapsed += dt
+	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+		elapsed += t.Delta
 		v := fmath.Triangle(elapsed / 2.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 5, 50, v)
 	})
 
-	for range frames {
-		core.UpdateBehaviors(world, dt)
+	for i := range frames {
+		t := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, t)
 
 		canvas.Clear()
 		canvas.DrawBorder()
-		core.Render(world, canvas)
+		core.Render(world, canvas, t)
 		screen.Flush(canvas)
 	}
 

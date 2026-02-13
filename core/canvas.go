@@ -5,9 +5,10 @@ type Color struct {
 }
 
 type Cell struct {
-	Rune rune
-	FG   Color
-	BG   Color
+	Rune  rune
+	FG    Color
+	BG    Color
+	Alpha float64
 }
 
 type Canvas struct {

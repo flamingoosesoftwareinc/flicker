@@ -2,11 +2,16 @@ package core
 
 type Entity uint64
 
+// Material is a per-entity fragment shader applied after drawing.
+// x, y are local coords relative to the drawable origin.
+type Material func(x, y int, t Time, cell Cell) Cell
+
 type World struct {
 	next       Entity
 	transforms map[Entity]*Transform
 	drawables  map[Entity]Drawable
 	behaviors  map[Entity]Behavior
+	materials  map[Entity]Material
 	children   map[Entity][]Entity
 	roots      []Entity
 }
@@ -16,6 +21,7 @@ func NewWorld() *World {
 		transforms: make(map[Entity]*Transform),
 		drawables:  make(map[Entity]Drawable),
 		behaviors:  make(map[Entity]Behavior),
+		materials:  make(map[Entity]Material),
 		children:   make(map[Entity][]Entity),
 	}
 }
@@ -63,4 +69,12 @@ func (w *World) AddBehavior(e Entity, b Behavior) {
 
 func (w *World) Behavior(e Entity) Behavior {
 	return w.behaviors[e]
+}
+
+func (w *World) AddMaterial(e Entity, m Material) {
+	w.materials[e] = m
+}
+
+func (w *World) Material(e Entity) Material {
+	return w.materials[e]
 }
