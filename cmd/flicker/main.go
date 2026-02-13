@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
 	"github.com/gdamore/tcell/v2"
 )
+
+const targetFPS = 60
 
 func main() {
 	screen, err := terminal.NewTcellScreen()
@@ -33,15 +36,53 @@ func main() {
 	})
 	world.AddRoot(box)
 
-	canvas.Clear()
-	canvas.DrawBorder()
-	core.Render(world, canvas)
-	screen.Flush(canvas)
+	elapsed := 0.0
+	world.AddBehavior(box, func(dt float64, e core.Entity, w *core.World) {
+		elapsed += dt
+		v := fmath.Triangle(elapsed / 2.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, 5, 50, v)
+	})
+
+	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
+	events := make(chan tcell.Event, 1)
+	go func() {
+		for {
+			events <- screen.PollEvent()
+		}
+	}()
+
+	frameBudget := time.Second / targetFPS
+	last := time.Now()
 
 	for {
-		ev := screen.PollEvent()
-		if _, ok := ev.(*tcell.EventKey); ok {
-			return
+		// Drain events (non-blocking).
+		done := false
+		for !done {
+			select {
+			case ev := <-events:
+				if _, ok := ev.(*tcell.EventKey); ok {
+					return
+				}
+			default:
+				done = true
+			}
+		}
+
+		now := time.Now()
+		dt := now.Sub(last).Seconds()
+		last = now
+
+		core.UpdateBehaviors(world, dt)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas)
+		screen.Flush(canvas)
+
+		// Sleep remainder of frame budget.
+		elapsed := time.Since(now)
+		if sleep := frameBudget - elapsed; sleep > 0 {
+			time.Sleep(sleep)
 		}
 	}
 }

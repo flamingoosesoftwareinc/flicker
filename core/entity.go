@@ -6,6 +6,7 @@ type World struct {
 	next       Entity
 	transforms map[Entity]*Transform
 	drawables  map[Entity]Drawable
+	behaviors  map[Entity]Behavior
 	children   map[Entity][]Entity
 	roots      []Entity
 }
@@ -14,6 +15,7 @@ func NewWorld() *World {
 	return &World{
 		transforms: make(map[Entity]*Transform),
 		drawables:  make(map[Entity]Drawable),
+		behaviors:  make(map[Entity]Behavior),
 		children:   make(map[Entity][]Entity),
 	}
 }
@@ -53,4 +55,12 @@ func (w *World) Transform(e Entity) *Transform {
 
 func (w *World) Drawable(e Entity) Drawable {
 	return w.drawables[e]
+}
+
+func (w *World) AddBehavior(e Entity, b Behavior) {
+	w.behaviors[e] = b
+}
+
+func (w *World) Behavior(e Entity) Behavior {
+	return w.behaviors[e]
 }

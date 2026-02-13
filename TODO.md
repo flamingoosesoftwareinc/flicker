@@ -16,16 +16,19 @@ Bubble Tea remains a good choice for a future editor/preview tool built *on top 
 
 ## Iteration 1: A Square on Screen (complete)
 
-Entity/component world, canvas buffer, scene graph traversal, and terminal flush. A rectangle rendered to the terminal via a transform, a geometry component, and a direct cell buffer.
+Entity/component world, canvas buffer, scene graph traversal, and terminal flush. A rectangle rendered to the terminal via a transform, a `Drawable` interface, and a direct cell buffer.
 
 The `Screen` interface decouples rendering from the terminal backend. `TcellScreen` drives a real terminal; `SimScreen` captures frames in-memory for golden tests (using `goldie/v2`).
+
+## Iteration 2: Behavior System, Wave Functions, and Tick Loop (complete)
+
+Tick loop (`update → render → flush` at 60 FPS) with goroutine-pumped non-blocking input. `Behavior` component — a per-entity update function `func(dt, Entity, *World)` — iterated by `UpdateBehaviors`. Wave functions in `fmath` (`Saw`, `Sine`, `Triangle`, `Square`, `Pulse`) with period 1.0, composable with `Remap`. Demo: box seesaws horizontally via `Triangle`. Multi-frame golden test with deterministic fixed `dt`.
 
 ## What Comes Next
 
 Rough ordering for future iterations, not a commitment:
 
-- **Color**: `FG`/`BG` on `Cell`, style propagation through `Geometry` or a new `Style` component
-- **Frame loop**: `tick` → `update` → `render` → `flush` at a target FPS
+- **Color**: `FG`/`BG` on `Cell`, style propagation through `Drawable` or a new `Style` component
 - **Animation**: `Tween` system that interpolates component fields over time
 - **Materials**: cell transform functions `(x, y, time, cell) → cell`
 - **Text rendering**: bitmap font rasterization → braille/block mapping
@@ -41,20 +44,24 @@ Rough ordering for future iterations, not a commitment:
 flicker/
   core/
     entity.go      // Entity, World, parent/child relationships
-    transform.go   // Transform component (position via Vec2)
-    geometry.go    // Geometry component, GeometryKind enum
+    transform.go   // Transform component (position via Vec3)
+    drawable.go    // Drawable interface
+    rect.go        // Rect drawable
+    behavior.go    // Behavior component + UpdateBehaviors system
     canvas.go      // Cell, Canvas (2D cell buffer)
-    render.go      // Scene graph traversal, geometry → canvas
+    render.go      // Scene graph traversal, drawable → canvas
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
-    interpolation.go // Lerp, InverseLerp, Remap, cubic bezier, spring solver
+    vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp
+    interpolation.go // Lerp, InverseLerp, Remap
     easing.go      // Easing functions: linear, quad, cubic, elastic, bounce (all func(t float64) float64)
+    wave.go        // Wave functions: saw, sine, triangle, square, pulse (period 1.0)
   terminal/
     screen.go      // Screen interface, TcellScreen (tcell backend)
     simscreen.go   // SimScreen (in-memory backend for testing)
   cmd/
     flicker/
-      main.go      // Wire everything, run the loop
+      main.go      // Wire everything, run the tick loop
   golden_test.go   // Integration golden tests
   testdata/        // Golden files
 ```

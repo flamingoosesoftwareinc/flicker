@@ -48,3 +48,53 @@ func TestBasicExample(t *testing.T) {
 	g := goldie.New(t)
 	g.Assert(t, "basic_example", []byte(b.String()))
 }
+
+func TestAnimatedBehavior(t *testing.T) {
+	const (
+		w      = 60
+		h      = 12
+		frames = 5
+		dt     = 0.5 // fixed dt per tick
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+	box := world.Spawn()
+	world.AddTransform(box, &core.Transform{
+		Position: fmath.Vec3{X: 5, Y: 1},
+	})
+	world.AddDrawable(box, &core.Rect{
+		Width:  10,
+		Height: 5,
+		Rune:   '#',
+	})
+	world.AddRoot(box)
+
+	elapsed := 0.0
+	world.AddBehavior(box, func(dt float64, e core.Entity, w *core.World) {
+		elapsed += dt
+		v := fmath.Triangle(elapsed / 2.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, 5, 50, v)
+	})
+
+	for range frames {
+		core.UpdateBehaviors(world, dt)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "animated_behavior", []byte(b.String()))
+}
