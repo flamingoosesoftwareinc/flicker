@@ -1,18 +1,16 @@
 package flicker_test
 
 import (
-	"flag"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
-)
 
-var update = flag.Bool("update", false, "update golden files")
+	"github.com/sebdah/goldie/v2"
+)
 
 func TestBasicExample(t *testing.T) {
 	const (
@@ -48,27 +46,7 @@ func TestBasicExample(t *testing.T) {
 		b.WriteString(frame)
 		b.WriteByte('\n')
 	}
-	got := b.String()
 
-	goldenPath := "testdata/basic_example.golden"
-
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(goldenPath, []byte(got), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Log("updated golden file")
-		return
-	}
-
-	want, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("golden file not found (run with -update to create): %v", err)
-	}
-
-	if got != string(want) {
-		t.Errorf("output does not match golden file %s\n\nGot:\n%s\nWant:\n%s", goldenPath, got, string(want))
-	}
+	g := goldie.New(t)
+	g.Assert(t, "basic_example", []byte(b.String()))
 }
