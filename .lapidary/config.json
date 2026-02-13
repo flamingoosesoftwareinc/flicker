@@ -1,0 +1,27 @@
+{
+  "mounts": [
+    {
+      "source": "$HOME/.claude",
+      "target": "/home/dev/.claude",
+      "type": "bind"
+    },
+    {
+      "source": "$HOME/.local/share/opencode",
+      "target": "/home/dev/.local/share/opencode",
+      "type": "bind"
+    },
+    {
+      "source": "lapidary-history-$SANDBOX",
+      "target": "/commandhistory",
+      "type": "volume"
+    }
+  ],
+  "env": [
+    "HOME=/home/dev",
+    "SHELL=/bin/zsh",
+    "EDITOR=nvim",
+    "VISUAL=nvim",
+    "CLAUDE_CONFIG_DIR=/home/dev/.claude"
+  ],
+  "post_create_commands": []
+}
