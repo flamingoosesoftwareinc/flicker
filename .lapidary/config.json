@@ -23,5 +23,5 @@
     "VISUAL=nvim",
     "CLAUDE_CONFIG_DIR=/home/dev/.claude"
   ],
-  "post_create_commands": []
+  "post_create_commands": ["scripts/setup-hooks.sh"]
 }
