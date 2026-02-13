@@ -6,11 +6,19 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-type Screen struct {
+// Screen is the minimal interface a renderer needs to present frames.
+type Screen interface {
+	Size() (int, int)
+	Flush(canvas *core.Canvas)
+	Fini()
+}
+
+// TcellScreen is a Screen backed by a real tcell terminal.
+type TcellScreen struct {
 	tcell tcell.Screen
 }
 
-func NewScreen() (*Screen, error) {
+func NewTcellScreen() (*TcellScreen, error) {
 	s, err := tcell.NewScreen()
 	if err != nil {
 		return nil, err
@@ -18,14 +26,14 @@ func NewScreen() (*Screen, error) {
 	if err := s.Init(); err != nil {
 		return nil, err
 	}
-	return &Screen{tcell: s}, nil
+	return &TcellScreen{tcell: s}, nil
 }
 
-func (s *Screen) Size() (int, int) {
+func (s *TcellScreen) Size() (int, int) {
 	return s.tcell.Size()
 }
 
-func (s *Screen) Flush(canvas *core.Canvas) {
+func (s *TcellScreen) Flush(canvas *core.Canvas) {
 	for y := 0; y < canvas.Height; y++ {
 		for x := 0; x < canvas.Width; x++ {
 			cell := canvas.Get(x, y)
@@ -39,10 +47,10 @@ func (s *Screen) Flush(canvas *core.Canvas) {
 	s.tcell.Show()
 }
 
-func (s *Screen) PollEvent() tcell.Event {
+func (s *TcellScreen) PollEvent() tcell.Event {
 	return s.tcell.PollEvent()
 }
 
-func (s *Screen) Fini() {
+func (s *TcellScreen) Fini() {
 	s.tcell.Fini()
 }

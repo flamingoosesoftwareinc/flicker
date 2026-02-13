@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	screen, err := terminal.NewScreen()
+	screen, err := terminal.NewTcellScreen()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
