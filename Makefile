@@ -23,7 +23,7 @@ pr-ready: tidy-go generate format build lint test git-dirty ## Run comprehensive
 
 install: ## Install the flicker binary
 	$(info $(_bullet) Installing <flicker>)
-	go install .
+	go install ./cmd/flicker
 
 # Verify staged changes and record tree SHA for pre-commit hook
 verify: pr-ready ## Verify staged changes pass all checks and record for commit
