@@ -24,10 +24,9 @@ func main() {
 
 	box := world.Spawn()
 	world.AddTransform(box, &core.Transform{
-		Position: fmath.Vec2{X: 10, Y: 5},
+		Position: fmath.Vec3{X: 10, Y: 5},
 	})
-	world.AddGeometry(box, &core.Geometry{
-		Kind:   core.GeoRect,
+	world.AddDrawable(box, &core.Rect{
 		Width:  20,
 		Height: 10,
 		Rune:   '█',

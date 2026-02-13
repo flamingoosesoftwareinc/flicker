@@ -3,5 +3,5 @@ package core
 import "flicker/fmath"
 
 type Transform struct {
-	Position fmath.Vec2
+	Position fmath.Vec3
 }

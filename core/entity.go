@@ -5,7 +5,7 @@ type Entity uint64
 type World struct {
 	next       Entity
 	transforms map[Entity]*Transform
-	geometries map[Entity]*Geometry
+	drawables  map[Entity]Drawable
 	children   map[Entity][]Entity
 	roots      []Entity
 }
@@ -13,7 +13,7 @@ type World struct {
 func NewWorld() *World {
 	return &World{
 		transforms: make(map[Entity]*Transform),
-		geometries: make(map[Entity]*Geometry),
+		drawables:  make(map[Entity]Drawable),
 		children:   make(map[Entity][]Entity),
 	}
 }
@@ -35,8 +35,8 @@ func (w *World) AddTransform(e Entity, t *Transform) {
 	w.transforms[e] = t
 }
 
-func (w *World) AddGeometry(e Entity, g *Geometry) {
-	w.geometries[e] = g
+func (w *World) AddDrawable(e Entity, d Drawable) {
+	w.drawables[e] = d
 }
 
 func (w *World) Roots() []Entity {
@@ -51,6 +51,6 @@ func (w *World) Transform(e Entity) *Transform {
 	return w.transforms[e]
 }
 
-func (w *World) Geometry(e Entity) *Geometry {
-	return w.geometries[e]
+func (w *World) Drawable(e Entity) Drawable {
+	return w.drawables[e]
 }
