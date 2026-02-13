@@ -17,7 +17,7 @@ build: flicker
 flicker: ## Build the flicker CLI binary
 	$(info $(_bullet) Building <flicker>)
 	@cd $(GO_SRC_DIR) && \
-	go build -o ./bin/flicker
+	go build -o ./bin/flicker ./cmd/flicker
 
 pr-ready: tidy-go generate format build lint test git-dirty ## Run comprehensive pre-commit checks
 
