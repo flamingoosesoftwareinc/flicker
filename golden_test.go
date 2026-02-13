@@ -8,7 +8,6 @@ import (
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
-
 	"github.com/sebdah/goldie/v2"
 )
 

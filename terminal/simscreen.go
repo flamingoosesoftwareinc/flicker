@@ -1,8 +1,9 @@
 package terminal
 
 import (
-	"flicker/core"
 	"strings"
+
+	"flicker/core"
 )
 
 // SimScreen is an in-memory Screen for testing. It captures every flushed

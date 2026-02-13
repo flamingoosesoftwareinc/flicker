@@ -2,7 +2,6 @@ package terminal
 
 import (
 	"flicker/core"
-
 	"github.com/gdamore/tcell/v2"
 )
 

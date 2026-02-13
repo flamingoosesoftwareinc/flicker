@@ -7,7 +7,6 @@ import (
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
-
 	"github.com/gdamore/tcell/v2"
 )
 
