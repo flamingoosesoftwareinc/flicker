@@ -44,3 +44,26 @@ func (c *Canvas) Clear() {
 		}
 	}
 }
+
+func (c *Canvas) DrawBorder() {
+	if c.Width < 2 || c.Height < 2 {
+		return
+	}
+
+	last := c.Width - 1
+	bottom := c.Height - 1
+
+	c.Set(0, 0, Cell{Rune: '┌'})
+	c.Set(last, 0, Cell{Rune: '┐'})
+	c.Set(0, bottom, Cell{Rune: '└'})
+	c.Set(last, bottom, Cell{Rune: '┘'})
+
+	for x := 1; x < last; x++ {
+		c.Set(x, 0, Cell{Rune: '─'})
+		c.Set(x, bottom, Cell{Rune: '─'})
+	}
+	for y := 1; y < bottom; y++ {
+		c.Set(0, y, Cell{Rune: '│'})
+		c.Set(last, y, Cell{Rune: '│'})
+	}
+}

@@ -36,6 +36,7 @@ func main() {
 	world.AddRoot(box)
 
 	canvas.Clear()
+	canvas.DrawBorder()
 	core.Render(world, canvas)
 	screen.Flush(canvas)
 
