@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 )
 
@@ -24,7 +25,7 @@ func TestRasterizeWireframe_Simple(t *testing.T) {
 	view := fmath.Mat4Translate(0, 0, -3)
 	mvp := proj.Multiply(view)
 
-	bm := core.NewBitmap(20, 20)
+	bm := bitmap.New(20, 20)
 	c := core.Color{R: 255, G: 255, B: 255}
 	RasterizeWireframe(mesh, mvp, bm, c)
 
@@ -60,7 +61,7 @@ func TestRasterizeWireframe_BehindCamera(t *testing.T) {
 	// Camera at origin, looking -Z. Vertices at z=5 are behind.
 	mvp := proj
 
-	bm := core.NewBitmap(20, 20)
+	bm := bitmap.New(20, 20)
 	RasterizeWireframe(mesh, mvp, bm, core.Color{R: 255})
 
 	count := 0
@@ -88,7 +89,7 @@ func TestRasterizeWireframe_Suzanne(t *testing.T) {
 	model := fmath.Mat4RotateY(0.5)
 	mvp := proj.Multiply(view).Multiply(model)
 
-	bm := core.NewBitmap(60, 60)
+	bm := bitmap.New(60, 60)
 	RasterizeWireframe(mesh, mvp, bm, core.Color{R: 0, G: 255, B: 100})
 
 	count := 0

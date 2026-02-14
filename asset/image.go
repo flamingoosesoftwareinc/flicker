@@ -9,12 +9,13 @@ import (
 	"os"
 
 	"flicker/core"
+	"flicker/core/bitmap"
 )
 
 // LoadImage decodes a PNG or JPEG file into a Bitmap.
 // If maxWidth or maxHeight > 0, the image is downsampled (nearest-neighbor)
 // to fit within those bounds while preserving aspect ratio.
-func LoadImage(path string, maxWidth, maxHeight int) (*core.Bitmap, error) {
+func LoadImage(path string, maxWidth, maxHeight int) (*bitmap.Bitmap, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func LoadImage(path string, maxWidth, maxHeight int) (*core.Bitmap, error) {
 		}
 	}
 
-	bm := core.NewBitmap(dstW, dstH)
+	bm := bitmap.New(dstW, dstH)
 	for y := range dstH {
 		for x := range dstW {
 			// Nearest-neighbor sampling.
@@ -63,10 +64,10 @@ func LoadImage(path string, maxWidth, maxHeight int) (*core.Bitmap, error) {
 	return bm, nil
 }
 
-func (c *Cache) GetOrLoadImage(path string, maxW, maxH int) (*core.Bitmap, error) {
+func (c *Cache) GetOrLoadImage(path string, maxW, maxH int) (*bitmap.Bitmap, error) {
 	key := fmt.Sprintf("%s@%dx%d", path, maxW, maxH)
 	if v, ok := c.Get(key); ok {
-		return v.(*core.Bitmap), nil
+		return v.(*bitmap.Bitmap), nil
 	}
 	bm, err := LoadImage(path, maxW, maxH)
 	if err != nil {

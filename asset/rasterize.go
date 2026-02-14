@@ -2,6 +2,7 @@ package asset
 
 import (
 	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 )
 
@@ -11,7 +12,7 @@ import (
 //
 // NDC coordinates [-1,1] are mapped to [0, Width-1] and [0, Height-1].
 // Edges with any vertex behind the camera (w <= 0) are clipped.
-func RasterizeWireframe(mesh *Mesh, mvp fmath.Mat4, bm *core.Bitmap, c core.Color) {
+func RasterizeWireframe(mesh *Mesh, mvp fmath.Mat4, bm *bitmap.Bitmap, c core.Color) {
 	w := float64(bm.Width)
 	h := float64(bm.Height)
 

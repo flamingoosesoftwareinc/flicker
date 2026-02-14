@@ -8,6 +8,7 @@ import (
 
 	"flicker/asset"
 	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 	"flicker/terminal"
 	"github.com/gdamore/tcell/v2"
@@ -36,7 +37,7 @@ func main() {
 		Position: fmath.Vec3{X: 2, Y: 5},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxA, &core.Rect{
+	world.AddDrawable(boxA, &bitmap.Rect{
 		Width:   12,
 		Height:  6,
 		FG:      core.Color{R: 200, G: 60, B: 60},
@@ -86,7 +87,7 @@ func main() {
 		Position: fmath.Vec3{X: float64(sw - 14), Y: 5},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxB, &core.Rect{
+	world.AddDrawable(boxB, &bitmap.Rect{
 		Width:   12,
 		Height:  6,
 		FG:      core.Color{R: 60, G: 200, B: 60},
@@ -108,7 +109,7 @@ func main() {
 		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxC, &core.Rect{
+	world.AddDrawable(boxC, &bitmap.Rect{
 		Width:   12,
 		Height:  6,
 		FG:      core.Color{R: 60, G: 60, B: 200},
@@ -130,7 +131,7 @@ func main() {
 		Position: fmath.Vec3{X: 2, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxD, &core.Rect{
+	world.AddDrawable(boxD, &bitmap.Rect{
 		Width:   12,
 		Height:  6,
 		FG:      core.Color{R: 200, G: 200, B: 60},
@@ -172,7 +173,7 @@ func main() {
 		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: float64(sh/2 - 3)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxE, &core.Rect{
+	world.AddDrawable(boxE, &bitmap.Rect{
 		Width:   12,
 		Height:  6,
 		FG:      core.Color{R: 60, G: 200, B: 200},
@@ -189,13 +190,13 @@ func main() {
 	})
 
 	// Layer 5: Braille sine wave — sub-cell resolution wireframe.
-	brailleBm := core.NewBitmap(30, 20)
+	brailleBm := bitmap.New(30, 20)
 	brailleEnt := world.Spawn()
 	world.AddTransform(brailleEnt, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: float64(sh - 7)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	brailleDraw := &core.BitmapDrawable{Bitmap: brailleBm, Mode: core.EncodeBraille}
+	brailleDraw := &bitmap.Braille{Bitmap: brailleBm}
 	world.AddDrawable(brailleEnt, brailleDraw)
 	world.AddLayer(brailleEnt, 5)
 	world.AddRoot(brailleEnt)
@@ -222,13 +223,13 @@ func main() {
 	})
 
 	// Layer 6: Half-block color gradient — two colors per cell.
-	hbBm := core.NewBitmap(16, 10)
+	hbBm := bitmap.New(16, 10)
 	hbEnt := world.Spawn()
 	world.AddTransform(hbEnt, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw - 20), Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	hbDraw := &core.BitmapDrawable{Bitmap: hbBm, Mode: core.EncodeHalfBlock}
+	hbDraw := &bitmap.HalfBlock{Bitmap: hbBm}
 	world.AddDrawable(hbEnt, hbDraw)
 	world.AddLayer(hbEnt, 6)
 	world.AddRoot(hbEnt)
@@ -250,7 +251,7 @@ func main() {
 
 	// Layer 7: Orbiting pair — parent rotates, child orbits around it.
 	// Braille bitmaps give sub-cell rotation resolution.
-	pivotBm := core.NewBitmap(8, 8)
+	pivotBm := bitmap.New(8, 8)
 	for py := range 8 {
 		for px := range 8 {
 			pivotBm.SetDot(px, py, core.Color{R: 255, G: 180, B: 0})
@@ -261,12 +262,12 @@ func main() {
 		Position: fmath.Vec3{X: float64(sw/2 - 3), Y: float64(sh/2 - 2)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(rotPivot, &core.BitmapDrawable{Bitmap: pivotBm, Mode: core.EncodeBraille})
+	world.AddDrawable(rotPivot, &bitmap.Braille{Bitmap: pivotBm})
 	world.AddLayer(rotPivot, 7)
 	world.AddRoot(rotPivot)
 
 	// Child: offset from parent, orbits as parent rotates.
-	orbiterBm := core.NewBitmap(6, 4)
+	orbiterBm := bitmap.New(6, 4)
 	for py := range 4 {
 		for px := range 6 {
 			orbiterBm.SetDot(px, py, core.Color{R: 255, G: 100, B: 200})
@@ -277,7 +278,7 @@ func main() {
 		Position: fmath.Vec3{X: 10, Y: 0},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(orbiter, &core.BitmapDrawable{Bitmap: orbiterBm, Mode: core.EncodeBraille})
+	world.AddDrawable(orbiter, &bitmap.Braille{Bitmap: orbiterBm})
 	world.Attach(orbiter, rotPivot)
 
 	world.AddBehavior(rotPivot, func(t core.Time, e core.Entity, w *core.World) {
@@ -290,13 +291,13 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (skipping OBJ layer)\n", err)
 	} else {
-		objBm := core.NewBitmap(60, 60)
+		objBm := bitmap.New(60, 60)
 		objEnt := world.Spawn()
 		world.AddTransform(objEnt, &core.Transform{
 			Position: fmath.Vec3{X: float64(sw/2 - 15), Y: 1},
 			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 		})
-		objDraw := &core.BitmapDrawable{Bitmap: objBm, Mode: core.EncodeBraille}
+		objDraw := &bitmap.Braille{Bitmap: objBm}
 		world.AddDrawable(objEnt, objDraw)
 		world.AddLayer(objEnt, 8)
 		world.AddRoot(objEnt)
@@ -314,13 +315,13 @@ func main() {
 	}
 
 	// Layer 9: Full-block plasma — 1:1 pixel-to-cell animated color field.
-	fbBm := core.NewBitmap(14, 8)
+	fbBm := bitmap.New(14, 8)
 	fbEnt := world.Spawn()
 	world.AddTransform(fbEnt, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 1},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(fbEnt, &core.BitmapDrawable{Bitmap: fbBm, Mode: core.EncodeFullBlock})
+	world.AddDrawable(fbEnt, &bitmap.FullBlock{Bitmap: fbBm})
 	world.AddLayer(fbEnt, 9)
 	world.AddRoot(fbEnt)
 
@@ -344,13 +345,13 @@ func main() {
 	})
 
 	// Layer 10: BG-only color wash — transparent FG lets underlying content bleed through.
-	bgBm := core.NewBitmap(16, 10)
+	bgBm := bitmap.New(16, 10)
 	bgEnt := world.Spawn()
 	world.AddTransform(bgEnt, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw/2 - 8), Y: float64(sh/2 - 5)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(bgEnt, &core.BitmapDrawable{Bitmap: bgBm, Mode: core.EncodeBGBlock})
+	world.AddDrawable(bgEnt, &bitmap.BGBlock{Bitmap: bgBm})
 	world.AddLayer(bgEnt, 10)
 	world.AddRoot(bgEnt)
 

@@ -1,24 +1,26 @@
-package core
+package core_test
 
 import (
 	"testing"
 
+	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 )
 
 func TestCompositor_SingleLayer(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddTransform(box, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(
 		box,
-		&Rect{Width: 3, Height: 2, FG: Color{255, 0, 0}, BG: Color{0, 0, 0}},
+		&bitmap.Rect{Width: 3, Height: 2, FG: core.Color{R: 255}, BG: core.Color{}},
 	)
 	world.AddRoot(box)
 
-	dst := NewCanvas(5, 3)
-	comp := NewCompositor(5, 3)
-	comp.Composite(world, dst, Time{})
+	dst := core.NewCanvas(5, 3)
+	comp := core.NewCompositor(5, 3)
+	comp.Composite(world, dst, core.Time{})
 
 	cell := dst.Get(1, 0)
 	if cell.Rune != '▀' {
@@ -30,25 +32,25 @@ func TestCompositor_SingleLayer(t *testing.T) {
 }
 
 func TestCompositor_TwoLayers_Opaque(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 
 	// Layer 0: red 'A'
 	boxA := world.Spawn()
-	world.AddTransform(boxA, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxA, &Rect{Width: 3, Height: 2, FG: Color{200, 0, 0}})
+	world.AddTransform(boxA, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxA, &bitmap.Rect{Width: 3, Height: 2, FG: core.Color{R: 200}})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
 	// Layer 1: blue (opaque, fully overwrites)
 	boxB := world.Spawn()
-	world.AddTransform(boxB, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, FG: Color{0, 0, 200}})
+	world.AddTransform(boxB, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxB, &bitmap.Rect{Width: 3, Height: 2, FG: core.Color{B: 200}})
 	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
 
-	dst := NewCanvas(3, 2)
-	comp := NewCompositor(3, 2)
-	comp.Composite(world, dst, Time{})
+	dst := core.NewCanvas(3, 2)
+	comp := core.NewCompositor(3, 2)
+	comp.Composite(world, dst, core.Time{})
 
 	cell := dst.Get(0, 0)
 	if cell.Rune != '▀' {
@@ -60,30 +62,30 @@ func TestCompositor_TwoLayers_Opaque(t *testing.T) {
 }
 
 func TestCompositor_TwoLayers_SemiTransparent(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 
 	// Layer 0: red, opaque
 	boxA := world.Spawn()
-	world.AddTransform(boxA, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxA, &Rect{Width: 3, Height: 2, FG: Color{200, 0, 0}})
+	world.AddTransform(boxA, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxA, &bitmap.Rect{Width: 3, Height: 2, FG: core.Color{R: 200}})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
 	// Layer 1: blue, semi-transparent via material
 	boxB := world.Spawn()
-	world.AddTransform(boxB, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, FG: Color{0, 0, 200}})
+	world.AddTransform(boxB, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxB, &bitmap.Rect{Width: 3, Height: 2, FG: core.Color{B: 200}})
 	world.AddLayer(boxB, 1)
-	world.AddMaterial(boxB, func(f Fragment) Cell {
+	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
 		f.Cell.FGAlpha = 0.5
 		f.Cell.BGAlpha = 0.5
 		return f.Cell
 	})
 	world.AddRoot(boxB)
 
-	dst := NewCanvas(3, 2)
-	comp := NewCompositor(3, 2)
-	comp.Composite(world, dst, Time{})
+	dst := core.NewCanvas(3, 2)
+	comp := core.NewCompositor(3, 2)
+	comp.Composite(world, dst, core.Time{})
 
 	cell := dst.Get(0, 0)
 	// FG.R: 200*(1-0.5) + 0*0.5 = 100
@@ -100,24 +102,24 @@ func TestCompositor_TwoLayers_SemiTransparent(t *testing.T) {
 }
 
 func TestCompositor_LayerOrder(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 
 	// Add root on layer 5 first, then layer 2 — compositor should sort.
 	boxHigh := world.Spawn()
-	world.AddTransform(boxHigh, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxHigh, &Rect{Width: 2, Height: 1, FG: Color{0, 255, 0}})
+	world.AddTransform(boxHigh, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxHigh, &bitmap.Rect{Width: 2, Height: 1, FG: core.Color{G: 255}})
 	world.AddLayer(boxHigh, 5)
 	world.AddRoot(boxHigh)
 
 	boxLow := world.Spawn()
-	world.AddTransform(boxLow, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(boxLow, &Rect{Width: 2, Height: 1, FG: Color{255, 0, 0}})
+	world.AddTransform(boxLow, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(boxLow, &bitmap.Rect{Width: 2, Height: 1, FG: core.Color{R: 255}})
 	world.AddLayer(boxLow, 2)
 	world.AddRoot(boxLow)
 
-	dst := NewCanvas(2, 1)
-	comp := NewCompositor(2, 1)
-	comp.Composite(world, dst, Time{})
+	dst := core.NewCanvas(2, 1)
+	comp := core.NewCompositor(2, 1)
+	comp.Composite(world, dst, core.Time{})
 
 	// Layer 5 composited after layer 2 → 'H' wins.
 	cell := dst.Get(0, 0)
@@ -127,24 +129,27 @@ func TestCompositor_LayerOrder(t *testing.T) {
 }
 
 func TestCompositor_PostProcess(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(box, &Rect{Width: 2, Height: 1, FG: Color{100, 100, 100}})
+	world.AddTransform(box, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(
+		box,
+		&bitmap.Rect{Width: 2, Height: 1, FG: core.Color{R: 100, G: 100, B: 100}},
+	)
 	world.AddLayer(box, 0)
 	world.AddRoot(box)
 
-	dst := NewCanvas(2, 1)
-	comp := NewCompositor(2, 1)
+	dst := core.NewCanvas(2, 1)
+	comp := core.NewCompositor(2, 1)
 
 	// Post-process: zero out FG green channel.
-	comp.SetPostProcess(0, func(f Fragment) Cell {
+	comp.SetPostProcess(0, func(f core.Fragment) core.Cell {
 		f.Cell.FG.G = 0
 		return f.Cell
 	})
 
-	comp.Composite(world, dst, Time{})
+	comp.Composite(world, dst, core.Time{})
 
 	cell := dst.Get(0, 0)
 	if cell.FG.G != 0 {
@@ -156,21 +161,21 @@ func TestCompositor_PostProcess(t *testing.T) {
 }
 
 func TestCompositor_DefaultLayer(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 
 	// Entity without AddLayer should use default layer 0.
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(box, &Rect{Width: 2, Height: 1})
+	world.AddTransform(box, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(box, &bitmap.Rect{Width: 2, Height: 1})
 	world.AddRoot(box)
 
 	if world.Layer(box) != 0 {
 		t.Errorf("unassigned entity should be on layer 0, got %d", world.Layer(box))
 	}
 
-	dst := NewCanvas(2, 1)
-	comp := NewCompositor(2, 1)
-	comp.Composite(world, dst, Time{})
+	dst := core.NewCanvas(2, 1)
+	comp := core.NewCompositor(2, 1)
+	comp.Composite(world, dst, core.Time{})
 
 	if dst.Get(0, 0).Rune != '▀' {
 		t.Errorf("expected '▀', got %c", dst.Get(0, 0).Rune)

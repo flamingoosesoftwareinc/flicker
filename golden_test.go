@@ -8,6 +8,7 @@ import (
 
 	"flicker/asset"
 	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 	"flicker/terminal"
 	"github.com/sebdah/goldie/v2"
@@ -27,7 +28,7 @@ func TestBasicExample(t *testing.T) {
 		Position: fmath.Vec3{X: 10, Y: 5},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(box, &core.Rect{
+	world.AddDrawable(box, &bitmap.Rect{
 		Width:  20,
 		Height: 10,
 	})
@@ -68,7 +69,7 @@ func TestAnimatedBehavior(t *testing.T) {
 		Position: fmath.Vec3{X: 5, Y: 1},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(box, &core.Rect{
+	world.AddDrawable(box, &bitmap.Rect{
 		Width:  10,
 		Height: 5,
 	})
@@ -124,7 +125,7 @@ func TestOverlappingObjects(t *testing.T) {
 		Position: fmath.Vec3{X: 2, Y: 5},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxA, &core.Rect{
+	world.AddDrawable(boxA, &bitmap.Rect{
 		Width:  12,
 		Height: 6,
 		FG:     core.Color{R: 200, G: 60, B: 60},
@@ -145,7 +146,7 @@ func TestOverlappingObjects(t *testing.T) {
 		Position: fmath.Vec3{X: 45, Y: 5},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxB, &core.Rect{
+	world.AddDrawable(boxB, &bitmap.Rect{
 		Width:  12,
 		Height: 6,
 		FG:     core.Color{R: 60, G: 60, B: 200},
@@ -201,7 +202,7 @@ func TestLayerBlending(t *testing.T) {
 		Position: fmath.Vec3{X: 5, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxA, &core.Rect{
+	world.AddDrawable(boxA, &bitmap.Rect{
 		Width:  15,
 		Height: 6,
 		FG:     core.Color{R: 200, G: 60, B: 60},
@@ -216,7 +217,7 @@ func TestLayerBlending(t *testing.T) {
 		Position: fmath.Vec3{X: 10, Y: 3},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxB, &core.Rect{
+	world.AddDrawable(boxB, &bitmap.Rect{
 		Width:  15,
 		Height: 6,
 		FG:     core.Color{R: 60, G: 60, B: 200},
@@ -265,7 +266,7 @@ func TestTween(t *testing.T) {
 		Position: fmath.Vec3{X: 2, Y: 3},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(box, &core.Rect{
+	world.AddDrawable(box, &bitmap.Rect{
 		Width:  8,
 		Height: 4,
 	})
@@ -329,7 +330,7 @@ func TestBlendModes(t *testing.T) {
 		Position: fmath.Vec3{X: 5, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxA, &core.Rect{
+	world.AddDrawable(boxA, &bitmap.Rect{
 		Width:  20,
 		Height: 8,
 		FG:     core.Color{R: 200, G: 60, B: 60},
@@ -344,7 +345,7 @@ func TestBlendModes(t *testing.T) {
 		Position: fmath.Vec3{X: 10, Y: 3},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxB, &core.Rect{
+	world.AddDrawable(boxB, &bitmap.Rect{
 		Width:  15,
 		Height: 6,
 		FG:     core.Color{R: 60, G: 200, B: 60},
@@ -364,7 +365,7 @@ func TestBlendModes(t *testing.T) {
 		Position: fmath.Vec3{X: 15, Y: 4},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(boxC, &core.Rect{
+	world.AddDrawable(boxC, &bitmap.Rect{
 		Width:  15,
 		Height: 6,
 		FG:     core.Color{R: 60, G: 60, B: 200},
@@ -409,7 +410,7 @@ func TestBitmapRendering(t *testing.T) {
 	world := core.NewWorld()
 
 	// Entity 1: Braille diagonal line.
-	brailleBm := core.NewBitmap(16, 16)
+	brailleBm := bitmap.New(16, 16)
 	for i := range 16 {
 		brailleBm.SetDot(i, i, core.Color{R: 0, G: 255, B: 100})
 	}
@@ -418,14 +419,13 @@ func TestBitmapRendering(t *testing.T) {
 		Position: fmath.Vec3{X: 1, Y: 1},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(brailleEnt, &core.BitmapDrawable{
+	world.AddDrawable(brailleEnt, &bitmap.Braille{
 		Bitmap: brailleBm,
-		Mode:   core.EncodeBraille,
 	})
 	world.AddRoot(brailleEnt)
 
 	// Entity 2: Half-block gradient.
-	hbBm := core.NewBitmap(10, 8)
+	hbBm := bitmap.New(10, 8)
 	for y := range 8 {
 		for x := range 10 {
 			r := uint8(x * 25)
@@ -438,9 +438,8 @@ func TestBitmapRendering(t *testing.T) {
 		Position: fmath.Vec3{X: 20, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(hbEnt, &core.BitmapDrawable{
+	world.AddDrawable(hbEnt, &bitmap.HalfBlock{
 		Bitmap: hbBm,
-		Mode:   core.EncodeHalfBlock,
 	})
 	world.AddRoot(hbEnt)
 
@@ -450,15 +449,15 @@ func TestBitmapRendering(t *testing.T) {
 	core.Render(world, canvas, core.Time{})
 	screen.Flush(canvas)
 
-	var b strings.Builder
+	var bb strings.Builder
 	for i, frame := range screen.Frames() {
-		fmt.Fprintf(&b, "--- frame %d ---\n", i)
-		b.WriteString(frame)
-		b.WriteByte('\n')
+		fmt.Fprintf(&bb, "--- frame %d ---\n", i)
+		bb.WriteString(frame)
+		bb.WriteByte('\n')
 	}
 
 	g := goldie.New(t)
-	g.Assert(t, "bitmap_rendering", []byte(b.String()))
+	g.Assert(t, "bitmap_rendering", []byte(bb.String()))
 }
 
 func TestTransformRotation(t *testing.T) {
@@ -480,7 +479,7 @@ func TestTransformRotation(t *testing.T) {
 		Position: fmath.Vec3{X: 10, Y: 3},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(box, &core.Rect{
+	world.AddDrawable(box, &bitmap.Rect{
 		Width:  8,
 		Height: 4,
 		FG:     core.Color{R: 200, G: 100, B: 50},
@@ -493,7 +492,7 @@ func TestTransformRotation(t *testing.T) {
 		Position: fmath.Vec3{X: 10, Y: 0},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(child, &core.Rect{
+	world.AddDrawable(child, &bitmap.Rect{
 		Width:  4,
 		Height: 2,
 		FG:     core.Color{R: 50, G: 200, B: 100},
@@ -546,13 +545,13 @@ func TestOBJWireframe(t *testing.T) {
 
 	world := core.NewWorld()
 
-	objBm := core.NewBitmap(60, 60)
+	objBm := bitmap.New(60, 60)
 	objEnt := world.Spawn()
 	world.AddTransform(objEnt, &core.Transform{
 		Position: fmath.Vec3{X: 5, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	objDraw := &core.BitmapDrawable{Bitmap: objBm, Mode: core.EncodeBraille}
+	objDraw := &bitmap.Braille{Bitmap: objBm}
 	world.AddDrawable(objEnt, objDraw)
 	world.AddRoot(objEnt)
 

@@ -1,33 +1,35 @@
-package core
+package core_test
 
 import (
 	"testing"
 
+	"flicker/core"
+	"flicker/core/bitmap"
 	"flicker/fmath"
 )
 
 func TestMaterialApplication(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 	e := world.Spawn()
-	world.AddTransform(e, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(e, &Rect{
+	world.AddTransform(e, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(e, &bitmap.Rect{
 		Width:  3,
 		Height: 2,
-		FG:     Color{R: 100, G: 100, B: 100},
-		BG:     Color{R: 0, G: 0, B: 0},
+		FG:     core.Color{R: 100, G: 100, B: 100},
+		BG:     core.Color{R: 0, G: 0, B: 0},
 	})
 	world.AddRoot(e)
 
 	// Material that sets FG red channel to 10*x and green channel to 10*y.
-	world.AddMaterial(e, func(f Fragment) Cell {
+	world.AddMaterial(e, func(f core.Fragment) core.Cell {
 		f.Cell.FG.R = uint8(10 * f.X)
 		f.Cell.FG.G = uint8(10 * f.Y)
 		f.Cell.FG.B = 0
 		return f.Cell
 	})
 
-	canvas := NewCanvas(10, 10)
-	Render(world, canvas, Time{Total: 1.0, Delta: 0.016})
+	canvas := core.NewCanvas(10, 10)
+	core.Render(world, canvas, core.Time{Total: 1.0, Delta: 0.016})
 
 	tests := []struct {
 		cx, cy int // canvas coords
@@ -57,23 +59,23 @@ func TestMaterialApplication(t *testing.T) {
 }
 
 func TestMaterialPreservesAlpha(t *testing.T) {
-	world := NewWorld()
+	world := core.NewWorld()
 	e := world.Spawn()
-	world.AddTransform(e, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
-	world.AddDrawable(e, &Rect{
+	world.AddTransform(e, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(e, &bitmap.Rect{
 		Width:  2,
 		Height: 2,
-		FG:     Color{R: 255, G: 255, B: 255},
+		FG:     core.Color{R: 255, G: 255, B: 255},
 	})
 	world.AddRoot(e)
 
 	// Identity material — returns cell unchanged.
-	world.AddMaterial(e, func(f Fragment) Cell {
+	world.AddMaterial(e, func(f core.Fragment) core.Cell {
 		return f.Cell
 	})
 
-	canvas := NewCanvas(5, 5)
-	Render(world, canvas, Time{})
+	canvas := core.NewCanvas(5, 5)
+	core.Render(world, canvas, core.Time{})
 
 	// Cells inside drawable should have Alpha 1.0.
 	for y := range 2 {

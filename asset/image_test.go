@@ -198,12 +198,12 @@ func TestLoadImage_CacheHit(t *testing.T) {
 	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
 	path := writePNG(t, dir, "cached.png", img)
 
-	c := NewCache()
-	bm1, err := c.GetOrLoadImage(path, 0, 0)
+	ca := NewCache()
+	bm1, err := ca.GetOrLoadImage(path, 0, 0)
 	if err != nil {
 		t.Fatalf("first load: %v", err)
 	}
-	bm2, err := c.GetOrLoadImage(path, 0, 0)
+	bm2, err := ca.GetOrLoadImage(path, 0, 0)
 	if err != nil {
 		t.Fatalf("second load: %v", err)
 	}
