@@ -39,8 +39,8 @@ func main() {
 	world.AddDrawable(boxA, &core.Rect{
 		Width:   12,
 		Height:  6,
-		FG:      core.Color{R: 180, G: 120, B: 60},
-		BG:      core.Color{R: 180, G: 120, B: 60},
+		FG:      core.Color{R: 200, G: 60, B: 60},
+		BG:      core.Color{R: 200, G: 60, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -89,8 +89,8 @@ func main() {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:   12,
 		Height:  6,
-		FG:      core.Color{R: 180, G: 120, B: 60},
-		BG:      core.Color{R: 180, G: 120, B: 60},
+		FG:      core.Color{R: 60, G: 200, B: 60},
+		BG:      core.Color{R: 60, G: 200, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -111,8 +111,8 @@ func main() {
 	world.AddDrawable(boxC, &core.Rect{
 		Width:   12,
 		Height:  6,
-		FG:      core.Color{R: 180, G: 120, B: 60},
-		BG:      core.Color{R: 180, G: 120, B: 60},
+		FG:      core.Color{R: 60, G: 60, B: 200},
+		BG:      core.Color{R: 60, G: 60, B: 200},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -133,8 +133,8 @@ func main() {
 	world.AddDrawable(boxD, &core.Rect{
 		Width:   12,
 		Height:  6,
-		FG:      core.Color{R: 180, G: 120, B: 60},
-		BG:      core.Color{R: 180, G: 120, B: 60},
+		FG:      core.Color{R: 200, G: 200, B: 60},
+		BG:      core.Color{R: 200, G: 200, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -175,8 +175,8 @@ func main() {
 	world.AddDrawable(boxE, &core.Rect{
 		Width:   12,
 		Height:  6,
-		FG:      core.Color{R: 180, G: 120, B: 60},
-		BG:      core.Color{R: 180, G: 120, B: 60},
+		FG:      core.Color{R: 60, G: 200, B: 200},
+		BG:      core.Color{R: 60, G: 200, B: 200},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
