@@ -1,6 +1,8 @@
 package bitmap
 
 import (
+	"math"
+
 	"flicker/core"
 	"flicker/fmath"
 )
@@ -56,10 +58,33 @@ func (fb *FullBlock) Bounds() (int, int) {
 	return fb.Bitmap.Width, fb.Bitmap.Height
 }
 
-// Renderer returns a forward-mapping RenderFunc for full-block mode.
+// Renderer returns an inverse-mapping RenderFunc for full-block mode.
 func (fb *FullBlock) Renderer() core.RenderFunc {
 	if fb.Bitmap == nil {
 		return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell core.Cell)) {}
 	}
-	return forwardRenderer(fb)
+	bw, bh := fb.Bounds()
+	bm := fb.Bitmap
+	cx, cy := float64(bw)/2.0, float64(bh)/2.0
+	return inverseRenderer(
+		bw,
+		bh,
+		func(inv [4]float64, tx, ty float64, sx, sy int) (core.Cell, bool) {
+			P := float64(sx) - tx + 0.5
+			Q := float64(sy) - ty + 0.5
+			localX := inv[0]*P + inv[1]*Q + cx
+			localY := inv[2]*P + inv[3]*Q + cy
+
+			px := int(math.Floor(localX))
+			py := int(math.Floor(localY))
+			if px < 0 || px >= bm.Width || py < 0 || py >= bm.Height {
+				return core.Cell{}, false
+			}
+			c, a := bm.Get(px, py)
+			if a == 0 {
+				return core.Cell{}, false
+			}
+			return core.Cell{Rune: '█', FG: c, FGAlpha: a}, true
+		},
+	)
 }

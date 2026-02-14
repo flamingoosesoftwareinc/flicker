@@ -1,6 +1,8 @@
 package bitmap
 
 import (
+	"math"
+
 	"flicker/core"
 	"flicker/fmath"
 )
@@ -114,10 +116,73 @@ func (hb *HalfBlock) Bounds() (int, int) {
 	return hb.Bitmap.Width, (hb.Bitmap.Height + 1) / 2
 }
 
-// Renderer returns a forward-mapping RenderFunc for half-block mode.
+// Renderer returns an inverse-mapping RenderFunc for half-block mode.
+// Each screen cell samples two bitmap rows (top and bottom halves).
 func (hb *HalfBlock) Renderer() core.RenderFunc {
 	if hb.Bitmap == nil {
 		return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell core.Cell)) {}
 	}
-	return forwardRenderer(hb)
+	bw, bh := hb.Bounds()
+	bm := hb.Bitmap
+	cx, cy := float64(bw)/2.0, float64(bh)/2.0
+	return inverseRenderer(
+		bw,
+		bh,
+		func(inv [4]float64, tx, ty float64, sx, sy int) (core.Cell, bool) {
+			// Sample top half (cell center at y+0.25) and bottom half (y+0.75).
+			P := float64(sx) - tx + 0.5
+			Qtop := float64(sy) - ty + 0.25
+			Qbot := float64(sy) - ty + 0.75
+
+			topLX := inv[0]*P + inv[1]*Qtop + cx
+			topLY := inv[2]*P + inv[3]*Qtop + cy
+			botLX := inv[0]*P + inv[1]*Qbot + cx
+			botLY := inv[2]*P + inv[3]*Qbot + cy
+
+			// Convert cell-space to bitmap pixel coordinates (2 bitmap rows per cell row).
+			topPX := int(math.Floor(topLX))
+			topPY := int(math.Floor(topLY * 2))
+			botPX := int(math.Floor(botLX))
+			botPY := int(math.Floor(botLY * 2))
+
+			var topC core.Color
+			var topA float64
+			if topPX >= 0 && topPX < bm.Width && topPY >= 0 && topPY < bm.Height {
+				topC, topA = bm.Get(topPX, topPY)
+			}
+
+			var botC core.Color
+			var botA float64
+			if botPX >= 0 && botPX < bm.Width && botPY >= 0 && botPY < bm.Height {
+				botC, botA = bm.Get(botPX, botPY)
+			}
+
+			topOn := topA > 0
+			botOn := botA > 0
+
+			if !topOn && !botOn {
+				return core.Cell{}, false
+			}
+
+			var cell core.Cell
+			switch {
+			case topOn && botOn:
+				cell.Rune = '▀'
+				cell.FG = topC
+				cell.BG = botC
+				cell.FGAlpha = topA
+				cell.BGAlpha = botA
+			case topOn:
+				cell.Rune = '▀'
+				cell.FG = topC
+				cell.FGAlpha = topA
+			case botOn:
+				cell.Rune = '▄'
+				cell.FG = botC
+				cell.FGAlpha = botA
+			}
+
+			return cell, true
+		},
+	)
 }

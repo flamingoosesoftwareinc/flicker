@@ -387,9 +387,8 @@ func main() {
 		// Gentle circular pan: radius 3, period ~20s, centered on neutral position.
 		tr.Position.X = cx + 3*math.Cos(t.Total*0.3)
 		tr.Position.Y = cy + 3*math.Sin(t.Total*0.3)
-		// Zoom stays at 1.0 — non-integer zoom causes scan-line gaps with
-		// the forward renderer. Zoom works correctly with inverse-mapped
-		// drawables (Braille).
+		// Subtle zoom pulse: oscillates between 0.95 and 1.05.
+		w.Camera(e).Zoom = 1.0 + 0.05*math.Sin(t.Total*0.5)
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
