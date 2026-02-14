@@ -85,11 +85,13 @@ func main() {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxB, &core.Rect{
-		Width:  12,
-		Height: 6,
-		Rune:   '▒',
-		FG:     core.Color{R: 60, G: 200, B: 60},
-		BG:     core.Color{R: 0, G: 140, B: 0},
+		Width:   12,
+		Height:  6,
+		Rune:    '▒',
+		FG:      core.Color{R: 60, G: 200, B: 60},
+		BG:      core.Color{R: 0, G: 140, B: 0},
+		FGAlpha: 0.7,
+		BGAlpha: 0.7,
 	})
 	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
@@ -99,12 +101,6 @@ func main() {
 		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
 	})
 
-	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
-		f.Cell.FGAlpha = 0.7
-		f.Cell.BGAlpha = 0.7
-		return f.Cell
-	})
-
 	// Layer 2: Blue box — Screen blend, vertical bounce.
 	boxC := world.Spawn()
 	world.AddTransform(boxC, &core.Transform{
@@ -112,11 +108,13 @@ func main() {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxC, &core.Rect{
-		Width:  12,
-		Height: 6,
-		Rune:   '▓',
-		FG:     core.Color{R: 60, G: 60, B: 200},
-		BG:     core.Color{R: 0, G: 0, B: 200},
+		Width:   12,
+		Height:  6,
+		Rune:    '▓',
+		FG:      core.Color{R: 60, G: 60, B: 200},
+		BG:      core.Color{R: 0, G: 0, B: 200},
+		FGAlpha: 0.7,
+		BGAlpha: 0.7,
 	})
 	world.AddLayer(boxC, 2)
 	world.AddRoot(boxC)
@@ -126,12 +124,6 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), v)
 	})
 
-	world.AddMaterial(boxC, func(f core.Fragment) core.Cell {
-		f.Cell.FGAlpha = 0.7
-		f.Cell.BGAlpha = 0.7
-		return f.Cell
-	})
-
 	// Layer 3: Yellow box — Overlay blend, diagonal drift.
 	boxD := world.Spawn()
 	world.AddTransform(boxD, &core.Transform{
@@ -139,11 +131,13 @@ func main() {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxD, &core.Rect{
-		Width:  12,
-		Height: 6,
-		Rune:   '█',
-		FG:     core.Color{R: 200, G: 200, B: 60},
-		BG:     core.Color{R: 140, G: 140, B: 0},
+		Width:   12,
+		Height:  6,
+		Rune:    '█',
+		FG:      core.Color{R: 200, G: 200, B: 60},
+		BG:      core.Color{R: 140, G: 140, B: 0},
+		FGAlpha: 0.7,
+		BGAlpha: 0.7,
 	})
 	world.AddLayer(boxD, 3)
 	world.AddRoot(boxD)
@@ -173,12 +167,6 @@ func main() {
 		}
 	})
 
-	world.AddMaterial(boxD, func(f core.Fragment) core.Cell {
-		f.Cell.FGAlpha = 0.7
-		f.Cell.BGAlpha = 0.7
-		return f.Cell
-	})
-
 	// Layer 4: Cyan box — Difference blend, opposite horizontal.
 	boxE := world.Spawn()
 	world.AddTransform(boxE, &core.Transform{
@@ -186,11 +174,13 @@ func main() {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxE, &core.Rect{
-		Width:  12,
-		Height: 6,
-		Rune:   '◆',
-		FG:     core.Color{R: 60, G: 200, B: 200},
-		BG:     core.Color{R: 0, G: 140, B: 140},
+		Width:   12,
+		Height:  6,
+		Rune:    '◆',
+		FG:      core.Color{R: 60, G: 200, B: 200},
+		BG:      core.Color{R: 0, G: 140, B: 140},
+		FGAlpha: 0.7,
+		BGAlpha: 0.7,
 	})
 	world.AddLayer(boxE, 4)
 	world.AddRoot(boxE)
@@ -198,12 +188,6 @@ func main() {
 	world.AddBehavior(boxE, func(t core.Time, e core.Entity, w *core.World) {
 		v := fmath.Triangle(t.Total / 7.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
-	})
-
-	world.AddMaterial(boxE, func(f core.Fragment) core.Cell {
-		f.Cell.FGAlpha = 0.7
-		f.Cell.BGAlpha = 0.7
-		return f.Cell
 	})
 
 	// Layer 5: Braille sine wave — sub-cell resolution wireframe.
