@@ -527,6 +527,119 @@ func TestTransformRotation(t *testing.T) {
 	g.Assert(t, "transform_rotation", []byte(b.String()))
 }
 
+func TestCameraStaticPan(t *testing.T) {
+	const (
+		w = 40
+		h = 12
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// A box at world position (0,0).
+	box := world.Spawn()
+	world.AddTransform(box, &core.Transform{
+		Position: fmath.Vec3{X: 0, Y: 0},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(box, &bitmap.Rect{
+		Width:  8,
+		Height: 4,
+		FG:     core.Color{R: 200, G: 100, B: 50},
+	})
+	world.AddRoot(box)
+
+	// Camera panned to (10, 3) — box should appear shifted on screen.
+	cam := world.Spawn()
+	world.AddTransform(cam, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 3},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddCamera(cam, &core.Camera{Zoom: 1})
+	world.SetActiveCamera(cam)
+
+	canvas.Clear()
+	canvas.DrawBorder()
+	core.Render(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "camera_static_pan", []byte(b.String()))
+}
+
+func TestCameraAnimatedZoom(t *testing.T) {
+	const (
+		w      = 40
+		h      = 12
+		frames = 3
+		dt     = 1.0
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// A box at world origin.
+	box := world.Spawn()
+	world.AddTransform(box, &core.Transform{
+		Position: fmath.Vec3{X: 0, Y: 0},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(box, &bitmap.Rect{
+		Width:  6,
+		Height: 3,
+		FG:     core.Color{R: 100, G: 200, B: 100},
+	})
+	world.AddRoot(box)
+
+	// Camera at origin, zoom animated via behavior.
+	cam := world.Spawn()
+	world.AddTransform(cam, &core.Transform{
+		Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	camComp := &core.Camera{Zoom: 1}
+	world.AddCamera(cam, camComp)
+	world.SetActiveCamera(cam)
+
+	world.AddBehavior(cam, func(t core.Time, e core.Entity, w *core.World) {
+		// Zoom: 1 → 2 → 3 over frames.
+		w.Camera(e).Zoom = t.Total + 1.0
+	})
+
+	for i := range frames {
+		ti := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, ti)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas, ti)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "camera_animated_zoom", []byte(b.String()))
+}
+
 func TestOBJWireframe(t *testing.T) {
 	const (
 		w      = 40

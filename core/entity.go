@@ -6,14 +6,16 @@ type Entity uint64
 type Material func(f Fragment) Cell
 
 type World struct {
-	next       Entity
-	transforms map[Entity]*Transform
-	drawables  map[Entity]Drawable
-	behaviors  map[Entity]Behavior
-	materials  map[Entity]Material
-	layers     map[Entity]int
-	children   map[Entity][]Entity
-	roots      []Entity
+	next         Entity
+	transforms   map[Entity]*Transform
+	drawables    map[Entity]Drawable
+	behaviors    map[Entity]Behavior
+	materials    map[Entity]Material
+	layers       map[Entity]int
+	cameras      map[Entity]*Camera
+	children     map[Entity][]Entity
+	roots        []Entity
+	activeCamera Entity // 0 = no camera; safe because Spawn() starts at 1
 }
 
 func NewWorld() *World {
@@ -23,6 +25,7 @@ func NewWorld() *World {
 		behaviors:  make(map[Entity]Behavior),
 		materials:  make(map[Entity]Material),
 		layers:     make(map[Entity]int),
+		cameras:    make(map[Entity]*Camera),
 		children:   make(map[Entity][]Entity),
 	}
 }
@@ -86,4 +89,20 @@ func (w *World) AddLayer(e Entity, layer int) {
 
 func (w *World) Layer(e Entity) int {
 	return w.layers[e]
+}
+
+func (w *World) AddCamera(e Entity, c *Camera) {
+	w.cameras[e] = c
+}
+
+func (w *World) Camera(e Entity) *Camera {
+	return w.cameras[e]
+}
+
+func (w *World) SetActiveCamera(e Entity) {
+	w.activeCamera = e
+}
+
+func (w *World) ActiveCamera() Entity {
+	return w.activeCamera
 }

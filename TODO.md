@@ -100,7 +100,7 @@ When a braille entity overlaps another entity, only the destination's BG color s
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
 
 - **Iteration 11: Asset loading (complete)** — OBJ mesh loader, PNG/JPEG image loader with downsampling, wireframe rasterizer, resource cache. All in `asset/` package.
-- **Iteration 12: Camera and projection** — Camera entity with position/target. View matrix. Orthographic and perspective projection. Viewport bounds and culling. World-to-screen coordinate pipeline.
+- **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. Demo: gentle circular pan + subtle zoom pulse.
 
 ## Roadmap: Features
 
@@ -121,6 +121,7 @@ These are the target features, built on top of the foundations above. Dependenci
 flicker/
   core/
     entity.go      // Entity, World, parent/child relationships
+    camera.go      // Camera component, ViewMatrix (orthographic view transform)
     transform.go   // Transform component (position, rotation, scale) with LocalMatrix()
     drawable.go    // Drawable interface, RenderFunc
     behavior.go    // Behavior component + UpdateBehaviors system

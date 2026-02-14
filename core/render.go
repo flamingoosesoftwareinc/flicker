@@ -3,10 +3,19 @@ package core
 import "flicker/fmath"
 
 func Render(world *World, canvas *Canvas, t Time) {
-	identity := fmath.Mat3Identity()
+	view := viewMatrix(world, canvas.Width, canvas.Height)
 	for _, root := range world.Roots() {
-		renderEntity(world, canvas, root, identity, t)
+		renderEntity(world, canvas, root, view, t)
 	}
+}
+
+// viewMatrix returns the camera's view matrix, or identity if no active camera.
+func viewMatrix(w *World, canvasW, canvasH int) fmath.Mat3 {
+	e := w.ActiveCamera()
+	if e == 0 {
+		return fmath.Mat3Identity()
+	}
+	return ViewMatrix(w.Camera(e), w.Transform(e), canvasW, canvasH)
 }
 
 func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
