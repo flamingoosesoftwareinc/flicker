@@ -76,6 +76,38 @@ High-resolution `Bitmap` pixel buffer with two encoding modes that map back to t
 
 `Transform` gains `Rotation` (float64 radians, 2D rotation around Z) and `Scale` (Vec3, where `{0,0,0}` means zero — no magic defaults). `LocalMatrix()` computes the TRS matrix (translate * rotate * scale). Render traversal (`renderEntity`) replaced position accumulation (`ox, oy, oz`) with hierarchical `Mat3` multiplication — parent transforms compose correctly through the scene graph. All call sites updated to set `Scale: {1,1,1}` explicitly. Golden tests regenerated.
 
+## Open Issue: Braille BG Transparency
+
+Braille characters only define foreground dots — the background between dots should be transparent, showing whatever is underneath. Currently the braille `Cell` carries `BG: Color{}` (black) with `Alpha: 1.0`, so when composited it overwrites the destination BG with black instead of preserving it.
+
+The compositor makes this harder: entities render to isolated per-layer canvases (cleared to zero), then layers are composited back-to-front onto the destination. By the time `BlendCell` runs, the braille cell's zero BG has already been baked into the layer canvas — there's no way to distinguish "transparent BG" from "intentionally black BG" using a single `Alpha` value.
+
+**The core problem:** `Cell` has one `Alpha` that governs both FG and BG. Braille needs FG-opaque + BG-transparent.
+
+### Proposal A: Resolve buffer (two-pass render)
+
+Add a metadata buffer alongside the canvas where each cell records rendering intent (e.g., "BG is transparent"). After all entities render to a layer, a resolve pass reads the metadata and the destination canvas to produce the final cell values. This keeps `Cell` unchanged and moves the complexity to the compositing pipeline.
+
+Sketch:
+- `RenderMeta` struct per cell: flags like `BGTransparent bool`, source entity, etc.
+- `renderEntity` writes both `Cell` and `RenderMeta` to the layer canvas.
+- After rendering a layer but before compositing, a resolve pass iterates cells: if `BGTransparent`, the cell's BG is left unset so `BlendCell` can read it from the destination.
+- `BlendCell` (or a wrapper) checks the flag and preserves `dst.BG` when set.
+
+Pros: `Cell` stays simple, metadata is only needed during render. Cons: extra allocation per layer, two-pass adds complexity.
+
+### Proposal B: Per-cell BG alpha flag
+
+Add a `BGTransparent bool` to `Cell`. Zero-value (`false`) preserves all current behavior. Braille cells set it to `true`. `BlendCell` checks the flag and skips BG blending (preserves `dst.BG`) when set. `renderEntity`'s emit callback also reads the existing canvas BG when the flag is set (for the direct-render path).
+
+Sketch:
+- `Cell` gains `BGTransparent bool`.
+- Braille renderers (`brailleRenderer`, `BrailleCellAt`, `DrawBraille`) set `BGTransparent: true`.
+- `BlendCell`: if `src.BGTransparent`, set `out.BG = dst.BG` instead of blending.
+- `renderEntity` emit: if `cell.BGTransparent`, set `cell.BG = c.Get(sx, sy).BG` before writing.
+
+Pros: minimal change, explicit opt-in, no extra buffers. Cons: adds a field to `Cell` that only braille uses.
+
 ## Roadmap: Foundation
 
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
