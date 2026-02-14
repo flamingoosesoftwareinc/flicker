@@ -125,9 +125,10 @@ func (b *Bitmap) DrawBraille(canvas *Canvas, cx, cy int) {
 				B: uint8(bSum / count),
 			}
 			canvas.Set(cx+col, cy+row, Cell{
-				Rune:  rune(0x2800 | int(bits)),
-				FG:    fg,
-				Alpha: maxAlpha,
+				Rune:          rune(0x2800 | int(bits)),
+				FG:            fg,
+				Alpha:         maxAlpha,
+				BGTransparent: true,
 			})
 		}
 	}
@@ -223,9 +224,10 @@ func (b *Bitmap) BrailleCellAt(col, row int) Cell {
 		B: uint8(bSum / count),
 	}
 	return Cell{
-		Rune:  rune(0x2800 | int(bits)),
-		FG:    fg,
-		Alpha: maxAlpha,
+		Rune:          rune(0x2800 | int(bits)),
+		FG:            fg,
+		Alpha:         maxAlpha,
+		BGTransparent: true,
 	}
 }
 
@@ -457,9 +459,10 @@ func (bd *BitmapDrawable) brailleRenderer() RenderFunc {
 					B: uint8(bSum / count),
 				}
 				cell := Cell{
-					Rune:  rune(0x2800 | int(bits)),
-					FG:    fg,
-					Alpha: maxAlpha,
+					Rune:          rune(0x2800 | int(bits)),
+					FG:            fg,
+					Alpha:         maxAlpha,
+					BGTransparent: true,
 				}
 				emit(sx, sy, sx, sy, cell)
 			}

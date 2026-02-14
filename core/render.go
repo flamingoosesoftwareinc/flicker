@@ -31,6 +31,9 @@ func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
 				}
 				cell = m(f)
 			}
+			if cell.BGTransparent {
+				cell.BG = c.Get(sx, sy).BG
+			}
 			c.Set(sx, sy, cell)
 		})
 	}

@@ -5,10 +5,11 @@ type Color struct {
 }
 
 type Cell struct {
-	Rune  rune
-	FG    Color
-	BG    Color
-	Alpha float64
+	Rune          rune
+	FG            Color
+	BG            Color
+	Alpha         float64
+	BGTransparent bool // when true, blending preserves destination BG
 }
 
 // Fragment holds the per-cell context passed to Material and LayerPostProcess
@@ -80,7 +81,11 @@ func BlendCell(dst, src Cell, blend ColorBlend) Cell {
 		return dst
 	}
 	if src.Alpha >= 1 && dst.Alpha == 0 {
-		return src
+		out := src
+		if src.BGTransparent {
+			out.BG = dst.BG
+		}
+		return out
 	}
 
 	a := src.Alpha
@@ -88,6 +93,9 @@ func BlendCell(dst, src Cell, blend ColorBlend) Cell {
 		FG:    blend(dst.FG, src.FG, a),
 		BG:    blend(dst.BG, src.BG, a),
 		Alpha: dst.Alpha + src.Alpha*(1-dst.Alpha),
+	}
+	if src.BGTransparent {
+		out.BG = dst.BG
 	}
 
 	// Rune rule: real src rune wins; empty src preserves dst text.
