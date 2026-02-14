@@ -38,7 +38,6 @@ func main() {
 	world.AddDrawable(boxA, &core.Rect{
 		Width:   12,
 		Height:  6,
-		Rune:    '░',
 		FG:      core.Color{R: 180, G: 120, B: 60},
 		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
@@ -89,7 +88,6 @@ func main() {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:   12,
 		Height:  6,
-		Rune:    '▒',
 		FG:      core.Color{R: 180, G: 120, B: 60},
 		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
@@ -112,7 +110,6 @@ func main() {
 	world.AddDrawable(boxC, &core.Rect{
 		Width:   12,
 		Height:  6,
-		Rune:    '▓',
 		FG:      core.Color{R: 180, G: 120, B: 60},
 		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
@@ -135,7 +132,6 @@ func main() {
 	world.AddDrawable(boxD, &core.Rect{
 		Width:   12,
 		Height:  6,
-		Rune:    '█',
 		FG:      core.Color{R: 180, G: 120, B: 60},
 		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
@@ -178,7 +174,6 @@ func main() {
 	world.AddDrawable(boxE, &core.Rect{
 		Width:   12,
 		Height:  6,
-		Rune:    '◆',
 		FG:      core.Color{R: 180, G: 120, B: 60},
 		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,

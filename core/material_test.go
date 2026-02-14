@@ -13,7 +13,6 @@ func TestMaterialApplication(t *testing.T) {
 	world.AddDrawable(e, &Rect{
 		Width:  3,
 		Height: 2,
-		Rune:   '#',
 		FG:     Color{R: 100, G: 100, B: 100},
 		BG:     Color{R: 0, G: 0, B: 0},
 	})
@@ -64,7 +63,6 @@ func TestMaterialPreservesAlpha(t *testing.T) {
 	world.AddDrawable(e, &Rect{
 		Width:  2,
 		Height: 2,
-		Rune:   'X',
 		FG:     Color{R: 255, G: 255, B: 255},
 	})
 	world.AddRoot(e)
@@ -84,8 +82,8 @@ func TestMaterialPreservesAlpha(t *testing.T) {
 			if cell.FGAlpha != 1.0 {
 				t.Errorf("cell(%d,%d) Alpha=%f, want 1.0", x, y, cell.FGAlpha)
 			}
-			if cell.Rune != 'X' {
-				t.Errorf("cell(%d,%d) Rune=%q, want 'X'", x, y, cell.Rune)
+			if cell.Rune != '▀' {
+				t.Errorf("cell(%d,%d) Rune=%q, want '▀'", x, y, cell.Rune)
 			}
 		}
 	}

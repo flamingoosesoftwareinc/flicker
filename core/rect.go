@@ -1,68 +1,51 @@
 package core
 
-import "flicker/fmath"
-
 type Rect struct {
-	Width            int
-	Height           int
-	Rune             rune
+	Width, Height    int
 	FG, BG           Color
-	FGAlpha, BGAlpha float64 // 0 means opaque (1.0); set explicitly for transparency.
+	FGAlpha, BGAlpha float64 // 0 means opaque (1.0)
+
+	bd *BitmapDrawable // lazily built
 }
 
-func (r *Rect) fgAlpha() float64 {
-	if r.FGAlpha == 0 {
-		return 1
+func (r *Rect) ensureBitmap() {
+	if r.bd != nil {
+		return
 	}
-	return r.FGAlpha
-}
-
-func (r *Rect) bgAlpha() float64 {
-	if r.BGAlpha == 0 {
-		return 1
+	fgA := r.FGAlpha
+	if fgA == 0 {
+		fgA = 1
 	}
-	return r.BGAlpha
+	bgA := r.BGAlpha
+	if bgA == 0 {
+		bgA = 1
+	}
+	bm := NewBitmap(r.Width, r.Height*2)
+	for row := range r.Height {
+		for x := range r.Width {
+			bm.Set(x, row*2, r.FG, fgA)
+			bm.Set(x, row*2+1, r.BG, bgA)
+		}
+	}
+	r.bd = &BitmapDrawable{Bitmap: bm, Mode: EncodeHalfBlock}
 }
 
 func (r *Rect) Draw(canvas *Canvas, x, y int) {
-	for dy := 0; dy < r.Height; dy++ {
-		for dx := 0; dx < r.Width; dx++ {
-			canvas.Set(x+dx, y+dy, Cell{
-				Rune:    r.Rune,
-				FG:      r.FG,
-				BG:      r.BG,
-				FGAlpha: r.fgAlpha(),
-				BGAlpha: r.bgAlpha(),
-			})
-		}
-	}
+	r.ensureBitmap()
+	r.bd.Draw(canvas, x, y)
 }
 
 func (r *Rect) Bounds() (int, int) {
-	return r.Width, r.Height
+	r.ensureBitmap()
+	return r.bd.Bounds()
 }
 
 func (r *Rect) CellAt(x, y int) Cell {
-	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, FGAlpha: r.fgAlpha(), BGAlpha: r.bgAlpha()}
+	r.ensureBitmap()
+	return r.bd.CellAt(x, y)
 }
 
 func (r *Rect) Renderer() RenderFunc {
-	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {
-		bw, bh := r.Bounds()
-		cx, cy := float64(bw)/2.0, float64(bh)/2.0
-
-		for dy := range bh {
-			for dx := range bw {
-				cell := r.CellAt(dx, dy)
-				if cell.FGAlpha == 0 && cell.BGAlpha == 0 {
-					continue
-				}
-				relX := float64(dx) - cx
-				relY := float64(dy) - cy
-				sx := int(world[0]*relX + world[1]*relY + world[2] + cx)
-				sy := int(world[3]*relX + world[4]*relY + world[5] + cy)
-				emit(dx, dy, sx, sy, cell)
-			}
-		}
-	}
+	r.ensureBitmap()
+	return r.bd.Renderer()
 }

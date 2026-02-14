@@ -28,7 +28,6 @@ func TestBasicExample(t *testing.T) {
 	world.AddDrawable(box, &core.Rect{
 		Width:  20,
 		Height: 10,
-		Rune:   '█',
 	})
 	world.AddRoot(box)
 
@@ -70,7 +69,6 @@ func TestAnimatedBehavior(t *testing.T) {
 	world.AddDrawable(box, &core.Rect{
 		Width:  10,
 		Height: 5,
-		Rune:   '#',
 	})
 	world.AddRoot(box)
 
@@ -127,7 +125,6 @@ func TestOverlappingObjects(t *testing.T) {
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  12,
 		Height: 6,
-		Rune:   '░',
 		FG:     core.Color{R: 200, G: 60, B: 60},
 		BG:     core.Color{R: 40, G: 0, B: 0},
 	})
@@ -149,7 +146,6 @@ func TestOverlappingObjects(t *testing.T) {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  12,
 		Height: 6,
-		Rune:   '▓',
 		FG:     core.Color{R: 60, G: 60, B: 200},
 		BG:     core.Color{R: 0, G: 0, B: 40},
 	})
@@ -206,7 +202,6 @@ func TestLayerBlending(t *testing.T) {
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  15,
 		Height: 6,
-		Rune:   '░',
 		FG:     core.Color{R: 200, G: 60, B: 60},
 		BG:     core.Color{R: 40, G: 0, B: 0},
 	})
@@ -222,7 +217,6 @@ func TestLayerBlending(t *testing.T) {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  15,
 		Height: 6,
-		Rune:   '▓',
 		FG:     core.Color{R: 60, G: 60, B: 200},
 		BG:     core.Color{R: 0, G: 0, B: 40},
 	})
@@ -272,7 +266,6 @@ func TestTween(t *testing.T) {
 	world.AddDrawable(box, &core.Rect{
 		Width:  8,
 		Height: 4,
-		Rune:   '#',
 	})
 	world.AddRoot(box)
 
@@ -337,7 +330,6 @@ func TestBlendModes(t *testing.T) {
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  20,
 		Height: 8,
-		Rune:   '░',
 		FG:     core.Color{R: 200, G: 60, B: 60},
 		BG:     core.Color{R: 80, G: 20, B: 20},
 	})
@@ -353,7 +345,6 @@ func TestBlendModes(t *testing.T) {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  15,
 		Height: 6,
-		Rune:   '▒',
 		FG:     core.Color{R: 60, G: 200, B: 60},
 		BG:     core.Color{R: 20, G: 80, B: 20},
 	})
@@ -374,7 +365,6 @@ func TestBlendModes(t *testing.T) {
 	world.AddDrawable(boxC, &core.Rect{
 		Width:  15,
 		Height: 6,
-		Rune:   '▓',
 		FG:     core.Color{R: 60, G: 60, B: 200},
 		BG:     core.Color{R: 20, G: 20, B: 80},
 	})
@@ -491,7 +481,6 @@ func TestTransformRotation(t *testing.T) {
 	world.AddDrawable(box, &core.Rect{
 		Width:  8,
 		Height: 4,
-		Rune:   '*',
 		FG:     core.Color{R: 200, G: 100, B: 50},
 	})
 	world.AddRoot(box)
@@ -505,7 +494,6 @@ func TestTransformRotation(t *testing.T) {
 	world.AddDrawable(child, &core.Rect{
 		Width:  4,
 		Height: 2,
-		Rune:   '+',
 		FG:     core.Color{R: 50, G: 200, B: 100},
 	})
 	world.Attach(child, box)
