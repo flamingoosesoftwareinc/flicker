@@ -3,10 +3,25 @@ package core
 import "flicker/fmath"
 
 type Rect struct {
-	Width  int
-	Height int
-	Rune   rune
-	FG, BG Color
+	Width            int
+	Height           int
+	Rune             rune
+	FG, BG           Color
+	FGAlpha, BGAlpha float64 // 0 means opaque (1.0); set explicitly for transparency.
+}
+
+func (r *Rect) fgAlpha() float64 {
+	if r.FGAlpha == 0 {
+		return 1
+	}
+	return r.FGAlpha
+}
+
+func (r *Rect) bgAlpha() float64 {
+	if r.BGAlpha == 0 {
+		return 1
+	}
+	return r.BGAlpha
 }
 
 func (r *Rect) Draw(canvas *Canvas, x, y int) {
@@ -16,8 +31,8 @@ func (r *Rect) Draw(canvas *Canvas, x, y int) {
 				Rune:    r.Rune,
 				FG:      r.FG,
 				BG:      r.BG,
-				FGAlpha: 1,
-				BGAlpha: 1,
+				FGAlpha: r.fgAlpha(),
+				BGAlpha: r.bgAlpha(),
 			})
 		}
 	}
@@ -28,7 +43,7 @@ func (r *Rect) Bounds() (int, int) {
 }
 
 func (r *Rect) CellAt(x, y int) Cell {
-	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, FGAlpha: 1, BGAlpha: 1}
+	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, FGAlpha: r.fgAlpha(), BGAlpha: r.bgAlpha()}
 }
 
 func (r *Rect) Renderer() RenderFunc {

@@ -40,7 +40,7 @@ func main() {
 		Height: 6,
 		Rune:   '░',
 		FG:     core.Color{R: 200, G: 60, B: 60},
-		BG:     core.Color{R: 40, G: 0, B: 0},
+		BG:     core.Color{R: 140, G: 0, B: 0},
 	})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
@@ -89,7 +89,7 @@ func main() {
 		Height: 6,
 		Rune:   '▒',
 		FG:     core.Color{R: 60, G: 200, B: 60},
-		BG:     core.Color{R: 0, G: 40, B: 0},
+		BG:     core.Color{R: 0, G: 140, B: 0},
 	})
 	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
@@ -116,7 +116,7 @@ func main() {
 		Height: 6,
 		Rune:   '▓',
 		FG:     core.Color{R: 60, G: 60, B: 200},
-		BG:     core.Color{R: 0, G: 0, B: 40},
+		BG:     core.Color{R: 0, G: 0, B: 200},
 	})
 	world.AddLayer(boxC, 2)
 	world.AddRoot(boxC)
@@ -143,7 +143,7 @@ func main() {
 		Height: 6,
 		Rune:   '█',
 		FG:     core.Color{R: 200, G: 200, B: 60},
-		BG:     core.Color{R: 40, G: 40, B: 0},
+		BG:     core.Color{R: 140, G: 140, B: 0},
 	})
 	world.AddLayer(boxD, 3)
 	world.AddRoot(boxD)
@@ -190,7 +190,7 @@ func main() {
 		Height: 6,
 		Rune:   '◆',
 		FG:     core.Color{R: 60, G: 200, B: 200},
-		BG:     core.Color{R: 0, G: 40, B: 40},
+		BG:     core.Color{R: 0, G: 140, B: 140},
 	})
 	world.AddLayer(boxE, 4)
 	world.AddRoot(boxE)
