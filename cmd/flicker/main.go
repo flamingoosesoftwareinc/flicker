@@ -313,6 +313,36 @@ func main() {
 		})
 	}
 
+	// Layer 9: Full-block plasma — 1:1 pixel-to-cell animated color field.
+	fbBm := core.NewBitmap(14, 8)
+	fbEnt := world.Spawn()
+	world.AddTransform(fbEnt, &core.Transform{
+		Position: fmath.Vec3{X: 2, Y: 1},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(fbEnt, &core.BitmapDrawable{Bitmap: fbBm, Mode: core.EncodeFullBlock})
+	world.AddLayer(fbEnt, 9)
+	world.AddRoot(fbEnt)
+
+	world.AddBehavior(fbEnt, func(t core.Time, e core.Entity, w *core.World) {
+		for py := range 8 {
+			for px := range 14 {
+				fx := float64(px)
+				fy := float64(py)
+				v1 := math.Sin(fx*0.3 + t.Total*1.5)
+				v2 := math.Sin(fy*0.4 + t.Total*1.2)
+				v3 := math.Sin((fx+fy)*0.2 + t.Total*0.8)
+				v := (v1 + v2 + v3 + 3) / 6 // normalize to [0,1]
+				r := uint8(v * 255)
+				g := uint8((1 - v) * 180)
+				b := uint8(math.Abs(v-0.5) * 2 * 255)
+				fbBm.Set(px, py, core.Color{R: r, G: g, B: b}, 1.0)
+			}
+		}
+		v := fmath.Triangle(t.Total / 12.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-16), v)
+	})
+
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
 	events := make(chan tcell.Event, 1)
 	go func() {
