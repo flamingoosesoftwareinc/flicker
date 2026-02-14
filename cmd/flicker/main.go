@@ -196,6 +196,64 @@ func main() {
 		return f.Cell
 	})
 
+	// Layer 5: Braille sine wave — sub-cell resolution wireframe.
+	brailleBm := core.NewBitmap(30, 20)
+	brailleEnt := world.Spawn()
+	world.AddTransform(brailleEnt, &core.Transform{
+		Position: fmath.Vec3{X: 2, Y: float64(sh - 7)},
+	})
+	brailleDraw := &core.BitmapDrawable{Bitmap: brailleBm, Mode: core.EncodeBraille}
+	world.AddDrawable(brailleEnt, brailleDraw)
+	world.AddLayer(brailleEnt, 5)
+	world.AddRoot(brailleEnt)
+
+	world.AddBehavior(brailleEnt, func(t core.Time, e core.Entity, w *core.World) {
+		brailleBm.Clear()
+		phase := t.Total * 3.0
+		for px := range 30 {
+			// Sine wave mapped to bitmap Y range.
+			fy := (math.Sin(float64(px)*0.4+phase) + 1) / 2 * 19
+			py := int(fy)
+			c := core.Color{R: 0, G: 220, B: uint8(120 + int(math.Sin(phase)*80))}
+			brailleBm.SetDot(px, py, c)
+			// Thicken: also plot the pixel above/below if in range.
+			if py > 0 {
+				brailleBm.SetDot(px, py-1, c)
+			}
+			if py < 19 {
+				brailleBm.SetDot(px, py+1, c)
+			}
+		}
+		v := fmath.Triangle(t.Total / 10.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-17), v)
+	})
+
+	// Layer 6: Half-block color gradient — two colors per cell.
+	hbBm := core.NewBitmap(16, 10)
+	hbEnt := world.Spawn()
+	world.AddTransform(hbEnt, &core.Transform{
+		Position: fmath.Vec3{X: float64(sw - 20), Y: 2},
+	})
+	hbDraw := &core.BitmapDrawable{Bitmap: hbBm, Mode: core.EncodeHalfBlock}
+	world.AddDrawable(hbEnt, hbDraw)
+	world.AddLayer(hbEnt, 6)
+	world.AddRoot(hbEnt)
+
+	world.AddBehavior(hbEnt, func(t core.Time, e core.Entity, w *core.World) {
+		for py := range 10 {
+			for px := range 16 {
+				g := uint8(fmath.Clamp(float64(py)*28, 0, 255))
+				rv := fmath.Triangle(float64(px)*0.06 + t.Total*0.3)
+				bv := fmath.Triangle(float64(py)*0.1 + t.Total*0.2)
+				r := uint8(rv * 255)
+				b := uint8(bv * 255)
+				hbBm.Set(px, py, core.Color{R: r, G: g, B: b}, 1.0)
+			}
+		}
+		v := fmath.Triangle(t.Total / 9.0)
+		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-7), v)
+	})
+
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
 	events := make(chan tcell.Event, 1)
 	go func() {

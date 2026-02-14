@@ -58,11 +58,20 @@ Unified `Material` and `LayerPostProcess` under a single `Fragment` struct. Both
 
 `Canvas.Clone()` returns a deep copy. `Canvas.CopyInto(dst)` copies cells into an existing canvas without allocating. The `Compositor` reuses a single `scratch` buffer across frames for post-process snapshot double-buffering, eliminating per-frame allocations after warmup.
 
+## Iteration 8: Sub-cell Bitmap Buffer (complete)
+
+High-resolution `Bitmap` pixel buffer with two encoding modes that map back to terminal cells. Flat row-major `[]Color` and `[]float64` arrays for cache locality, matching the `Cell` alpha pattern.
+
+**Braille encoding** (2x4 dots per cell, U+2800-U+28FF): Each 2x4 pixel block maps to one braille character. Bit mapping follows the Unicode standard. FG color is the average RGB of all lit pixels; cell alpha is the max alpha in the block. Empty blocks are skipped. Resolution: 2x horizontal, 4x vertical (160x96 in 80x24). Best for wireframes, particles, monochrome text.
+
+**Half-block encoding** (1x2 per cell, `▀`/`▄`): Each 1x2 pixel pair maps to one cell with two independent colors (FG=top, BG=bottom). Both-on uses `▀` with FG+BG; top-only uses `▀`; bottom-only uses `▄`; both-off is transparent. Resolution: 1x horizontal, 2x vertical (80x48 in 80x24). Best for color images, gradients.
+
+`BitmapDrawable` implements `Drawable`, wrapping a `Bitmap` with an `EncodeMode` selector. Nil-safe (zero bounds, no-op draw). Bounds returns cell-space dimensions computed from pixel dimensions and encoding ratios.
+
 ## Roadmap: Foundation
 
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
 
-- **Iteration 8: Sub-cell bitmap buffer + braille/block mapper** — A high-resolution `Bitmap` buffer (2x per cell horizontal, 4x vertical via braille `⠀`-`⣿`) with a mapper that packs pixels back into terminal cells. Unlocks text rendering, particle-as-pixel, image display, SVG, and 3D rasterization. Half-block (`▀▄`) mode for 1x2 sub-cell with independent FG/BG color per half.
 - **Iteration 9: Extended math** — `Dot`, `Cross` on Vec3. `Mat3`/`Mat4` with multiply, inverse, transpose. Perspective/orthographic projection matrices. Perlin/simplex noise. Bezier curves (quadratic, cubic). Degrees/radians helpers.
 - **Iteration 10: Transform rotation and scale** — Add `Rotation` (float64 radians, 2D for now) and `Scale` (Vec3) to Transform. Hierarchical composition via matrices. Update render traversal to apply full transform chain.
 - **Iteration 11: Asset loading** — Loader pattern for fonts (TTF via `golang.org/x/image/font`), images (PNG/JPEG via `image/png`, `image/jpeg`), 3D models (OBJ), and SVG. Resource cache keyed by path.
@@ -92,6 +101,7 @@ flicker/
     transform.go   // Transform component (position via Vec3)
     drawable.go    // Drawable interface
     rect.go        // Rect drawable
+    bitmap.go      // Bitmap pixel buffer, braille/half-block encoding, BitmapDrawable
     behavior.go    // Behavior component + UpdateBehaviors system
     canvas.go      // Cell, Canvas (2D cell buffer)
     blend.go       // BlendMode, ColorBlend, all Photoshop-style blend modes

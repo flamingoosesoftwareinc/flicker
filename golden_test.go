@@ -392,3 +392,64 @@ func TestBlendModes(t *testing.T) {
 	g := goldie.New(t)
 	g.Assert(t, "blend_modes", []byte(b.String()))
 }
+
+func TestBitmapRendering(t *testing.T) {
+	const (
+		w = 40
+		h = 16
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+
+	world := core.NewWorld()
+
+	// Entity 1: Braille diagonal line.
+	brailleBm := core.NewBitmap(16, 16)
+	for i := range 16 {
+		brailleBm.SetDot(i, i, core.Color{R: 0, G: 255, B: 100})
+	}
+	brailleEnt := world.Spawn()
+	world.AddTransform(brailleEnt, &core.Transform{
+		Position: fmath.Vec3{X: 1, Y: 1},
+	})
+	world.AddDrawable(brailleEnt, &core.BitmapDrawable{
+		Bitmap: brailleBm,
+		Mode:   core.EncodeBraille,
+	})
+	world.AddRoot(brailleEnt)
+
+	// Entity 2: Half-block gradient.
+	hbBm := core.NewBitmap(10, 8)
+	for y := range 8 {
+		for x := range 10 {
+			r := uint8(x * 25)
+			b := uint8(y * 30)
+			hbBm.SetDot(x, y, core.Color{R: r, G: 0, B: b})
+		}
+	}
+	hbEnt := world.Spawn()
+	world.AddTransform(hbEnt, &core.Transform{
+		Position: fmath.Vec3{X: 20, Y: 2},
+	})
+	world.AddDrawable(hbEnt, &core.BitmapDrawable{
+		Bitmap: hbBm,
+		Mode:   core.EncodeHalfBlock,
+	})
+	world.AddRoot(hbEnt)
+
+	canvas := core.NewCanvas(w, h)
+	canvas.Clear()
+	canvas.DrawBorder()
+	core.Render(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "bitmap_rendering", []byte(b.String()))
+}
