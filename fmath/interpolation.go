@@ -15,3 +15,13 @@ func Remap(inMin, inMax, outMin, outMax, v float64) float64 {
 	t := InverseLerp(inMin, inMax, v)
 	return Lerp(outMin, outMax, t)
 }
+
+func Clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}

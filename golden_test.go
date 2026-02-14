@@ -245,6 +245,70 @@ func TestLayerBlending(t *testing.T) {
 	g.Assert(t, "layer_blending", []byte(b.String()))
 }
 
+func TestTween(t *testing.T) {
+	const (
+		w      = 40
+		h      = 10
+		frames = 6
+		dt     = 0.5 // 0.5s per frame; tween duration = 2.0s → done at frame 4
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+	box := world.Spawn()
+	world.AddTransform(box, &core.Transform{
+		Position: fmath.Vec3{X: 2, Y: 3},
+	})
+	world.AddDrawable(box, &core.Rect{
+		Width:  8,
+		Height: 4,
+		Rune:   '#',
+	})
+	world.AddRoot(box)
+
+	// Ping-pong tween: move X from 2 to 30, then back, using EaseInOutQuad.
+	forward := true
+	tw := &fmath.Tween{From: 2, To: 30, Duration: 2.0, Easing: fmath.EaseInOutQuad}
+	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+		pos := tw.Update(t.Delta)
+		w.Transform(e).Position.X = pos
+		if tw.Done() {
+			tw.Reset()
+			if forward {
+				tw.From, tw.To = 30, 2
+			} else {
+				tw.From, tw.To = 2, 30
+			}
+			forward = !forward
+		}
+	})
+
+	for i := range frames {
+		t := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, t)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas, t)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "tween", []byte(b.String()))
+}
+
 func TestBlendModes(t *testing.T) {
 	const (
 		w = 40

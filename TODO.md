@@ -38,11 +38,17 @@ Full set of Photoshop-style per-channel blend modes in `core/blend.go`, all foll
 
 **Blend modes added:** Multiply, Screen, Overlay, HardLight, SoftLight, Difference, Exclusion, HardMix, Darken, Lighten, LinearDodge, LinearBurn, ColorDodge, ColorBurn. Categorized as Darken (Multiply, Darken, LinearBurn, ColorBurn), Lighten (Screen, Lighten, LinearDodge, ColorDodge), Contrast (Overlay, HardLight, SoftLight), Inversion (Difference, Exclusion), and Posterize (HardMix).
 
-Demo expanded to 5 layers: Red/Normal base, Green/Multiply, Blue/Screen, Yellow/Overlay, Cyan/Difference — each with distinct animations and `Alpha=0.7` so blending is visible in overlap regions. Golden test `TestBlendModes` verifies blended ANSI output from 3 overlapping layers (Normal, Multiply, Screen).
+Demo expanded to 5 layers: Red/Normal base, Green/Multiply, Blue/Screen, Yellow/Overlay, Cyan/Difference — each with distinct animations and `Alpha=0.7` so blending is visible in overlap regions. Golden test `TestBlendModes` verifies blended ANSI output from 3 overlapping layers (Normal, Multiply, Screen). Demo has pause/step controls: Space toggles pause, Right/`.` steps one frame (1/60s), `q`/Esc quits. Simulation time is decoupled from wall clock.
+
+## Iteration 6: Tween System (complete)
+
+`Tween` and `TweenVec3` — stateful interpolators in `fmath` that track elapsed time, apply optional easing, and return interpolated values. Pure math, no engine dependency. Used from behavior closures to replace manual wave + `Remap` patterns.
+
+`Tween` interpolates `float64` values; `TweenVec3` interpolates `Vec3` values. Both support `Update(dt)` → current value, `Done()` → completion check, `Reset()` → replay. Easing is pluggable via `func(float64) float64` (nil defaults to linear). `Clamp` helper added to `interpolation.go`.
+
+Demo updated: Box A uses `Tween` with `EaseInOutCubic` for smooth horizontal ping-pong. Box D uses `TweenVec3` with `EaseInOutQuad` for diagonal ping-pong. Golden test `TestTween` verifies tween-driven animation with easing over 6 frames.
 
 ## What Comes Next
-
-- **Animation**: `Tween` system that interpolates component fields over time
 - **Text rendering**: bitmap font rasterization → braille/block mapping
 - **Particles**: point clouds, emitters, attractor targets
 - **Scenes/slides**: ordered scene list, transitions
@@ -66,7 +72,8 @@ flicker/
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
     vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp
-    interpolation.go // Lerp, InverseLerp, Remap
+    interpolation.go // Lerp, InverseLerp, Remap, Clamp
+    tween.go       // Tween (float64), TweenVec3 (Vec3) — stateful interpolators with easing
     easing.go      // Easing functions: linear, quad, cubic, elastic, bounce (all func(t float64) float64)
     wave.go        // Wave functions: saw, sine, triangle, square, pulse (period 1.0)
   terminal/

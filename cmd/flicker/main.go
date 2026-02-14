@@ -39,9 +39,25 @@ func main() {
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
+	// Tween-based ping-pong with easing.
+	tweenA := &fmath.Tween{
+		From:     2,
+		To:       float64(sw - 14),
+		Duration: 8.0,
+		Easing:   fmath.EaseInOutCubic,
+	}
+	forwardA := true
 	world.AddBehavior(boxA, func(t core.Time, e core.Entity, w *core.World) {
-		v := fmath.Triangle(t.Total / 16.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-14), v)
+		w.Transform(e).Position.X = tweenA.Update(t.Delta)
+		if tweenA.Done() {
+			tweenA.Reset()
+			if forwardA {
+				tweenA.From, tweenA.To = float64(sw-14), 2
+			} else {
+				tweenA.From, tweenA.To = 2, float64(sw-14)
+			}
+			forwardA = !forwardA
+		}
 	})
 
 	world.AddMaterial(boxA, func(x, y int, t core.Time, cell core.Cell) core.Cell {
@@ -121,11 +137,29 @@ func main() {
 	world.AddLayer(boxD, 3)
 	world.AddRoot(boxD)
 
+	// TweenVec3-based diagonal ping-pong with easing.
+	tweenD := &fmath.TweenVec3{
+		From:     fmath.Vec3{X: 2, Y: 1},
+		To:       fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)},
+		Duration: 5.0,
+		Easing:   fmath.EaseInOutQuad,
+	}
+	forwardD := true
 	world.AddBehavior(boxD, func(t core.Time, e core.Entity, w *core.World) {
-		vx := fmath.Triangle(t.Total / 10.0)
-		vy := fmath.Triangle(t.Total / 12.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-14), vx)
-		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), vy)
+		pos := tweenD.Update(t.Delta)
+		w.Transform(e).Position.X = pos.X
+		w.Transform(e).Position.Y = pos.Y
+		if tweenD.Done() {
+			tweenD.Reset()
+			if forwardD {
+				tweenD.From = fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)}
+				tweenD.To = fmath.Vec3{X: 2, Y: 1}
+			} else {
+				tweenD.From = fmath.Vec3{X: 2, Y: 1}
+				tweenD.To = fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)}
+			}
+			forwardD = !forwardD
+		}
 	})
 
 	world.AddMaterial(boxD, func(x, y int, t core.Time, cell core.Cell) core.Cell {
