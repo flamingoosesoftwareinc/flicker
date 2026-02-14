@@ -384,7 +384,7 @@ func main() {
 		})
 		if textBm != nil {
 			textSDF := bitmap.ComputeSDF(textBm, 30)
-			textDraw := &bitmap.HalfBlock{Bitmap: textBm}
+			textDraw := &bitmap.Braille{Bitmap: textBm}
 			textBW, textBH := textDraw.Bounds()
 
 			textEnt := world.Spawn()
@@ -401,48 +401,21 @@ func main() {
 
 			// SDF threshold materialization: sweep threshold from
 			// most-negative (skeleton) to 0 (full shape) over ~3 seconds.
-			// After reveal, text remains fully visible.
 			revealDuration := 3.0
-			// Find the most-negative distance in the SDF (deepest interior).
 			mostNeg := 0.0
 			for _, d := range textSDF.Dist {
 				if d < mostNeg {
 					mostNeg = d
 				}
 			}
-
-			world.AddMaterial(textEnt, func(f core.Fragment) core.Cell {
-				// Map local coords to bitmap pixel coords for SDF lookup.
-				// HalfBlock: ly is cell row, need pixel rows ly*2 and ly*2+1.
-				topD := textSDF.At(f.X, f.Y*2)
-				botD := textSDF.At(f.X, f.Y*2+1)
-
-				// Compute threshold: sweeps from mostNeg to 0 over revealDuration.
-				progress := f.Time.Total / revealDuration
+			threshold := mostNeg
+			world.AddMaterial(textEnt, bitmap.BrailleThreshold(textSDF, &threshold))
+			world.AddBehavior(textEnt, func(t core.Time, _ core.Entity, _ *core.World) {
+				progress := t.Total / revealDuration
 				if progress > 1 {
 					progress = 1
 				}
-				threshold := mostNeg * (1 - progress)
-
-				// Discard pixels whose SDF distance is below the threshold
-				// (i.e., they haven't been "revealed" yet).
-				topVisible := topD <= threshold
-				botVisible := botD <= threshold
-
-				if !topVisible && !botVisible {
-					return core.Cell{} // fully hidden
-				}
-
-				cell := f.Cell
-				if !topVisible {
-					// Only bottom half visible.
-					cell.FGAlpha = 0
-				}
-				if !botVisible {
-					// Only top half visible.
-					cell.BGAlpha = 0
-				}
-				return cell
+				threshold = mostNeg * (1 - progress)
 			})
 		}
 	}

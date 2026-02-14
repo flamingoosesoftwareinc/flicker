@@ -101,7 +101,7 @@ These foundation iterations unblock the feature work below. Order matters — ea
 
 - **Iteration 11: Asset loading (complete)** — OBJ mesh loader, PNG/JPEG image loader with downsampling, wireframe rasterizer, resource cache. All in `asset/` package.
 - **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. All forward-mapped drawables (HalfBlock, FullBlock, BGBlock) switched to inverse mapping via shared `inverseRenderer` — eliminates scan-line gaps under non-integer zoom. Demo: gentle circular pan + pronounced zoom pulse (0.7×–1.3×).
-- **Iteration 13: Text Rendering (complete)** — TTF font loading via `golang.org/x/image/font/sfnt`, glyph rasterization via `golang.org/x/image/vector` with analytical anti-aliasing. Single-line text layout with advance widths. SDF computation from rasterized bitmap using 8SSEDT algorithm. `inverseRenderer` fixed to emit local drawable coordinates (prerequisite for SDF materials). `asset/font.go`: `Font` type wrapping `sfnt.Font`, `LoadFont`, `GetOrLoadFont`, `Metrics`. `asset/text.go`: `RasterizeText` producing `*bitmap.Bitmap`. `core/bitmap/sdf.go`: `ComputeSDF` (8SSEDT), `At()`, `Gradient()`. Demo: "FLICKER" text with SDF threshold materialization effect revealing from skeleton outward over ~3 seconds. Golden test for static text rendering.
+- **Iteration 13: Text Rendering (complete)** — TTF font loading via `golang.org/x/image/font/sfnt`, glyph rasterization via `golang.org/x/image/vector` with analytical anti-aliasing. Single-line text layout with advance widths. SDF computation from rasterized bitmap using 8SSEDT algorithm. `inverseRenderer` fixed to emit local drawable coordinates (prerequisite for SDF materials). `asset/font.go`: `Font` type wrapping `sfnt.Font`, `LoadFont`, `GetOrLoadFont`, `Metrics`. `asset/text.go`: `RasterizeText` producing `*bitmap.Bitmap`. `core/bitmap/sdf.go`: `ComputeSDF` (8SSEDT), `At()`, `Gradient()`. Encoding-aware SDF threshold materials (`HalfBlockThreshold`, `BrailleThreshold`) as free functions for reusable reveal effects. Demo: "FLICKER" text with SDF threshold materialization effect revealing from skeleton outward over ~3 seconds. Golden test for static text rendering.
 
 ## Roadmap: Features
 
@@ -139,7 +139,7 @@ flicker/
     bgblock.go     // BGBlock drawable (BG-only encoding)
     rect.go        // Rect drawable (delegates to HalfBlock)
     renderer.go    // inverseRenderer shared by all drawable types
-    sdf.go         // SDF computation (8SSEDT), At(), Gradient()
+    sdf.go         // SDF computation (8SSEDT), At(), Gradient(), threshold materials
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
     vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp, dot, cross

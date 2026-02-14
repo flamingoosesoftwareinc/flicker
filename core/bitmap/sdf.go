@@ -3,6 +3,7 @@ package bitmap
 import (
 	"math"
 
+	"flicker/core"
 	"flicker/fmath"
 )
 
@@ -27,6 +28,44 @@ func (s *SDF) Gradient(x, y int) fmath.Vec2 {
 	dx := (s.At(x+1, y) - s.At(x-1, y)) / 2.0
 	dy := (s.At(x, y+1) - s.At(x, y-1)) / 2.0
 	return fmath.Vec2{X: dx, Y: dy}
+}
+
+// HalfBlockThreshold returns a material that reveals half-block encoded content
+// using SDF threshold animation. Cells where the SDF distance exceeds
+// *threshold are hidden. Each half (top/bottom) is masked independently.
+func HalfBlockThreshold(s *SDF, threshold *float64) core.Material {
+	return func(f core.Fragment) core.Cell {
+		topD := s.At(f.X, f.Y*2)
+		botD := s.At(f.X, f.Y*2+1)
+		t := *threshold
+		topVis := topD <= t
+		botVis := botD <= t
+		if !topVis && !botVis {
+			return core.Cell{}
+		}
+		cell := f.Cell
+		if !topVis {
+			cell.FGAlpha = 0
+		}
+		if !botVis {
+			cell.BGAlpha = 0
+		}
+		return cell
+	}
+}
+
+// BrailleThreshold returns a material that reveals braille-encoded content
+// using SDF threshold animation. Samples the SDF at the cell center
+// (2x4 dots per cell) and hides the entire cell if above *threshold.
+func BrailleThreshold(s *SDF, threshold *float64) core.Material {
+	return func(f core.Fragment) core.Cell {
+		px := f.X*2 + 1
+		py := f.Y*4 + 2
+		if s.At(px, py) > *threshold {
+			return core.Cell{}
+		}
+		return f.Cell
+	}
 }
 
 // ComputeSDF computes a signed distance field from a bitmap using the
