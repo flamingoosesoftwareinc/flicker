@@ -51,8 +51,8 @@ func TestMaterialApplication(t *testing.T) {
 		if cell.FG.B != 0 {
 			t.Errorf("cell(%d,%d) FG.B=%d, want 0", tc.cx, tc.cy, cell.FG.B)
 		}
-		if cell.Alpha != 1.0 {
-			t.Errorf("cell(%d,%d) Alpha=%f, want 1.0", tc.cx, tc.cy, cell.Alpha)
+		if cell.FGAlpha != 1.0 {
+			t.Errorf("cell(%d,%d) Alpha=%f, want 1.0", tc.cx, tc.cy, cell.FGAlpha)
 		}
 	}
 }
@@ -81,8 +81,8 @@ func TestMaterialPreservesAlpha(t *testing.T) {
 	for y := range 2 {
 		for x := range 2 {
 			cell := canvas.Get(x, y)
-			if cell.Alpha != 1.0 {
-				t.Errorf("cell(%d,%d) Alpha=%f, want 1.0", x, y, cell.Alpha)
+			if cell.FGAlpha != 1.0 {
+				t.Errorf("cell(%d,%d) Alpha=%f, want 1.0", x, y, cell.FGAlpha)
 			}
 			if cell.Rune != 'X' {
 				t.Errorf("cell(%d,%d) Rune=%q, want 'X'", x, y, cell.Rune)
@@ -92,7 +92,7 @@ func TestMaterialPreservesAlpha(t *testing.T) {
 
 	// Cell outside drawable should have Alpha 0.
 	cell := canvas.Get(3, 3)
-	if cell.Alpha != 0 {
-		t.Errorf("cell(3,3) Alpha=%f, want 0", cell.Alpha)
+	if cell.FGAlpha != 0 {
+		t.Errorf("cell(3,3) Alpha=%f, want 0", cell.FGAlpha)
 	}
 }

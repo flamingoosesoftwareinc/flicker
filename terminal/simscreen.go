@@ -35,7 +35,7 @@ func (s *SimScreen) Flush(canvas *core.Canvas) {
 			if r == 0 {
 				r = ' '
 			}
-			if cell.Alpha > 0 {
+			if cell.FGAlpha > 0 || cell.BGAlpha > 0 {
 				fmt.Fprintf(&buf, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm%c\x1b[0m",
 					cell.FG.R, cell.FG.G, cell.FG.B,
 					cell.BG.R, cell.BG.G, cell.BG.B,

@@ -228,7 +228,8 @@ func TestLayerBlending(t *testing.T) {
 	})
 	world.AddLayer(boxB, 1)
 	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.5
+		f.Cell.FGAlpha = 0.5
+		f.Cell.BGAlpha = 0.5
 		return f.Cell
 	})
 	world.AddRoot(boxB)
@@ -358,7 +359,8 @@ func TestBlendModes(t *testing.T) {
 	})
 	world.AddLayer(boxB, 1)
 	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.8
+		f.Cell.FGAlpha = 0.8
+		f.Cell.BGAlpha = 0.8
 		return f.Cell
 	})
 	world.AddRoot(boxB)
@@ -378,7 +380,8 @@ func TestBlendModes(t *testing.T) {
 	})
 	world.AddLayer(boxC, 2)
 	world.AddMaterial(boxC, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.8
+		f.Cell.FGAlpha = 0.8
+		f.Cell.BGAlpha = 0.8
 		return f.Cell
 	})
 	world.AddRoot(boxC)

@@ -75,7 +75,8 @@ func TestCompositor_TwoLayers_SemiTransparent(t *testing.T) {
 	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, Rune: 'B', FG: Color{0, 0, 200}})
 	world.AddLayer(boxB, 1)
 	world.AddMaterial(boxB, func(f Fragment) Cell {
-		f.Cell.Alpha = 0.5
+		f.Cell.FGAlpha = 0.5
+		f.Cell.BGAlpha = 0.5
 		return f.Cell
 	})
 	world.AddRoot(boxB)

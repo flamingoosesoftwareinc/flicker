@@ -23,8 +23,9 @@ func main() {
 	sw, sh := screen.Size()
 	canvas := core.NewCanvas(sw, sh)
 	canvas.Background = core.Cell{
-		BG:    core.Color{R: 155, G: 155, B: 155},
-		Alpha: 1,
+		BG:      core.Color{R: 155, G: 155, B: 155},
+		FGAlpha: 1,
+		BGAlpha: 1,
 	} // Opaque grey — blend modes need a real destination color.
 	world := core.NewWorld()
 
@@ -99,7 +100,8 @@ func main() {
 	})
 
 	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.7
+		f.Cell.FGAlpha = 0.7
+		f.Cell.BGAlpha = 0.7
 		return f.Cell
 	})
 
@@ -125,7 +127,8 @@ func main() {
 	})
 
 	world.AddMaterial(boxC, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.7
+		f.Cell.FGAlpha = 0.7
+		f.Cell.BGAlpha = 0.7
 		return f.Cell
 	})
 
@@ -171,7 +174,8 @@ func main() {
 	})
 
 	world.AddMaterial(boxD, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.7
+		f.Cell.FGAlpha = 0.7
+		f.Cell.BGAlpha = 0.7
 		return f.Cell
 	})
 
@@ -197,7 +201,8 @@ func main() {
 	})
 
 	world.AddMaterial(boxE, func(f core.Fragment) core.Cell {
-		f.Cell.Alpha = 0.7
+		f.Cell.FGAlpha = 0.7
+		f.Cell.BGAlpha = 0.7
 		return f.Cell
 	})
 

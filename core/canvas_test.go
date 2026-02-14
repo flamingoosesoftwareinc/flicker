@@ -35,17 +35,17 @@ func TestBlendColor(t *testing.T) {
 }
 
 func TestBlendCell_SrcInvisible(t *testing.T) {
-	dst := Cell{Rune: 'A', FG: Color{100, 0, 0}, Alpha: 1}
-	src := Cell{Rune: 'B', FG: Color{0, 100, 0}, Alpha: 0}
+	dst := Cell{Rune: 'A', FG: Color{100, 0, 0}, FGAlpha: 1, BGAlpha: 1}
+	src := Cell{Rune: 'B', FG: Color{0, 100, 0}} // zero alphas
 	out := BlendCell(dst, src, NormalColorBlend)
 	if out != dst {
-		t.Errorf("src.Alpha==0 should return dst, got %v", out)
+		t.Errorf("invisible src should return dst, got %v", out)
 	}
 }
 
 func TestBlendCell_SrcOpaqueDstEmpty(t *testing.T) {
 	dst := Cell{}
-	src := Cell{Rune: 'X', FG: Color{200, 0, 0}, BG: Color{0, 0, 50}, Alpha: 1}
+	src := Cell{Rune: 'X', FG: Color{200, 0, 0}, BG: Color{0, 0, 50}, FGAlpha: 1, BGAlpha: 1}
 	out := BlendCell(dst, src, NormalColorBlend)
 	if out != src {
 		t.Errorf("src opaque over empty dst should return src, got %v", out)
@@ -53,8 +53,8 @@ func TestBlendCell_SrcOpaqueDstEmpty(t *testing.T) {
 }
 
 func TestBlendCell_SemiTransparent(t *testing.T) {
-	dst := Cell{Rune: 'A', FG: Color{200, 0, 0}, BG: Color{40, 0, 0}, Alpha: 1}
-	src := Cell{Rune: 'B', FG: Color{0, 0, 200}, BG: Color{0, 0, 40}, Alpha: 0.5}
+	dst := Cell{Rune: 'A', FG: Color{200, 0, 0}, BG: Color{40, 0, 0}, FGAlpha: 1, BGAlpha: 1}
+	src := Cell{Rune: 'B', FG: Color{0, 0, 200}, BG: Color{0, 0, 40}, FGAlpha: 0.5, BGAlpha: 0.5}
 	out := BlendCell(dst, src, NormalColorBlend)
 
 	// Rune: src has a real character, so it wins.
@@ -73,11 +73,27 @@ func TestBlendCell_SemiTransparent(t *testing.T) {
 }
 
 func TestBlendCell_EmptySrcRunePreservesDst(t *testing.T) {
-	dst := Cell{Rune: 'Z', FG: Color{200, 0, 0}, Alpha: 1}
-	src := Cell{Rune: 0, FG: Color{0, 200, 0}, Alpha: 0.5} // color-only overlay
+	dst := Cell{Rune: 'Z', FG: Color{200, 0, 0}, FGAlpha: 1, BGAlpha: 1}
+	src := Cell{Rune: 0, FG: Color{0, 200, 0}, FGAlpha: 0.5, BGAlpha: 0.5} // color-only overlay
 	out := BlendCell(dst, src, NormalColorBlend)
 	if out.Rune != 'Z' {
 		t.Errorf("empty src rune should keep dst rune 'Z', got %c", out.Rune)
+	}
+}
+
+func TestBlendCell_IndependentAlphas(t *testing.T) {
+	// Braille case: FG opaque, BG transparent.
+	dst := Cell{FG: Color{100, 0, 0}, BG: Color{0, 0, 100}, FGAlpha: 1, BGAlpha: 1}
+	src := Cell{FG: Color{0, 200, 0}, FGAlpha: 1} // BGAlpha = 0
+	out := BlendCell(dst, src, NormalColorBlend)
+
+	// FG should be fully replaced (alpha=1).
+	if out.FG != (Color{0, 200, 0}) {
+		t.Errorf("FG should be src color, got %v", out.FG)
+	}
+	// BG should be preserved (alpha=0 → blend is identity).
+	if out.BG != (Color{0, 0, 100}) {
+		t.Errorf("BG should be preserved from dst, got %v", out.BG)
 	}
 }
 
@@ -88,14 +104,14 @@ func TestCanvasComposite(t *testing.T) {
 	// Fill dst with red 'A'
 	for y := 0; y < 2; y++ {
 		for x := 0; x < 3; x++ {
-			dst.Set(x, y, Cell{Rune: 'A', FG: Color{200, 0, 0}, Alpha: 1})
+			dst.Set(x, y, Cell{Rune: 'A', FG: Color{200, 0, 0}, FGAlpha: 1, BGAlpha: 1})
 		}
 	}
 
 	// Fill src with blue 'B' at 0.5 alpha
 	for y := 0; y < 2; y++ {
 		for x := 0; x < 3; x++ {
-			src.Set(x, y, Cell{Rune: 'B', FG: Color{0, 0, 200}, Alpha: 0.5})
+			src.Set(x, y, Cell{Rune: 'B', FG: Color{0, 0, 200}, FGAlpha: 0.5, BGAlpha: 0.5})
 		}
 	}
 
@@ -117,7 +133,7 @@ func TestCanvasComposite_DifferentSizes(t *testing.T) {
 	dst := NewCanvas(4, 4)
 	src := NewCanvas(2, 2)
 
-	src.Set(0, 0, Cell{Rune: 'X', Alpha: 1})
+	src.Set(0, 0, Cell{Rune: 'X', FGAlpha: 1, BGAlpha: 1})
 	dst.Composite(src, NormalColorBlend)
 
 	if dst.Get(0, 0).Rune != 'X' {

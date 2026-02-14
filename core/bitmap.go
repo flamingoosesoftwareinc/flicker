@@ -125,10 +125,9 @@ func (b *Bitmap) DrawBraille(canvas *Canvas, cx, cy int) {
 				B: uint8(bSum / count),
 			}
 			canvas.Set(cx+col, cy+row, Cell{
-				Rune:          rune(0x2800 | int(bits)),
-				FG:            fg,
-				Alpha:         maxAlpha,
-				BGTransparent: true,
+				Rune:    rune(0x2800 | int(bits)),
+				FG:      fg,
+				FGAlpha: maxAlpha,
 			})
 		}
 	}
@@ -163,21 +162,18 @@ func (b *Bitmap) DrawHalfBlock(canvas *Canvas, cx, cy int) {
 				cell.Rune = '▀'
 				cell.FG = topC
 				cell.BG = botC
-				if topA > botA {
-					cell.Alpha = topA
-				} else {
-					cell.Alpha = botA
-				}
+				cell.FGAlpha = topA
+				cell.BGAlpha = botA
 			case topOn:
 				topC, _ := b.Get(col, topY)
 				cell.Rune = '▀'
 				cell.FG = topC
-				cell.Alpha = topA
+				cell.FGAlpha = topA
 			case botOn:
 				botC, _ := b.Get(col, botY)
 				cell.Rune = '▄'
 				cell.FG = botC
-				cell.Alpha = botA
+				cell.FGAlpha = botA
 			}
 
 			canvas.Set(cx+col, cy+row, cell)
@@ -224,10 +220,9 @@ func (b *Bitmap) BrailleCellAt(col, row int) Cell {
 		B: uint8(bSum / count),
 	}
 	return Cell{
-		Rune:          rune(0x2800 | int(bits)),
-		FG:            fg,
-		Alpha:         maxAlpha,
-		BGTransparent: true,
+		Rune:    rune(0x2800 | int(bits)),
+		FG:      fg,
+		FGAlpha: maxAlpha,
 	}
 }
 
@@ -254,21 +249,18 @@ func (b *Bitmap) HalfBlockCellAt(col, row int) Cell {
 		cell.Rune = '▀'
 		cell.FG = topC
 		cell.BG = botC
-		if topA > botA {
-			cell.Alpha = topA
-		} else {
-			cell.Alpha = botA
-		}
+		cell.FGAlpha = topA
+		cell.BGAlpha = botA
 	case topOn:
 		topC, _ := b.Get(col, topY)
 		cell.Rune = '▀'
 		cell.FG = topC
-		cell.Alpha = topA
+		cell.FGAlpha = topA
 	case botOn:
 		botC, _ := b.Get(col, botY)
 		cell.Rune = '▄'
 		cell.FG = botC
-		cell.Alpha = botA
+		cell.FGAlpha = botA
 	}
 
 	return cell
@@ -344,7 +336,7 @@ func (bd *BitmapDrawable) forwardRenderer() RenderFunc {
 		for dy := range bh {
 			for dx := range bw {
 				cell := bd.CellAt(dx, dy)
-				if cell.Alpha == 0 {
+				if cell.FGAlpha == 0 && cell.BGAlpha == 0 {
 					continue
 				}
 				relX := float64(dx) - cx
@@ -459,10 +451,9 @@ func (bd *BitmapDrawable) brailleRenderer() RenderFunc {
 					B: uint8(bSum / count),
 				}
 				cell := Cell{
-					Rune:          rune(0x2800 | int(bits)),
-					FG:            fg,
-					Alpha:         maxAlpha,
-					BGTransparent: true,
+					Rune:    rune(0x2800 | int(bits)),
+					FG:      fg,
+					FGAlpha: maxAlpha,
 				}
 				emit(sx, sy, sx, sy, cell)
 			}

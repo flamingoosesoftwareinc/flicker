@@ -5,11 +5,11 @@ type Color struct {
 }
 
 type Cell struct {
-	Rune          rune
-	FG            Color
-	BG            Color
-	Alpha         float64
-	BGTransparent bool // when true, blending preserves destination BG
+	Rune    rune
+	FG      Color
+	BG      Color
+	FGAlpha float64
+	BGAlpha float64
 }
 
 // Fragment holds the per-cell context passed to Material and LayerPostProcess
@@ -75,27 +75,21 @@ func (c *Canvas) CopyInto(dst *Canvas) {
 }
 
 // BlendCell composites src over dst using the "over" operator. The
-// ColorBlend function controls how FG/BG colors are mixed.
+// ColorBlend function controls how FG/BG colors are mixed. FG and BG
+// are blended independently using their respective alpha channels.
 func BlendCell(dst, src Cell, blend ColorBlend) Cell {
-	if src.Alpha == 0 {
+	if src.FGAlpha == 0 && src.BGAlpha == 0 {
 		return dst
 	}
-	if src.Alpha >= 1 && dst.Alpha == 0 {
-		out := src
-		if src.BGTransparent {
-			out.BG = dst.BG
-		}
-		return out
+	if src.FGAlpha >= 1 && src.BGAlpha >= 1 && dst.FGAlpha == 0 && dst.BGAlpha == 0 {
+		return src
 	}
 
-	a := src.Alpha
 	out := Cell{
-		FG:    blend(dst.FG, src.FG, a),
-		BG:    blend(dst.BG, src.BG, a),
-		Alpha: dst.Alpha + src.Alpha*(1-dst.Alpha),
-	}
-	if src.BGTransparent {
-		out.BG = dst.BG
+		FG:      blend(dst.FG, src.FG, src.FGAlpha),
+		BG:      blend(dst.BG, src.BG, src.BGAlpha),
+		FGAlpha: dst.FGAlpha + src.FGAlpha*(1-dst.FGAlpha),
+		BGAlpha: dst.BGAlpha + src.BGAlpha*(1-dst.BGAlpha),
 	}
 
 	// Rune rule: real src rune wins; empty src preserves dst text.

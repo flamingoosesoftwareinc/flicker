@@ -13,10 +13,11 @@ func (r *Rect) Draw(canvas *Canvas, x, y int) {
 	for dy := 0; dy < r.Height; dy++ {
 		for dx := 0; dx < r.Width; dx++ {
 			canvas.Set(x+dx, y+dy, Cell{
-				Rune:  r.Rune,
-				FG:    r.FG,
-				BG:    r.BG,
-				Alpha: 1.0,
+				Rune:    r.Rune,
+				FG:      r.FG,
+				BG:      r.BG,
+				FGAlpha: 1,
+				BGAlpha: 1,
 			})
 		}
 	}
@@ -27,7 +28,7 @@ func (r *Rect) Bounds() (int, int) {
 }
 
 func (r *Rect) CellAt(x, y int) Cell {
-	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, Alpha: 1.0}
+	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, FGAlpha: 1, BGAlpha: 1}
 }
 
 func (r *Rect) Renderer() RenderFunc {
@@ -38,7 +39,7 @@ func (r *Rect) Renderer() RenderFunc {
 		for dy := range bh {
 			for dx := range bw {
 				cell := r.CellAt(dx, dy)
-				if cell.Alpha == 0 {
+				if cell.FGAlpha == 0 && cell.BGAlpha == 0 {
 					continue
 				}
 				relX := float64(dx) - cx

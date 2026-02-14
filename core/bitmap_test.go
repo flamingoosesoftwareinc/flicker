@@ -78,8 +78,8 @@ func TestBrailleSingleDot(t *testing.T) {
 	if cell.FG != (Color{R: 255}) {
 		t.Errorf("FG = %v, want {255 0 0}", cell.FG)
 	}
-	if cell.Alpha != 1.0 {
-		t.Errorf("Alpha = %v, want 1.0", cell.Alpha)
+	if cell.FGAlpha != 1.0 {
+		t.Errorf("FGAlpha = %v, want 1.0", cell.FGAlpha)
 	}
 }
 
@@ -130,8 +130,8 @@ func TestBrailleEmptyBlockSkipped(t *testing.T) {
 	if cell.Rune != 0 {
 		t.Errorf("empty block should not write a cell, got rune %U", cell.Rune)
 	}
-	if cell.Alpha != 0 {
-		t.Errorf("empty block alpha = %v, want 0", cell.Alpha)
+	if cell.FGAlpha != 0 {
+		t.Errorf("empty block FGAlpha = %v, want 0", cell.FGAlpha)
 	}
 }
 
@@ -186,8 +186,11 @@ func TestHalfBlockBothOn(t *testing.T) {
 	if cell.BG != (Color{B: 200}) {
 		t.Errorf("BG = %v, want bottom color {0 0 200}", cell.BG)
 	}
-	if cell.Alpha != 1.0 {
-		t.Errorf("Alpha = %v, want 1.0", cell.Alpha)
+	if cell.FGAlpha != 1.0 {
+		t.Errorf("FGAlpha = %v, want 1.0", cell.FGAlpha)
+	}
+	if cell.BGAlpha != 1.0 {
+		t.Errorf("BGAlpha = %v, want 1.0", cell.BGAlpha)
 	}
 }
 
@@ -232,8 +235,13 @@ func TestHalfBlockBothOff(t *testing.T) {
 	bm.DrawHalfBlock(canvas, 0, 0)
 
 	cell := canvas.Get(0, 0)
-	if cell.Rune != 0 || cell.Alpha != 0 {
-		t.Errorf("both-off should be transparent, got rune=%U alpha=%v", cell.Rune, cell.Alpha)
+	if cell.Rune != 0 || cell.FGAlpha != 0 || cell.BGAlpha != 0 {
+		t.Errorf(
+			"both-off should be transparent, got rune=%U FGAlpha=%v BGAlpha=%v",
+			cell.Rune,
+			cell.FGAlpha,
+			cell.BGAlpha,
+		)
 	}
 }
 
