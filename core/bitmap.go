@@ -1,5 +1,11 @@
 package core
 
+import (
+	"math"
+
+	"flicker/fmath"
+)
+
 // EncodeMode selects how a Bitmap is mapped to terminal cells.
 type EncodeMode int
 
@@ -311,4 +317,152 @@ func (bd *BitmapDrawable) Bounds() (int, int) {
 		return bd.Bitmap.Width, (bd.Bitmap.Height + 1) / 2
 	}
 	return 0, 0
+}
+
+// Renderer returns a mode-dependent RenderFunc strategy.
+func (bd *BitmapDrawable) Renderer() RenderFunc {
+	if bd.Bitmap == nil {
+		return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {}
+	}
+	switch bd.Mode {
+	case EncodeBraille:
+		return bd.brailleRenderer()
+	case EncodeHalfBlock:
+		return bd.forwardRenderer()
+	}
+	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {}
+}
+
+// forwardRenderer returns a forward-mapping RenderFunc (used for half-block mode).
+func (bd *BitmapDrawable) forwardRenderer() RenderFunc {
+	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {
+		bw, bh := bd.Bounds()
+		cx, cy := float64(bw)/2.0, float64(bh)/2.0
+
+		for dy := range bh {
+			for dx := range bw {
+				cell := bd.CellAt(dx, dy)
+				if cell.Alpha == 0 {
+					continue
+				}
+				relX := float64(dx) - cx
+				relY := float64(dy) - cy
+				sx := int(world[0]*relX + world[1]*relY + world[2] + cx)
+				sy := int(world[3]*relX + world[4]*relY + world[5] + cy)
+				emit(dx, dy, sx, sy, cell)
+			}
+		}
+	}
+}
+
+// brailleRenderer returns an inverse-mapping RenderFunc for braille mode.
+// For each screen cell in the rotated bounding box, it samples 2x4 dot positions
+// through the inverse world matrix to determine which source pixels are visible,
+// producing partial braille runes at rotated edges.
+func (bd *BitmapDrawable) brailleRenderer() RenderFunc {
+	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {
+		bw, bh := bd.Bounds()
+		cx, cy := float64(bw)/2.0, float64(bh)/2.0
+		bm := bd.Bitmap
+
+		det := world[0]*world[4] - world[1]*world[3]
+		if det == 0 {
+			return
+		}
+		invDet := 1.0 / det
+
+		// Transform 4 corners of the drawable to find the screen bounding box.
+		corners := [4][2]float64{
+			{-cx, -cy},
+			{float64(bw) - cx, -cy},
+			{-cx, float64(bh) - cy},
+			{float64(bw) - cx, float64(bh) - cy},
+		}
+
+		minSX := math.Inf(1)
+		minSY := math.Inf(1)
+		maxSX := math.Inf(-1)
+		maxSY := math.Inf(-1)
+		for _, cr := range corners {
+			scrX := world[0]*cr[0] + world[1]*cr[1] + world[2] + cx
+			scrY := world[3]*cr[0] + world[4]*cr[1] + world[5] + cy
+			if scrX < minSX {
+				minSX = scrX
+			}
+			if scrX > maxSX {
+				maxSX = scrX
+			}
+			if scrY < minSY {
+				minSY = scrY
+			}
+			if scrY > maxSY {
+				maxSY = scrY
+			}
+		}
+
+		startX := int(math.Floor(minSX)) - 1
+		startY := int(math.Floor(minSY)) - 1
+		endX := int(math.Ceil(maxSX)) + 1
+		endY := int(math.Ceil(maxSY)) + 1
+
+		// For each screen cell, sample 2x4 dot positions through inverse transform.
+		for sy := startY; sy <= endY; sy++ {
+			for sx := startX; sx <= endX; sx++ {
+				var bits byte
+				var rSum, gSum, bSum int
+				var count int
+				var maxAlpha float64
+
+				for ddy := range 4 {
+					for ddx := range 2 {
+						// Screen-space position of this dot's center.
+						dotSX := float64(sx) + (float64(ddx)+0.5)/2.0
+						dotSY := float64(sy) + (float64(ddy)+0.5)/4.0
+
+						// Inverse transform to local cell-space.
+						P := dotSX - world[2] - cx
+						Q := dotSY - world[5] - cy
+						localX := (world[4]*P-world[1]*Q)*invDet + cx
+						localY := (-world[3]*P+world[0]*Q)*invDet + cy
+
+						// Convert to bitmap pixel coordinates.
+						px := int(math.Floor(localX * 2))
+						py := int(math.Floor(localY * 4))
+
+						if px < 0 || px >= bm.Width || py < 0 || py >= bm.Height {
+							continue
+						}
+						_, a := bm.Get(px, py)
+						if a > 0 {
+							bits |= brailleBits[ddx][ddy]
+							clr := bm.Pix[py*bm.Width+px]
+							rSum += int(clr.R)
+							gSum += int(clr.G)
+							bSum += int(clr.B)
+							count++
+							if a > maxAlpha {
+								maxAlpha = a
+							}
+						}
+					}
+				}
+
+				if bits == 0 {
+					continue
+				}
+
+				fg := Color{
+					R: uint8(rSum / count),
+					G: uint8(gSum / count),
+					B: uint8(bSum / count),
+				}
+				cell := Cell{
+					Rune:  rune(0x2800 | int(bits)),
+					FG:    fg,
+					Alpha: maxAlpha,
+				}
+				emit(sx, sy, sx, sy, cell)
+			}
+		}
+	}
 }

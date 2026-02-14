@@ -18,35 +18,21 @@ func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
 	world := parent.Multiply(tr.LocalMatrix())
 
 	if d := w.Drawable(e); d != nil {
-		bw, bh := d.Bounds()
-		cx, cy := float64(bw)/2.0, float64(bh)/2.0
+		render := d.Renderer()
 		m := w.Material(e)
-
-		for dy := range bh {
-			for dx := range bw {
-				cell := d.CellAt(dx, dy)
-				if cell.Alpha == 0 {
-					continue
+		render(world, func(dx, dy, sx, sy int, cell Cell) {
+			if m != nil {
+				f := Fragment{
+					X: dx, Y: dy,
+					ScreenX: sx, ScreenY: sy,
+					Time:   t,
+					Cell:   cell,
+					Source: c,
 				}
-
-				relX := float64(dx) - cx
-				relY := float64(dy) - cy
-				sx := int(world[0]*relX + world[1]*relY + world[2] + cx)
-				sy := int(world[3]*relX + world[4]*relY + world[5] + cy)
-
-				if m != nil {
-					f := Fragment{
-						X: dx, Y: dy,
-						ScreenX: sx, ScreenY: sy,
-						Time:   t,
-						Cell:   cell,
-						Source: c,
-					}
-					cell = m(f)
-				}
-				c.Set(sx, sy, cell)
+				cell = m(f)
 			}
-		}
+			c.Set(sx, sy, cell)
+		})
 	}
 
 	for _, child := range w.Children(e) {

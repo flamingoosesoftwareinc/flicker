@@ -262,33 +262,35 @@ func main() {
 	})
 
 	// Layer 7: Orbiting pair — parent rotates, child orbits around it.
+	// Braille bitmaps give sub-cell rotation resolution.
+	pivotBm := core.NewBitmap(8, 8)
+	for py := range 8 {
+		for px := range 8 {
+			pivotBm.SetDot(px, py, core.Color{R: 255, G: 180, B: 0})
+		}
+	}
 	rotPivot := world.Spawn()
 	world.AddTransform(rotPivot, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw/2 - 3), Y: float64(sh/2 - 2)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(rotPivot, &core.Rect{
-		Width:  4,
-		Height: 2,
-		Rune:   '◇',
-		FG:     core.Color{R: 255, G: 180, B: 0},
-		BG:     core.Color{R: 40, G: 30, B: 0},
-	})
+	world.AddDrawable(rotPivot, &core.BitmapDrawable{Bitmap: pivotBm, Mode: core.EncodeBraille})
 	world.AddLayer(rotPivot, 7)
 	world.AddRoot(rotPivot)
 
 	// Child: offset from parent, orbits as parent rotates.
+	orbiterBm := core.NewBitmap(6, 4)
+	for py := range 4 {
+		for px := range 6 {
+			orbiterBm.SetDot(px, py, core.Color{R: 255, G: 100, B: 200})
+		}
+	}
 	orbiter := world.Spawn()
 	world.AddTransform(orbiter, &core.Transform{
 		Position: fmath.Vec3{X: 10, Y: 0},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(orbiter, &core.Rect{
-		Width:  3,
-		Height: 1,
-		Rune:   '●',
-		FG:     core.Color{R: 255, G: 100, B: 200},
-	})
+	world.AddDrawable(orbiter, &core.BitmapDrawable{Bitmap: orbiterBm, Mode: core.EncodeBraille})
 	world.Attach(orbiter, rotPivot)
 
 	world.AddBehavior(rotPivot, func(t core.Time, e core.Entity, w *core.World) {
