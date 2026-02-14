@@ -24,9 +24,9 @@ The `Screen` interface decouples rendering from the terminal backend. `TcellScre
 
 Tick loop (`update → render → flush` at 60 FPS) with goroutine-pumped non-blocking input. `Behavior` component — a per-entity update function `func(dt, Entity, *World)` — iterated by `UpdateBehaviors`. Wave functions in `fmath` (`Saw`, `Sine`, `Triangle`, `Square`, `Pulse`) with period 1.0, composable with `Remap`. Demo: box seesaws horizontally via `Triangle`. Multi-frame golden test with deterministic fixed `dt`.
 
-## Iteration 3: Color, Alpha, and Materials (planned)
+## Iteration 3: Color, Alpha, and Materials (complete)
 
-Color plumbing end-to-end (FG/BG through to tcell). Cell-level `Alpha float64` for transparency. Per-entity `Material` component `func(x, y int, t float64, cell Cell) Cell` — a fragment shader applied during render. Time passed into `Render`. Uncap framerate.
+Color plumbing end-to-end (FG/BG through to tcell). Cell-level `Alpha float64` for transparency. Per-entity `Material` component `func(x, y int, t float64, cell Cell) Cell` — a fragment shader applied during render. Time passed into `Render`. Uncap framerate. VT emulator golden tests capture ANSI color sequences. Overlapping animated objects test validates painter's algorithm with distinct colored entities.
 
 ## Iteration 4: Layers and Compositing (planned)
 
