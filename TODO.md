@@ -60,13 +60,16 @@ Unified `Material` and `LayerPostProcess` under a single `Fragment` struct. Both
 
 ## Iteration 8: Sub-cell Bitmap Buffer (complete)
 
-High-resolution `Bitmap` pixel buffer with two encoding modes that map back to terminal cells. Flat row-major `[]Color` and `[]float64` arrays for cache locality, matching the `Cell` alpha pattern.
+High-resolution `Bitmap` pixel buffer in `core/bitmap` with concrete drawable types that each implement `core.Drawable` directly — no enum dispatch. Flat row-major `[]Color` and `[]float64` arrays for cache locality.
 
-**Braille encoding** (2x4 dots per cell, U+2800-U+28FF): Each 2x4 pixel block maps to one braille character. Bit mapping follows the Unicode standard. FG color is the average RGB of all lit pixels; cell alpha is the max alpha in the block. Empty blocks are skipped. Resolution: 2x horizontal, 4x vertical (160x96 in 80x24). Best for wireframes, particles, monochrome text.
+**Encoding types** (each a concrete struct in `core/bitmap`):
+- `Braille` — 2x4 dots per cell (U+2800-U+28FF), averaged FG color, max alpha. Best for wireframes, particles.
+- `HalfBlock` — 1x2 per cell (`▀`/`▄`), two independent colors (FG=top, BG=bottom). Best for color images.
+- `FullBlock` — 1:1 pixel-to-cell (`█`), single FG color. Simplest encoding.
+- `BGBlock` — 1:1 pixel-to-cell (space with BG color), FGAlpha=0 for compositing transparency.
+- `Rect` — convenience type delegating to `HalfBlock`.
 
-**Half-block encoding** (1x2 per cell, `▀`/`▄`): Each 1x2 pixel pair maps to one cell with two independent colors (FG=top, BG=bottom). Both-on uses `▀` with FG+BG; top-only uses `▀`; bottom-only uses `▄`; both-off is transparent. Resolution: 1x horizontal, 2x vertical (80x48 in 80x24). Best for color images, gradients.
-
-`BitmapDrawable` implements `Drawable`, wrapping a `Bitmap` with an `EncodeMode` selector. Nil-safe (zero bounds, no-op draw). Bounds returns cell-space dimensions computed from pixel dimensions and encoding ratios.
+All types are nil-safe. `forwardRenderer` is shared by HalfBlock/FullBlock/BGBlock; Braille uses an inverse-mapping renderer for rotation support.
 
 ## Iteration 9: Extended Math (complete)
 
@@ -96,20 +99,18 @@ When a braille entity overlaps another entity, only the destination's BG color s
 
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
 
-- **Iteration 11: Asset loading** — Loader pattern for fonts (TTF via `golang.org/x/image/font`), images (PNG/JPEG via `image/png`, `image/jpeg`), 3D models (OBJ), and SVG. Resource cache keyed by path.
+- **Iteration 11: Asset loading (complete)** — OBJ mesh loader, PNG/JPEG image loader with downsampling, wireframe rasterizer, resource cache. All in `asset/` package.
 - **Iteration 12: Camera and projection** — Camera entity with position/target. View matrix. Orthographic and perspective projection. Viewport bounds and culling. World-to-screen coordinate pipeline.
 
 ## Roadmap: Features
 
 These are the target features, built on top of the foundations above. Dependencies noted.
 
-- **Text rendering** (needs: 8, 11) — Load Google Fonts TTFs, rasterize glyphs into bitmap buffer, render as braille/block cells. Text effects: typewriter, scramble-reveal, count up/down.
-- **Particle systems** (needs: 8) — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Sub-cell rendering for pixel-precise particles. Text materialization from particles.
-- **Trails** (needs: nothing, achievable now) — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
-- **Physics: springs and effectors** (needs: 9) — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
-- **OBJ rendering** (needs: 8, 9, 10, 11, 12) — Load OBJ meshes, project vertices, rasterize wireframe or filled triangles into bitmap buffer. Basic vertex lighting (Phong). ASCII luminance mapping for shading.
-- **SVG rendering** (needs: 8, 9, 11) — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
-- **PNG/image rendering** (needs: 8, 11) — Decode images, downsample to bitmap resolution, map to braille/half-block cells with color.
+- **Text rendering** — Load Google Fonts TTFs, rasterize glyphs into bitmap buffer, render as braille/block cells. Text effects: typewriter, scramble-reveal, count up/down.
+- **Particle systems** — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Sub-cell rendering for pixel-precise particles. Text materialization from particles.
+- **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
+- **Physics: springs and effectors** — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
+- **SVG rendering** — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
 - **Scenes/slides** — Ordered scene list, transitions between scenes.
 - **Scripting** — Lua bindings over the Go API.
 - **Playback/recording** — VHS / asciinema integration.
@@ -121,14 +122,20 @@ flicker/
   core/
     entity.go      // Entity, World, parent/child relationships
     transform.go   // Transform component (position, rotation, scale) with LocalMatrix()
-    drawable.go    // Drawable interface
-    rect.go        // Rect drawable
-    bitmap.go      // Bitmap pixel buffer, braille/half-block encoding, BitmapDrawable
+    drawable.go    // Drawable interface, RenderFunc
     behavior.go    // Behavior component + UpdateBehaviors system
-    canvas.go      // Cell, Canvas (2D cell buffer)
+    canvas.go      // Cell, Color, Fragment, Canvas (2D cell buffer)
     blend.go       // BlendMode, ColorBlend, all Photoshop-style blend modes
     render.go      // Scene graph traversal, drawable → canvas
     layer.go       // Compositor, per-layer canvases, back-to-front compositing
+  core/bitmap/
+    bitmap.go      // Bitmap pixel buffer, New(), Set/Get/SetDot/Clear/Line
+    braille.go     // Braille drawable (2x4 dots per cell)
+    halfblock.go   // HalfBlock drawable (1x2 per cell)
+    fullblock.go   // FullBlock drawable (1:1 pixel-to-cell)
+    bgblock.go     // BGBlock drawable (BG-only encoding)
+    rect.go        // Rect drawable (delegates to HalfBlock)
+    renderer.go    // forwardRenderer shared by HalfBlock/FullBlock/BGBlock
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
     vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp, dot, cross
@@ -141,6 +148,11 @@ flicker/
     tween.go       // Tween (float64), TweenVec3 (Vec3) — stateful interpolators with easing
     easing.go      // Easing functions: linear, quad, cubic, elastic, bounce (all func(t float64) float64)
     wave.go        // Wave functions: saw, sine, triangle, square, pulse (period 1.0)
+  asset/
+    obj.go         // OBJ mesh loader
+    image.go       // PNG/JPEG image loader → bitmap.Bitmap
+    rasterize.go   // Wireframe rasterizer (mesh → bitmap)
+    cache.go       // Resource cache keyed by path
   terminal/
     screen.go      // Screen interface, TcellScreen (tcell backend)
     simscreen.go   // SimScreen (in-memory backend for testing)
@@ -151,4 +163,4 @@ flicker/
   testdata/        // Golden files
 ```
 
-`fmath` depends on nothing. `core` depends on `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all three.
+`fmath` depends on nothing. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
