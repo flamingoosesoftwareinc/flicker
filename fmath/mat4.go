@@ -110,6 +110,52 @@ func Mat4Ortho(left, right, bottom, top, near, far float64) Mat4 {
 	}
 }
 
+// Mat4Translate returns a translation matrix.
+func Mat4Translate(x, y, z float64) Mat4 {
+	return Mat4{
+		1, 0, 0, x,
+		0, 1, 0, y,
+		0, 0, 1, z,
+		0, 0, 0, 1,
+	}
+}
+
+// Mat4RotateX returns a rotation matrix around the X axis.
+func Mat4RotateX(angle float64) Mat4 {
+	c := math.Cos(angle)
+	s := math.Sin(angle)
+	return Mat4{
+		1, 0, 0, 0,
+		0, c, -s, 0,
+		0, s, c, 0,
+		0, 0, 0, 1,
+	}
+}
+
+// Mat4RotateY returns a rotation matrix around the Y axis.
+func Mat4RotateY(angle float64) Mat4 {
+	c := math.Cos(angle)
+	s := math.Sin(angle)
+	return Mat4{
+		c, 0, s, 0,
+		0, 1, 0, 0,
+		-s, 0, c, 0,
+		0, 0, 0, 1,
+	}
+}
+
+// Mat4RotateZ returns a rotation matrix around the Z axis.
+func Mat4RotateZ(angle float64) Mat4 {
+	c := math.Cos(angle)
+	s := math.Sin(angle)
+	return Mat4{
+		c, -s, 0, 0,
+		s, c, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1,
+	}
+}
+
 // Mat4Perspective returns a perspective projection matrix.
 func Mat4Perspective(fovY, aspect, near, far float64) Mat4 {
 	f := 1.0 / math.Tan(fovY/2)

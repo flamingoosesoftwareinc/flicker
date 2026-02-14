@@ -2,9 +2,11 @@ package flicker_test
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
+	"flicker/asset"
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
@@ -524,4 +526,66 @@ func TestTransformRotation(t *testing.T) {
 
 	g := goldie.New(t)
 	g.Assert(t, "transform_rotation", []byte(b.String()))
+}
+
+func TestOBJWireframe(t *testing.T) {
+	const (
+		w      = 40
+		h      = 20
+		frames = 3
+		dt     = 0.5
+	)
+
+	mesh, err := asset.LoadOBJ("suzanne.obj")
+	if err != nil {
+		t.Fatalf("LoadOBJ: %v", err)
+	}
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	objBm := core.NewBitmap(60, 60)
+	objEnt := world.Spawn()
+	world.AddTransform(objEnt, &core.Transform{
+		Position: fmath.Vec3{X: 5, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	objDraw := &core.BitmapDrawable{Bitmap: objBm, Mode: core.EncodeBraille}
+	world.AddDrawable(objEnt, objDraw)
+	world.AddRoot(objEnt)
+
+	proj := fmath.Mat4Perspective(math.Pi/3, 1.0, 0.1, 100)
+	view := fmath.Mat4Translate(0, 0, -3)
+
+	world.AddBehavior(objEnt, func(t core.Time, e core.Entity, w *core.World) {
+		objBm.Clear()
+		model := fmath.Mat4RotateY(t.Total * 0.8).Multiply(fmath.Mat4RotateX(0.3))
+		mvp := proj.Multiply(view).Multiply(model)
+		asset.RasterizeWireframe(mesh, mvp, objBm, core.Color{R: 180, G: 255, B: 200})
+	})
+
+	for i := range frames {
+		ti := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, ti)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas, ti)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "obj_wireframe", []byte(b.String()))
 }

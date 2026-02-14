@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"flicker/asset"
 	"flicker/core"
 	"flicker/fmath"
 	"flicker/terminal"
@@ -283,6 +284,34 @@ func main() {
 		tr := w.Transform(e)
 		tr.Rotation = t.Total * fmath.DegToRad(60)
 	})
+
+	// Layer 8: Suzanne OBJ wireframe — spinning 3D model via braille.
+	suzanneMesh, err := asset.LoadOBJ("suzanne.obj")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v (skipping OBJ layer)\n", err)
+	} else {
+		objBm := core.NewBitmap(60, 60)
+		objEnt := world.Spawn()
+		world.AddTransform(objEnt, &core.Transform{
+			Position: fmath.Vec3{X: float64(sw/2 - 15), Y: 1},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		objDraw := &core.BitmapDrawable{Bitmap: objBm, Mode: core.EncodeBraille}
+		world.AddDrawable(objEnt, objDraw)
+		world.AddLayer(objEnt, 8)
+		world.AddRoot(objEnt)
+
+		proj := fmath.Mat4Perspective(math.Pi/3, 1.0, 0.1, 100)
+		view := fmath.Mat4Translate(0, 0, -3)
+
+		world.AddBehavior(objEnt, func(t core.Time, e core.Entity, w *core.World) {
+			objBm.Clear()
+			model := fmath.Mat4RotateY(t.Total * 0.8).Multiply(fmath.Mat4RotateX(0.3))
+			mvp := proj.Multiply(view).Multiply(model)
+			c := core.Color{R: 180, G: 255, B: 200}
+			asset.RasterizeWireframe(suzanneMesh, mvp, objBm, c)
+		})
+	}
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
 	events := make(chan tcell.Event, 1)

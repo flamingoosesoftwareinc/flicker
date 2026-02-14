@@ -130,3 +130,38 @@ func TestMat4ApplyPerspectiveDivide(t *testing.T) {
 		t.Errorf("Apply with w=2: %v, want (2,3,4)", got)
 	}
 }
+
+func TestMat4Translate(t *testing.T) {
+	m := Mat4Translate(3, -5, 7)
+	got := m.Apply(Vec3{X: 1, Y: 2, Z: 3})
+	if !approxEqual(got.X, 4) || !approxEqual(got.Y, -3) || !approxEqual(got.Z, 10) {
+		t.Errorf("Translate(3,-5,7).Apply(1,2,3) = %v, want (4,-3,10)", got)
+	}
+}
+
+func TestMat4RotateY_90(t *testing.T) {
+	m := Mat4RotateY(math.Pi / 2)
+	// Rotating (1,0,0) by 90° around Y → (0,0,-1)
+	got := m.Apply(Vec3{X: 1})
+	if !approxEqual(got.X, 0) || !approxEqual(got.Y, 0) || !approxEqual(got.Z, -1) {
+		t.Errorf("RotateY(90°).Apply(1,0,0) = %v, want (0,0,-1)", got)
+	}
+}
+
+func TestMat4RotateX_90(t *testing.T) {
+	m := Mat4RotateX(math.Pi / 2)
+	// Rotating (0,1,0) by 90° around X → (0,0,1)
+	got := m.Apply(Vec3{Y: 1})
+	if !approxEqual(got.X, 0) || !approxEqual(got.Y, 0) || !approxEqual(got.Z, 1) {
+		t.Errorf("RotateX(90°).Apply(0,1,0) = %v, want (0,0,1)", got)
+	}
+}
+
+func TestMat4RotateZ_90(t *testing.T) {
+	m := Mat4RotateZ(math.Pi / 2)
+	// Rotating (1,0,0) by 90° around Z → (0,1,0)
+	got := m.Apply(Vec3{X: 1})
+	if !approxEqual(got.X, 0) || !approxEqual(got.Y, 1) || !approxEqual(got.Z, 0) {
+		t.Errorf("RotateZ(90°).Apply(1,0,0) = %v, want (0,1,0)", got)
+	}
+}

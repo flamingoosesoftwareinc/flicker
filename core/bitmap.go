@@ -83,6 +83,45 @@ func (b *Bitmap) Clear() {
 	}
 }
 
+// Line draws a line from (x0,y0) to (x1,y1) using Bresenham's algorithm.
+func (b *Bitmap) Line(x0, y0, x1, y1 int, c Color) {
+	dx := x1 - x0
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := y1 - y0
+	if dy < 0 {
+		dy = -dy
+	}
+	dy = -dy
+
+	sx := 1
+	if x0 >= x1 {
+		sx = -1
+	}
+	sy := 1
+	if y0 >= y1 {
+		sy = -1
+	}
+
+	err := dx + dy
+	for {
+		b.SetDot(x0, y0, c)
+		if x0 == x1 && y0 == y1 {
+			break
+		}
+		e2 := 2 * err
+		if e2 >= dy {
+			err += dy
+			x0 += sx
+		}
+		if e2 <= dx {
+			err += dx
+			y0 += sy
+		}
+	}
+}
+
 // DrawBraille encodes the bitmap into braille characters on the canvas.
 // Each 2x4 pixel block becomes one braille cell at canvas position (cx+col, cy+row).
 func (b *Bitmap) DrawBraille(canvas *Canvas, cx, cy int) {

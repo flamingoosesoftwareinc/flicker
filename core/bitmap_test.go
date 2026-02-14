@@ -245,6 +245,62 @@ func TestHalfBlockBothOff(t *testing.T) {
 	}
 }
 
+// --- Line drawing ---
+
+func TestLineHorizontal(t *testing.T) {
+	bm := NewBitmap(10, 10)
+	bm.Line(1, 5, 8, 5, Color{R: 255})
+
+	for x := 1; x <= 8; x++ {
+		_, a := bm.Get(x, 5)
+		if a == 0 {
+			t.Errorf("pixel (%d,5) should be set", x)
+		}
+	}
+	// Outside the line.
+	_, a := bm.Get(0, 5)
+	if a != 0 {
+		t.Error("pixel (0,5) should not be set")
+	}
+}
+
+func TestLineVertical(t *testing.T) {
+	bm := NewBitmap(10, 10)
+	bm.Line(3, 2, 3, 7, Color{G: 255})
+
+	for y := 2; y <= 7; y++ {
+		_, a := bm.Get(3, y)
+		if a == 0 {
+			t.Errorf("pixel (3,%d) should be set", y)
+		}
+	}
+}
+
+func TestLineDiagonal(t *testing.T) {
+	bm := NewBitmap(10, 10)
+	bm.Line(0, 0, 9, 9, Color{B: 255})
+
+	// Diagonal should hit (0,0) and (9,9) at minimum.
+	_, a := bm.Get(0, 0)
+	if a == 0 {
+		t.Error("start pixel should be set")
+	}
+	_, a = bm.Get(9, 9)
+	if a == 0 {
+		t.Error("end pixel should be set")
+	}
+}
+
+func TestLineSinglePoint(t *testing.T) {
+	bm := NewBitmap(5, 5)
+	bm.Line(2, 3, 2, 3, Color{R: 100})
+
+	_, a := bm.Get(2, 3)
+	if a == 0 {
+		t.Error("single-point line should set pixel")
+	}
+}
+
 // --- BitmapDrawable ---
 
 func TestBitmapDrawableBounds(t *testing.T) {
