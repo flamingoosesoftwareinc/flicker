@@ -76,6 +76,22 @@ High-resolution `Bitmap` pixel buffer with two encoding modes that map back to t
 
 `Transform` gains `Rotation` (float64 radians, 2D rotation around Z) and `Scale` (Vec3, where `{0,0,0}` means zero — no magic defaults). `LocalMatrix()` computes the TRS matrix (translate * rotate * scale). Render traversal (`renderEntity`) replaced position accumulation (`ox, oy, oz`) with hierarchical `Mat3` multiplication — parent transforms compose correctly through the scene graph. All call sites updated to set `Scale: {1,1,1}` explicitly. Golden tests regenerated.
 
+### Inverse-Mapped Braille Rendering
+
+`Drawable.Renderer()` returns a `RenderFunc` strategy. Rect and half-block use forward mapping; braille uses inverse mapping that samples 2×4 dot positions through the inverse world matrix for smooth partial-dot edges at rotated angles.
+
+### Independent FG/BG Alpha
+
+`Cell` originally had a single `Alpha` governing both FG and BG. Braille cells need FG-opaque (dots visible) with BG-transparent (show whatever is underneath). A `BGTransparent bool` was tried first but was really just a boolean encoding of "BG alpha is 0." Since Cell already has separate FG and BG colors, separate alphas are the natural model.
+
+`Cell.Alpha` was replaced with `Cell.FGAlpha` and `Cell.BGAlpha`. `BlendCell` blends FG and BG independently — `blend(dst.BG, src.BG, src.BGAlpha=0)` naturally preserves the destination BG with no special cases. Half-block encoding also benefits: top and bottom pixel alphas are now independent (`FGAlpha=topA`, `BGAlpha=botA`) instead of approximated as `max(topA, botA)`.
+
+## Known Limitations
+
+### Braille BG shows destination BG, not destination FG
+
+When a braille entity overlaps another entity, only the destination's BG color shows through between the braille dots. The destination's FG color (carried by the rune glyph) is replaced by the braille rune. This is a fundamental constraint of terminal cells: one rune, one FG, one BG per cell. If the underlying entity's visual identity comes primarily from its FG (e.g. a Rect with `▓` and a vivid FG but dark BG), overlapping braille will appear to "erase" that color. Use saturated BG colors on entities that need to remain visible under braille overlays.
+
 ## Roadmap: Foundation
 
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
