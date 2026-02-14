@@ -23,3 +23,7 @@ func (r *Rect) Draw(canvas *Canvas, x, y int) {
 func (r *Rect) Bounds() (int, int) {
 	return r.Width, r.Height
 }
+
+func (r *Rect) CellAt(x, y int) Cell {
+	return Cell{Rune: r.Rune, FG: r.FG, BG: r.BG, Alpha: 1.0}
+}

@@ -178,6 +178,94 @@ func (b *Bitmap) DrawHalfBlock(canvas *Canvas, cx, cy int) {
 	}
 }
 
+// BrailleCellAt returns the braille-encoded Cell for the cell-grid position (col, row).
+func (b *Bitmap) BrailleCellAt(col, row int) Cell {
+	var bits byte
+	var rSum, gSum, bSum int
+	var count int
+	var maxAlpha float64
+
+	for dy := range 4 {
+		for dx := range 2 {
+			px := col*2 + dx
+			py := row*4 + dy
+			if px >= b.Width || py >= b.Height {
+				continue
+			}
+			_, a := b.Get(px, py)
+			if a > 0 {
+				bits |= brailleBits[dx][dy]
+				c := b.Pix[py*b.Width+px]
+				rSum += int(c.R)
+				gSum += int(c.G)
+				bSum += int(c.B)
+				count++
+				if a > maxAlpha {
+					maxAlpha = a
+				}
+			}
+		}
+	}
+
+	if bits == 0 {
+		return Cell{}
+	}
+
+	fg := Color{
+		R: uint8(rSum / count),
+		G: uint8(gSum / count),
+		B: uint8(bSum / count),
+	}
+	return Cell{
+		Rune:  rune(0x2800 | int(bits)),
+		FG:    fg,
+		Alpha: maxAlpha,
+	}
+}
+
+// HalfBlockCellAt returns the half-block-encoded Cell for the cell-grid position (col, row).
+func (b *Bitmap) HalfBlockCellAt(col, row int) Cell {
+	topY := row * 2
+	botY := row*2 + 1
+
+	_, topA := b.Get(col, topY)
+	_, botA := b.Get(col, botY)
+	topOn := topA > 0
+	botOn := botA > 0
+
+	if !topOn && !botOn {
+		return Cell{}
+	}
+
+	var cell Cell
+
+	switch {
+	case topOn && botOn:
+		topC, _ := b.Get(col, topY)
+		botC, _ := b.Get(col, botY)
+		cell.Rune = '▀'
+		cell.FG = topC
+		cell.BG = botC
+		if topA > botA {
+			cell.Alpha = topA
+		} else {
+			cell.Alpha = botA
+		}
+	case topOn:
+		topC, _ := b.Get(col, topY)
+		cell.Rune = '▀'
+		cell.FG = topC
+		cell.Alpha = topA
+	case botOn:
+		botC, _ := b.Get(col, botY)
+		cell.Rune = '▄'
+		cell.FG = botC
+		cell.Alpha = botA
+	}
+
+	return cell
+}
+
 // BitmapDrawable wraps a Bitmap to implement the Drawable interface.
 type BitmapDrawable struct {
 	Bitmap *Bitmap
@@ -195,6 +283,20 @@ func (bd *BitmapDrawable) Draw(canvas *Canvas, x, y int) {
 	case EncodeHalfBlock:
 		bd.Bitmap.DrawHalfBlock(canvas, x, y)
 	}
+}
+
+// CellAt returns the encoded cell at position (x, y) in cell-grid space.
+func (bd *BitmapDrawable) CellAt(x, y int) Cell {
+	if bd.Bitmap == nil {
+		return Cell{}
+	}
+	switch bd.Mode {
+	case EncodeBraille:
+		return bd.Bitmap.BrailleCellAt(x, y)
+	case EncodeHalfBlock:
+		return bd.Bitmap.HalfBlockCellAt(x, y)
+	}
+	return Cell{}
 }
 
 // Bounds returns the cell-space dimensions of the bitmap.
