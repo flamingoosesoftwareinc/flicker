@@ -172,29 +172,59 @@ func main() {
 	comp.SetBlend(3, core.OverlayColorBlend)
 	comp.SetBlend(4, core.DifferenceColorBlend)
 
-	start := time.Now()
-	last := start
+	const stepSize = 1.0 / 60.0
+
+	var simTime float64
+	paused := false
+	last := time.Now()
 
 	for {
 		// Drain events (non-blocking).
-		done := false
-		for !done {
+		step := false
+		quit := false
+		for draining := true; draining; {
 			select {
 			case ev := <-events:
-				if _, ok := ev.(*tcell.EventKey); ok {
-					return
+				if kev, ok := ev.(*tcell.EventKey); ok {
+					switch {
+					case kev.Key() == tcell.KeyEscape:
+						quit = true
+					case kev.Key() == tcell.KeyRight:
+						step = true
+					case kev.Rune() == ' ':
+						paused = !paused
+					case kev.Rune() == '.':
+						step = true
+					case kev.Rune() == 'q':
+						quit = true
+					}
 				}
 			default:
-				done = true
+				draining = false
 			}
+		}
+		if quit {
+			return
 		}
 
 		now := time.Now()
-		t := core.Time{
-			Total: now.Sub(start).Seconds(),
-			Delta: now.Sub(last).Seconds(),
-		}
+		wallDelta := now.Sub(last).Seconds()
 		last = now
+
+		var simDelta float64
+		switch {
+		case step:
+			simDelta = stepSize
+			paused = true
+		case !paused:
+			simDelta = wallDelta
+		}
+		simTime += simDelta
+
+		t := core.Time{
+			Total: simTime,
+			Delta: simDelta,
+		}
 
 		core.UpdateBehaviors(world, t)
 
