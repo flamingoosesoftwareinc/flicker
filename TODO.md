@@ -58,12 +58,30 @@ Unified `Material` and `LayerPostProcess` under a single `Fragment` struct. Both
 
 `Canvas.Clone()` returns a deep copy. `Canvas.CopyInto(dst)` copies cells into an existing canvas without allocating. The `Compositor` reuses a single `scratch` buffer across frames for post-process snapshot double-buffering, eliminating per-frame allocations after warmup.
 
-## What Comes Next
-- **Text rendering**: bitmap font rasterization → braille/block mapping
-- **Particles**: point clouds, emitters, attractor targets
-- **Scenes/slides**: ordered scene list, transitions
-- **Scripting**: Lua bindings over the Go API
-- **Playback/recording**: VHS / asciinema integration
+## Roadmap: Foundation
+
+These foundation iterations unblock the feature work below. Order matters — each builds on the last.
+
+- **Iteration 8: Sub-cell bitmap buffer + braille/block mapper** — A high-resolution `Bitmap` buffer (2x per cell horizontal, 4x vertical via braille `⠀`-`⣿`) with a mapper that packs pixels back into terminal cells. Unlocks text rendering, particle-as-pixel, image display, SVG, and 3D rasterization. Half-block (`▀▄`) mode for 1x2 sub-cell with independent FG/BG color per half.
+- **Iteration 9: Extended math** — `Dot`, `Cross` on Vec3. `Mat3`/`Mat4` with multiply, inverse, transpose. Perspective/orthographic projection matrices. Perlin/simplex noise. Bezier curves (quadratic, cubic). Degrees/radians helpers.
+- **Iteration 10: Transform rotation and scale** — Add `Rotation` (float64 radians, 2D for now) and `Scale` (Vec3) to Transform. Hierarchical composition via matrices. Update render traversal to apply full transform chain.
+- **Iteration 11: Asset loading** — Loader pattern for fonts (TTF via `golang.org/x/image/font`), images (PNG/JPEG via `image/png`, `image/jpeg`), 3D models (OBJ), and SVG. Resource cache keyed by path.
+- **Iteration 12: Camera and projection** — Camera entity with position/target. View matrix. Orthographic and perspective projection. Viewport bounds and culling. World-to-screen coordinate pipeline.
+
+## Roadmap: Features
+
+These are the target features, built on top of the foundations above. Dependencies noted.
+
+- **Text rendering** (needs: 8, 11) — Load Google Fonts TTFs, rasterize glyphs into bitmap buffer, render as braille/block cells. Text effects: typewriter, scramble-reveal, count up/down.
+- **Particle systems** (needs: 8) — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Sub-cell rendering for pixel-precise particles. Text materialization from particles.
+- **Trails** (needs: nothing, achievable now) — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
+- **Physics: springs and effectors** (needs: 9) — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
+- **OBJ rendering** (needs: 8, 9, 10, 11, 12) — Load OBJ meshes, project vertices, rasterize wireframe or filled triangles into bitmap buffer. Basic vertex lighting (Phong). ASCII luminance mapping for shading.
+- **SVG rendering** (needs: 8, 9, 11) — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
+- **PNG/image rendering** (needs: 8, 11) — Decode images, downsample to bitmap resolution, map to braille/half-block cells with color.
+- **Scenes/slides** — Ordered scene list, transitions between scenes.
+- **Scripting** — Lua bindings over the Go API.
+- **Playback/recording** — VHS / asciinema integration.
 
 ## Package Structure
 
