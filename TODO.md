@@ -110,6 +110,7 @@ These are the target features, built on top of the foundations above. Dependenci
 - **Particle systems** — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Sub-cell rendering for pixel-precise particles. Text materialization from particles.
 - **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
 - **Physics: springs and effectors** — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
+- **SDF primitives** — `sdf/` package with common 2D signed distance functions sourced from [iquilezles.org/articles/distfunctions2d](https://iquilezles.org/articles/distfunctions2d/). Circle, box, segment, arc, bezier, etc. Composable via union/intersection/subtraction. Useful for procedural shapes, glow, outlines, and collision fields.
 - **SVG rendering** — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
 - **Scenes/slides** — Ordered scene list, transitions between scenes.
 - **Scripting** — Lua bindings over the Go API.
