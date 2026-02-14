@@ -343,6 +343,33 @@ func main() {
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-16), v)
 	})
 
+	// Layer 10: BG-only color wash — transparent FG lets underlying content bleed through.
+	bgBm := core.NewBitmap(16, 10)
+	bgEnt := world.Spawn()
+	world.AddTransform(bgEnt, &core.Transform{
+		Position: fmath.Vec3{X: float64(sw/2 - 8), Y: float64(sh/2 - 5)},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(bgEnt, &core.BitmapDrawable{Bitmap: bgBm, Mode: core.EncodeBGBlock})
+	world.AddLayer(bgEnt, 10)
+	world.AddRoot(bgEnt)
+
+	world.AddBehavior(bgEnt, func(t core.Time, e core.Entity, w *core.World) {
+		for py := range 10 {
+			for px := range 16 {
+				fx := float64(px)
+				fy := float64(py)
+				// Slow rolling color bands.
+				r := uint8((math.Sin(fy*0.5+t.Total*0.6) + 1) / 2 * 200)
+				g := uint8((math.Sin(fx*0.4+t.Total*0.4) + 1) / 2 * 160)
+				b := uint8((math.Cos((fx+fy)*0.3+t.Total*0.5) + 1) / 2 * 220)
+				bgBm.Set(px, py, core.Color{R: r, G: g, B: b}, 0.6)
+			}
+		}
+		v := fmath.Triangle(t.Total / 11.0)
+		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
+	})
+
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
 	events := make(chan tcell.Event, 1)
 	go func() {
