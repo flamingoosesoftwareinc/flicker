@@ -69,7 +69,7 @@ High-resolution `Bitmap` pixel buffer in `core/bitmap` with concrete drawable ty
 - `BGBlock` — 1:1 pixel-to-cell (space with BG color), FGAlpha=0 for compositing transparency.
 - `Rect` — convenience type delegating to `HalfBlock`.
 
-All types are nil-safe. `forwardRenderer` is shared by HalfBlock/FullBlock/BGBlock; Braille uses an inverse-mapping renderer for rotation support.
+All types are nil-safe. `inverseRenderer` is shared by HalfBlock/FullBlock/BGBlock/Braille for gap-free rendering under zoom and rotation.
 
 ## Iteration 9: Extended Math (complete)
 
@@ -100,7 +100,7 @@ When a braille entity overlaps another entity, only the destination's BG color s
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
 
 - **Iteration 11: Asset loading (complete)** — OBJ mesh loader, PNG/JPEG image loader with downsampling, wireframe rasterizer, resource cache. All in `asset/` package.
-- **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. All forward-mapped drawables (HalfBlock, FullBlock, BGBlock) switched to inverse mapping via shared `inverseRenderer` — eliminates scan-line gaps under non-integer zoom. Demo: gentle circular pan + subtle zoom pulse.
+- **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. All forward-mapped drawables (HalfBlock, FullBlock, BGBlock) switched to inverse mapping via shared `inverseRenderer` — eliminates scan-line gaps under non-integer zoom. Demo: gentle circular pan + pronounced zoom pulse (0.7×–1.3×).
 
 ## Roadmap: Features
 
@@ -136,7 +136,7 @@ flicker/
     fullblock.go   // FullBlock drawable (1:1 pixel-to-cell)
     bgblock.go     // BGBlock drawable (BG-only encoding)
     rect.go        // Rect drawable (delegates to HalfBlock)
-    renderer.go    // forwardRenderer shared by HalfBlock/FullBlock/BGBlock
+    renderer.go    // inverseRenderer shared by all drawable types
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
     vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp, dot, cross
