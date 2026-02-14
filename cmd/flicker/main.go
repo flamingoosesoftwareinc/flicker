@@ -371,7 +371,7 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
 	})
 
-	// Camera: gentle circular pan + subtle zoom pulse.
+	// Camera: gentle circular pan + zoom pulse.
 	cam := world.Spawn()
 	world.AddTransform(cam, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw) / 2.0, Y: float64(sh) / 2.0},
@@ -387,8 +387,8 @@ func main() {
 		// Gentle circular pan: radius 3, period ~20s, centered on neutral position.
 		tr.Position.X = cx + 3*math.Cos(t.Total*0.3)
 		tr.Position.Y = cy + 3*math.Sin(t.Total*0.3)
-		// Subtle zoom pulse: oscillates between 0.95 and 1.05.
-		w.Camera(e).Zoom = 1.0 + 0.05*math.Sin(t.Total*0.5)
+		// Zoom pulse: oscillates between 0.7 and 1.3 (~10s period).
+		w.Camera(e).Zoom = 1.0 + 0.3*math.Sin(t.Total*0.6)
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
