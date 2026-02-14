@@ -22,6 +22,10 @@ func main() {
 
 	sw, sh := screen.Size()
 	canvas := core.NewCanvas(sw, sh)
+	canvas.Background = core.Cell{
+		BG:    core.Color{R: 155, G: 155, B: 155},
+		Alpha: 1,
+	} // Opaque grey — blend modes need a real destination color.
 	world := core.NewWorld()
 
 	// Layer 0: Red box — Normal blend (base layer), slow seesaw left→right.

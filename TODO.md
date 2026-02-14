@@ -48,6 +48,8 @@ Demo expanded to 5 layers: Red/Normal base, Green/Multiply, Blue/Screen, Yellow/
 
 Demo updated: Box A uses `Tween` with `EaseInOutCubic` for smooth horizontal ping-pong. Box D uses `TweenVec3` with `EaseInOutQuad` for diagonal ping-pong. Golden test `TestTween` verifies tween-driven animation with easing over 6 frames.
 
+Canvas background color: `Canvas.Background` field — `Clear()` fills with it instead of `Cell{}`. Default is zero-value (transparent), fully backward compatible. Demo sets opaque black background so non-Normal blend modes (Multiply, Difference, etc.) composite correctly over empty regions.
+
 ## What Comes Next
 - **Text rendering**: bitmap font rasterization → braille/block mapping
 - **Particles**: point clouds, emitters, attractor targets

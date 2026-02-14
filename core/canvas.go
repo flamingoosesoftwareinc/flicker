@@ -14,6 +14,7 @@ type Cell struct {
 type Canvas struct {
 	Width, Height int
 	Cells         [][]Cell
+	Background    Cell // Clear() fills with this; zero-value = transparent
 }
 
 func NewCanvas(w, h int) *Canvas {
@@ -41,7 +42,7 @@ func (c *Canvas) Get(x, y int) Cell {
 func (c *Canvas) Clear() {
 	for y := range c.Cells {
 		for x := range c.Cells[y] {
-			c.Cells[y][x] = Cell{}
+			c.Cells[y][x] = c.Background
 		}
 	}
 }
