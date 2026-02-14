@@ -36,6 +36,7 @@ func main() {
 		FG:     core.Color{R: 200, G: 60, B: 60},
 		BG:     core.Color{R: 40, G: 0, B: 0},
 	})
+	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
 	world.AddBehavior(boxA, func(t core.Time, e core.Entity, w *core.World) {
@@ -67,6 +68,7 @@ func main() {
 		FG:     core.Color{R: 60, G: 60, B: 200},
 		BG:     core.Color{R: 0, G: 0, B: 40},
 	})
+	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
 
 	world.AddBehavior(boxB, func(t core.Time, e core.Entity, w *core.World) {
@@ -75,6 +77,7 @@ func main() {
 	})
 
 	world.AddMaterial(boxB, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.5
 		gradient := float64(y) / 5.0
 		pulse := (math.Sin(2*math.Pi*t.Total+math.Pi) + 1) / 2 // offset phase
 		brightness := gradient*0.5 + pulse*0.5
@@ -93,6 +96,8 @@ func main() {
 			events <- screen.PollEvent()
 		}
 	}()
+
+	comp := core.NewCompositor(sw, sh)
 
 	start := time.Now()
 	last := start
@@ -122,7 +127,7 @@ func main() {
 
 		canvas.Clear()
 		canvas.DrawBorder()
-		core.Render(world, canvas, t)
+		comp.Composite(world, canvas, t)
 		screen.Flush(canvas)
 	}
 }

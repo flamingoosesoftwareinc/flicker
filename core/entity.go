@@ -12,6 +12,7 @@ type World struct {
 	drawables  map[Entity]Drawable
 	behaviors  map[Entity]Behavior
 	materials  map[Entity]Material
+	layers     map[Entity]int
 	children   map[Entity][]Entity
 	roots      []Entity
 }
@@ -22,6 +23,7 @@ func NewWorld() *World {
 		drawables:  make(map[Entity]Drawable),
 		behaviors:  make(map[Entity]Behavior),
 		materials:  make(map[Entity]Material),
+		layers:     make(map[Entity]int),
 		children:   make(map[Entity][]Entity),
 	}
 }
@@ -77,4 +79,12 @@ func (w *World) AddMaterial(e Entity, m Material) {
 
 func (w *World) Material(e Entity) Material {
 	return w.materials[e]
+}
+
+func (w *World) AddLayer(e Entity, layer int) {
+	w.layers[e] = layer
+}
+
+func (w *World) Layer(e Entity) int {
+	return w.layers[e]
 }

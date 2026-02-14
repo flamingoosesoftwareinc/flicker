@@ -28,9 +28,9 @@ Tick loop (`update → render → flush` at 60 FPS) with goroutine-pumped non-bl
 
 Color plumbing end-to-end (FG/BG through to tcell). Cell-level `Alpha float64` for transparency. Per-entity `Material` component `func(x, y int, t float64, cell Cell) Cell` — a fragment shader applied during render. Time passed into `Render`. Uncap framerate. VT emulator golden tests capture ANSI color sequences. Overlapping animated objects test validates painter's algorithm with distinct colored entities.
 
-## Iteration 4: Layers and Compositing (planned)
+## Iteration 4: Layers and Compositing (complete)
 
-Ordered canvas layers. Entities target a layer. Back-to-front compositing with alpha blending. Post-process passes per layer before compositing.
+Ordered canvas layers with per-entity layer assignment (`AddLayer`/`Layer` component). Pluggable `BlendMode func(d, s uint8, alpha float64) uint8` for per-channel color blending; `BlendNormal` (linear interpolation) is the default. `BlendColor` applies a `BlendMode` per-channel; `BlendCell` implements the "over" operator for terminal cells (alpha blending FG/BG, rune precedence: real src rune wins, empty src preserves dst text). `Canvas.Composite` applies cell-by-cell blending with a given `BlendMode`. `Compositor` owns per-layer canvases, renders each root's entity tree into its layer, sorts layers back-to-front, applies optional `LayerPostProcess` passes, then composites onto the destination canvas. Children inherit their root's layer. Unassigned entities default to layer 0. `core.Render` remains available for simple code that doesn't need layers.
 
 ## What Comes Next
 
@@ -53,6 +53,7 @@ flicker/
     behavior.go    // Behavior component + UpdateBehaviors system
     canvas.go      // Cell, Canvas (2D cell buffer)
     render.go      // Scene graph traversal, drawable → canvas
+    layer.go       // Compositor, per-layer canvases, back-to-front compositing
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
     vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp

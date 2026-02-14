@@ -181,3 +181,66 @@ func TestOverlappingObjects(t *testing.T) {
 	g := goldie.New(t)
 	g.Assert(t, "overlapping_objects", []byte(b.String()))
 }
+
+func TestLayerBlending(t *testing.T) {
+	const (
+		w = 30
+		h = 10
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// Layer 0: red box, stationary, opaque.
+	boxA := world.Spawn()
+	world.AddTransform(boxA, &core.Transform{
+		Position: fmath.Vec3{X: 5, Y: 2},
+	})
+	world.AddDrawable(boxA, &core.Rect{
+		Width:  15,
+		Height: 6,
+		Rune:   '░',
+		FG:     core.Color{R: 200, G: 60, B: 60},
+		BG:     core.Color{R: 40, G: 0, B: 0},
+	})
+	world.AddLayer(boxA, 0)
+	world.AddRoot(boxA)
+
+	// Layer 1: blue box, overlapping, semi-transparent via material.
+	boxB := world.Spawn()
+	world.AddTransform(boxB, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 3},
+	})
+	world.AddDrawable(boxB, &core.Rect{
+		Width:  15,
+		Height: 6,
+		Rune:   '▓',
+		FG:     core.Color{R: 60, G: 60, B: 200},
+		BG:     core.Color{R: 0, G: 0, B: 40},
+	})
+	world.AddLayer(boxB, 1)
+	world.AddMaterial(boxB, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.5
+		return cell
+	})
+	world.AddRoot(boxB)
+
+	comp := core.NewCompositor(w, h)
+
+	canvas.Clear()
+	canvas.DrawBorder()
+	comp.Composite(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "layer_blending", []byte(b.String()))
+}
