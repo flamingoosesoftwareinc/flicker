@@ -640,6 +640,54 @@ func TestCameraAnimatedZoom(t *testing.T) {
 	g.Assert(t, "camera_animated_zoom", []byte(b.String()))
 }
 
+func TestTextRendering(t *testing.T) {
+	const (
+		w = 40
+		h = 10
+	)
+
+	f, err := asset.LoadFont("Oxanium/static/Oxanium-Regular.ttf")
+	if err != nil {
+		t.Fatalf("LoadFont: %v", err)
+	}
+
+	textBm := asset.RasterizeText("Hi", asset.TextOptions{
+		Font:  f,
+		Size:  16,
+		Color: core.Color{R: 255, G: 255, B: 255},
+	})
+	if textBm == nil {
+		t.Fatal("RasterizeText returned nil")
+	}
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+	textEnt := world.Spawn()
+	world.AddTransform(textEnt, &core.Transform{
+		Position: fmath.Vec3{X: 2, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(textEnt, &bitmap.HalfBlock{Bitmap: textBm})
+	world.AddRoot(textEnt)
+
+	canvas.Clear()
+	canvas.DrawBorder()
+	core.Render(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "text_rendering", []byte(b.String()))
+}
+
 func TestOBJWireframe(t *testing.T) {
 	const (
 		w      = 40

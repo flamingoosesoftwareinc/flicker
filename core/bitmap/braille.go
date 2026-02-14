@@ -197,6 +197,8 @@ func (br *Braille) Renderer() core.RenderFunc {
 				var rSum, gSum, bSum int
 				var count int
 				var maxAlpha float64
+				var firstLX, firstLY int
+				gotFirst := false
 
 				for ddy := range 4 {
 					for ddx := range 2 {
@@ -228,6 +230,11 @@ func (br *Braille) Renderer() core.RenderFunc {
 							if a > maxAlpha {
 								maxAlpha = a
 							}
+							if !gotFirst {
+								firstLX = int(math.Floor(localX))
+								firstLY = int(math.Floor(localY))
+								gotFirst = true
+							}
 						}
 					}
 				}
@@ -246,7 +253,7 @@ func (br *Braille) Renderer() core.RenderFunc {
 					FG:      fg,
 					FGAlpha: maxAlpha,
 				}
-				emit(sx, sy, sx, sy, cell)
+				emit(firstLX, firstLY, sx, sy, cell)
 			}
 		}
 	}

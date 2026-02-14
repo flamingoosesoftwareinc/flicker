@@ -128,7 +128,7 @@ func (hb *HalfBlock) Renderer() core.RenderFunc {
 	return inverseRenderer(
 		bw,
 		bh,
-		func(inv [4]float64, tx, ty float64, sx, sy int) (core.Cell, bool) {
+		func(inv [4]float64, tx, ty float64, sx, sy int) (int, int, core.Cell, bool) {
 			// Sample top half (cell center at y+0.25) and bottom half (y+0.75).
 			P := float64(sx) - tx + 0.5
 			Qtop := float64(sy) - ty + 0.25
@@ -161,8 +161,12 @@ func (hb *HalfBlock) Renderer() core.RenderFunc {
 			botOn := botA > 0
 
 			if !topOn && !botOn {
-				return core.Cell{}, false
+				return 0, 0, core.Cell{}, false
 			}
+
+			// Local coords: X from top sample, Y is the cell row (topPY / 2).
+			lx := topPX
+			ly := int(math.Floor(topLY))
 
 			var cell core.Cell
 			switch {
@@ -180,9 +184,11 @@ func (hb *HalfBlock) Renderer() core.RenderFunc {
 				cell.Rune = '▄'
 				cell.FG = botC
 				cell.FGAlpha = botA
+				lx = botPX
+				ly = int(math.Floor(botLY))
 			}
 
-			return cell, true
+			return lx, ly, cell, true
 		},
 	)
 }

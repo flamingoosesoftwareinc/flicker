@@ -69,7 +69,7 @@ func (fb *FullBlock) Renderer() core.RenderFunc {
 	return inverseRenderer(
 		bw,
 		bh,
-		func(inv [4]float64, tx, ty float64, sx, sy int) (core.Cell, bool) {
+		func(inv [4]float64, tx, ty float64, sx, sy int) (int, int, core.Cell, bool) {
 			P := float64(sx) - tx + 0.5
 			Q := float64(sy) - ty + 0.5
 			localX := inv[0]*P + inv[1]*Q + cx
@@ -78,13 +78,13 @@ func (fb *FullBlock) Renderer() core.RenderFunc {
 			px := int(math.Floor(localX))
 			py := int(math.Floor(localY))
 			if px < 0 || px >= bm.Width || py < 0 || py >= bm.Height {
-				return core.Cell{}, false
+				return 0, 0, core.Cell{}, false
 			}
 			c, a := bm.Get(px, py)
 			if a == 0 {
-				return core.Cell{}, false
+				return 0, 0, core.Cell{}, false
 			}
-			return core.Cell{Rune: '█', FG: c, FGAlpha: a}, true
+			return px, py, core.Cell{Rune: '█', FG: c, FGAlpha: a}, true
 		},
 	)
 }

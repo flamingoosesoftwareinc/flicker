@@ -13,7 +13,7 @@ import (
 // cell to emit (or false to skip).
 func inverseRenderer(
 	bw, bh int,
-	sample func(inv [4]float64, tx, ty float64, sx, sy int) (core.Cell, bool),
+	sample func(inv [4]float64, tx, ty float64, sx, sy int) (lx, ly int, cell core.Cell, ok bool),
 ) core.RenderFunc {
 	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell core.Cell)) {
 		cx, cy := float64(bw)/2.0, float64(bh)/2.0
@@ -72,11 +72,11 @@ func inverseRenderer(
 
 		for sy := startY; sy <= endY; sy++ {
 			for sx := startX; sx <= endX; sx++ {
-				cell, ok := sample(inv, tx, ty, sx, sy)
+				lx, ly, cell, ok := sample(inv, tx, ty, sx, sy)
 				if !ok {
 					continue
 				}
-				emit(sx, sy, sx, sy, cell)
+				emit(lx, ly, sx, sy, cell)
 			}
 		}
 	}

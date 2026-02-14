@@ -371,6 +371,82 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
 	})
 
+	// Layer 11: Text — "FLICKER" with SDF threshold materialization.
+	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
+	if fontErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v (skipping text layer)\n", fontErr)
+	} else {
+		textSize := float64(sh) * 1.4 // scale text to terminal height
+		textBm := asset.RasterizeText("FLICKER", asset.TextOptions{
+			Font:  textFont,
+			Size:  textSize,
+			Color: core.Color{R: 220, G: 240, B: 255},
+		})
+		if textBm != nil {
+			textSDF := bitmap.ComputeSDF(textBm, 30)
+			textDraw := &bitmap.HalfBlock{Bitmap: textBm}
+			textBW, textBH := textDraw.Bounds()
+
+			textEnt := world.Spawn()
+			world.AddTransform(textEnt, &core.Transform{
+				Position: fmath.Vec3{
+					X: float64(sw/2) - float64(textBW)/2,
+					Y: float64(sh/2) - float64(textBH)/2,
+				},
+				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
+			})
+			world.AddDrawable(textEnt, textDraw)
+			world.AddLayer(textEnt, 11)
+			world.AddRoot(textEnt)
+
+			// SDF threshold materialization: sweep threshold from
+			// most-negative (skeleton) to 0 (full shape) over ~3 seconds.
+			// After reveal, text remains fully visible.
+			revealDuration := 3.0
+			// Find the most-negative distance in the SDF (deepest interior).
+			mostNeg := 0.0
+			for _, d := range textSDF.Dist {
+				if d < mostNeg {
+					mostNeg = d
+				}
+			}
+
+			world.AddMaterial(textEnt, func(f core.Fragment) core.Cell {
+				// Map local coords to bitmap pixel coords for SDF lookup.
+				// HalfBlock: ly is cell row, need pixel rows ly*2 and ly*2+1.
+				topD := textSDF.At(f.X, f.Y*2)
+				botD := textSDF.At(f.X, f.Y*2+1)
+
+				// Compute threshold: sweeps from mostNeg to 0 over revealDuration.
+				progress := f.Time.Total / revealDuration
+				if progress > 1 {
+					progress = 1
+				}
+				threshold := mostNeg * (1 - progress)
+
+				// Discard pixels whose SDF distance is below the threshold
+				// (i.e., they haven't been "revealed" yet).
+				topVisible := topD <= threshold
+				botVisible := botD <= threshold
+
+				if !topVisible && !botVisible {
+					return core.Cell{} // fully hidden
+				}
+
+				cell := f.Cell
+				if !topVisible {
+					// Only bottom half visible.
+					cell.FGAlpha = 0
+				}
+				if !botVisible {
+					// Only top half visible.
+					cell.BGAlpha = 0
+				}
+				return cell
+			})
+		}
+	}
+
 	// Camera: gentle circular pan + zoom pulse.
 	cam := world.Spawn()
 	world.AddTransform(cam, &core.Transform{

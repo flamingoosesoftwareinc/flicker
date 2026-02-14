@@ -6,6 +6,7 @@ require (
 	github.com/charmbracelet/x/vt v0.0.0-20260209194814-eeb2896ac759
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/sebdah/goldie/v2 v2.8.0
+	golang.org/x/image v0.36.0
 )
 
 require (
@@ -27,8 +28,8 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )
