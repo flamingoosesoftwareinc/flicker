@@ -50,6 +50,14 @@ Demo updated: Box A uses `Tween` with `EaseInOutCubic` for smooth horizontal pin
 
 Canvas background color: `Canvas.Background` field — `Clear()` fills with it instead of `Cell{}`. Default is zero-value (transparent), fully backward compatible. Demo sets opaque black background so non-Normal blend modes (Multiply, Difference, etc.) composite correctly over empty regions.
 
+## Iteration 7: Fragment Shader System (complete)
+
+Unified `Material` and `LayerPostProcess` under a single `Fragment` struct. Both are now `func(f Fragment) Cell` — per-cell fragment shaders with consistent signatures, extensible for future Lua scripting.
+
+`Fragment` carries local coords (`X`, `Y`), absolute canvas position (`ScreenX`, `ScreenY`), `Time`, the current `Cell`, and a `Source` canvas for neighbor reads. Materials receive the layer canvas as `Source`; post-process passes receive a snapshot (double-buffered via `Canvas.Clone`/`CopyInto`).
+
+`Canvas.Clone()` returns a deep copy. `Canvas.CopyInto(dst)` copies cells into an existing canvas without allocating. The `Compositor` reuses a single `scratch` buffer across frames for post-process snapshot double-buffering, eliminating per-frame allocations after warmup.
+
 ## What Comes Next
 - **Text rendering**: bitmap font rasterization → braille/block mapping
 - **Particles**: point clouds, emitters, attractor targets

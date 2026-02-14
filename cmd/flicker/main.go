@@ -64,16 +64,16 @@ func main() {
 		}
 	})
 
-	world.AddMaterial(boxA, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		gradient := float64(y) / 5.0
-		pulse := (math.Sin(2*math.Pi*t.Total) + 1) / 2
+	world.AddMaterial(boxA, func(f core.Fragment) core.Cell {
+		gradient := float64(f.Y) / 5.0
+		pulse := (math.Sin(2*math.Pi*f.Time.Total) + 1) / 2
 		brightness := gradient*0.5 + pulse*0.5
-		cell.FG = core.Color{
-			R: uint8(float64(cell.FG.R) * brightness),
-			G: uint8(float64(cell.FG.G) * brightness),
-			B: uint8(float64(cell.FG.B) * brightness),
+		f.Cell.FG = core.Color{
+			R: uint8(float64(f.Cell.FG.R) * brightness),
+			G: uint8(float64(f.Cell.FG.G) * brightness),
+			B: uint8(float64(f.Cell.FG.B) * brightness),
 		}
-		return cell
+		return f.Cell
 	})
 
 	// Layer 1: Green box — Multiply blend, seesaw right→left (faster).
@@ -96,9 +96,9 @@ func main() {
 		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
 	})
 
-	world.AddMaterial(boxB, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		cell.Alpha = 0.7
-		return cell
+	world.AddMaterial(boxB, func(f core.Fragment) core.Cell {
+		f.Cell.Alpha = 0.7
+		return f.Cell
 	})
 
 	// Layer 2: Blue box — Screen blend, vertical bounce.
@@ -121,9 +121,9 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), v)
 	})
 
-	world.AddMaterial(boxC, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		cell.Alpha = 0.7
-		return cell
+	world.AddMaterial(boxC, func(f core.Fragment) core.Cell {
+		f.Cell.Alpha = 0.7
+		return f.Cell
 	})
 
 	// Layer 3: Yellow box — Overlay blend, diagonal drift.
@@ -166,9 +166,9 @@ func main() {
 		}
 	})
 
-	world.AddMaterial(boxD, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		cell.Alpha = 0.7
-		return cell
+	world.AddMaterial(boxD, func(f core.Fragment) core.Cell {
+		f.Cell.Alpha = 0.7
+		return f.Cell
 	})
 
 	// Layer 4: Cyan box — Difference blend, opposite horizontal.
@@ -191,9 +191,9 @@ func main() {
 		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
 	})
 
-	world.AddMaterial(boxE, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		cell.Alpha = 0.7
-		return cell
+	world.AddMaterial(boxE, func(f core.Fragment) core.Cell {
+		f.Cell.Alpha = 0.7
+		return f.Cell
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.

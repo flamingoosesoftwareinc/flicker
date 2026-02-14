@@ -16,11 +16,11 @@ func TestMaterialApplication(t *testing.T) {
 	world.AddRoot(e)
 
 	// Material that sets FG red channel to 10*x and green channel to 10*y.
-	world.AddMaterial(e, func(x, y int, t Time, cell Cell) Cell {
-		cell.FG.R = uint8(10 * x)
-		cell.FG.G = uint8(10 * y)
-		cell.FG.B = 0
-		return cell
+	world.AddMaterial(e, func(f Fragment) Cell {
+		f.Cell.FG.R = uint8(10 * f.X)
+		f.Cell.FG.G = uint8(10 * f.Y)
+		f.Cell.FG.B = 0
+		return f.Cell
 	})
 
 	canvas := NewCanvas(10, 10)
@@ -66,8 +66,8 @@ func TestMaterialPreservesAlpha(t *testing.T) {
 	world.AddRoot(e)
 
 	// Identity material — returns cell unchanged.
-	world.AddMaterial(e, func(x, y int, t Time, cell Cell) Cell {
-		return cell
+	world.AddMaterial(e, func(f Fragment) Cell {
+		return f.Cell
 	})
 
 	canvas := NewCanvas(5, 5)

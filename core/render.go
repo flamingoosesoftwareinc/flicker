@@ -25,8 +25,14 @@ func renderEntity(w *World, c *Canvas, e Entity, ox, oy, oz float64, t Time) {
 			for dy := range bh {
 				for dx := range bw {
 					cx, cy := sx+dx, sy+dy
-					cell := c.Get(cx, cy)
-					c.Set(cx, cy, m(dx, dy, t, cell))
+					f := Fragment{
+						X: dx, Y: dy,
+						ScreenX: cx, ScreenY: cy,
+						Time:   t,
+						Cell:   c.Get(cx, cy),
+						Source: c,
+					}
+					c.Set(cx, cy, m(f))
 				}
 			}
 		}

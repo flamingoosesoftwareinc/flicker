@@ -2,8 +2,9 @@ package core
 
 import "sort"
 
-// LayerPostProcess is applied to an entire layer canvas before compositing.
-type LayerPostProcess func(canvas *Canvas, t Time)
+// LayerPostProcess is a per-cell fragment shader applied to a layer canvas
+// before compositing. Source points to a snapshot so reads are stable.
+type LayerPostProcess func(f Fragment) Cell
 
 // Compositor owns per-layer canvases and composites them back-to-front.
 type Compositor struct {
@@ -11,6 +12,7 @@ type Compositor struct {
 	layers        map[int]*Canvas
 	postProcess   map[int]LayerPostProcess
 	blends        map[int]ColorBlend
+	scratch       *Canvas // reusable snapshot buffer for post-process
 }
 
 // NewCompositor creates a compositor for the given canvas dimensions.
@@ -71,7 +73,22 @@ func (c *Compositor) Composite(world *World, dst *Canvas, t Time) {
 	for _, idx := range indices {
 		lc := c.layers[idx]
 		if pp, ok := c.postProcess[idx]; ok {
-			pp(lc, t)
+			if c.scratch == nil {
+				c.scratch = NewCanvas(c.width, c.height)
+			}
+			lc.CopyInto(c.scratch)
+			for y := range lc.Height {
+				for x := range lc.Width {
+					f := Fragment{
+						X: x, Y: y,
+						ScreenX: x, ScreenY: y,
+						Time:   t,
+						Cell:   c.scratch.Get(x, y),
+						Source: c.scratch,
+					}
+					lc.Set(x, y, pp(f))
+				}
+			}
 		}
 		blend := NormalColorBlend
 		if b, ok := c.blends[idx]; ok {

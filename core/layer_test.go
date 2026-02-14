@@ -70,9 +70,9 @@ func TestCompositor_TwoLayers_SemiTransparent(t *testing.T) {
 	world.AddTransform(boxB, &Transform{})
 	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, Rune: 'B', FG: Color{0, 0, 200}})
 	world.AddLayer(boxB, 1)
-	world.AddMaterial(boxB, func(x, y int, t Time, cell Cell) Cell {
-		cell.Alpha = 0.5
-		return cell
+	world.AddMaterial(boxB, func(f Fragment) Cell {
+		f.Cell.Alpha = 0.5
+		return f.Cell
 	})
 	world.AddRoot(boxB)
 
@@ -134,14 +134,9 @@ func TestCompositor_PostProcess(t *testing.T) {
 	comp := NewCompositor(2, 1)
 
 	// Post-process: zero out FG green channel.
-	comp.SetPostProcess(0, func(c *Canvas, t Time) {
-		for y := 0; y < c.Height; y++ {
-			for x := 0; x < c.Width; x++ {
-				cell := c.Get(x, y)
-				cell.FG.G = 0
-				c.Set(x, y, cell)
-			}
-		}
+	comp.SetPostProcess(0, func(f Fragment) Cell {
+		f.Cell.FG.G = 0
+		return f.Cell
 	})
 
 	comp.Composite(world, dst, Time{})

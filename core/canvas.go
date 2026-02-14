@@ -11,6 +11,16 @@ type Cell struct {
 	Alpha float64
 }
 
+// Fragment holds the per-cell context passed to Material and LayerPostProcess
+// shaders. Source provides read access to neighboring cells.
+type Fragment struct {
+	X, Y             int // local coords (entity-relative for Material; 0-based for layer)
+	ScreenX, ScreenY int // absolute canvas position
+	Time             Time
+	Cell             Cell    // current cell at this position
+	Source           *Canvas // read neighbors via Source.Get(x, y)
+}
+
 type Canvas struct {
 	Width, Height int
 	Cells         [][]Cell
@@ -45,6 +55,22 @@ func (c *Canvas) Clear() {
 			c.Cells[y][x] = c.Background
 		}
 	}
+}
+
+func (c *Canvas) Clone() *Canvas {
+	clone := NewCanvas(c.Width, c.Height)
+	for y := range c.Cells {
+		copy(clone.Cells[y], c.Cells[y])
+	}
+	clone.Background = c.Background
+	return clone
+}
+
+func (c *Canvas) CopyInto(dst *Canvas) {
+	for y := range c.Cells {
+		copy(dst.Cells[y], c.Cells[y])
+	}
+	dst.Background = c.Background
 }
 
 // BlendCell composites src over dst using the "over" operator. The

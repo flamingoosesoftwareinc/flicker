@@ -3,8 +3,7 @@ package core
 type Entity uint64
 
 // Material is a per-entity fragment shader applied after drawing.
-// x, y are local coords relative to the drawable origin.
-type Material func(x, y int, t Time, cell Cell) Cell
+type Material func(f Fragment) Cell
 
 type World struct {
 	next       Entity
