@@ -37,3 +37,15 @@ func (v Vec3) Lerp(to Vec3, t float64) Vec3 {
 		Z: v.Z + (to.Z-v.Z)*t,
 	}
 }
+
+func (v Vec3) Dot(o Vec3) float64 {
+	return v.X*o.X + v.Y*o.Y + v.Z*o.Z
+}
+
+func (v Vec3) Cross(o Vec3) Vec3 {
+	return Vec3{
+		X: v.Y*o.Z - v.Z*o.Y,
+		Y: v.Z*o.X - v.X*o.Z,
+		Z: v.X*o.Y - v.Y*o.X,
+	}
+}

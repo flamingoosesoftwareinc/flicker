@@ -1,6 +1,10 @@
 package core
 
-import "sort"
+import (
+	"sort"
+
+	"flicker/fmath"
+)
 
 // LayerPostProcess is a per-cell fragment shader applied to a layer canvas
 // before compositing. Source points to a snapshot so reads are stable.
@@ -59,7 +63,7 @@ func (c *Compositor) Composite(world *World, dst *Canvas, t Time) {
 	for _, root := range world.Roots() {
 		idx := world.Layer(root)
 		lc := c.getLayer(idx)
-		renderEntity(world, lc, root, 0, 0, 0, t)
+		renderEntity(world, lc, root, fmath.Mat3Identity(), t)
 	}
 
 	// Collect and sort layer indices ascending (back-to-front).

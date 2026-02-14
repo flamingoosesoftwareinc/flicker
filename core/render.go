@@ -1,23 +1,25 @@
 package core
 
+import "flicker/fmath"
+
 func Render(world *World, canvas *Canvas, t Time) {
+	identity := fmath.Mat3Identity()
 	for _, root := range world.Roots() {
-		renderEntity(world, canvas, root, 0, 0, 0, t)
+		renderEntity(world, canvas, root, identity, t)
 	}
 }
 
-func renderEntity(w *World, c *Canvas, e Entity, ox, oy, oz float64, t Time) {
+func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
 	tr := w.Transform(e)
 	if tr == nil {
 		return
 	}
 
-	ax := ox + tr.Position.X
-	ay := oy + tr.Position.Y
-	az := oz + tr.Position.Z
+	world := parent.Multiply(tr.LocalMatrix())
+	pos := world.Apply(fmath.Vec2{})
 
 	if d := w.Drawable(e); d != nil {
-		sx, sy := int(ax), int(ay)
+		sx, sy := int(pos.X), int(pos.Y)
 		d.Draw(c, sx, sy)
 
 		if m := w.Material(e); m != nil {
@@ -39,6 +41,6 @@ func renderEntity(w *World, c *Canvas, e Entity, ox, oy, oz float64, t Time) {
 	}
 
 	for _, child := range w.Children(e) {
-		renderEntity(w, c, child, ax, ay, az, t)
+		renderEntity(w, c, child, world, t)
 	}
 }

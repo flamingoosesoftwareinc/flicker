@@ -32,6 +32,7 @@ func main() {
 	boxA := world.Spawn()
 	world.AddTransform(boxA, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  12,
@@ -80,6 +81,7 @@ func main() {
 	boxB := world.Spawn()
 	world.AddTransform(boxB, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw - 14), Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  12,
@@ -105,6 +107,7 @@ func main() {
 	boxC := world.Spawn()
 	world.AddTransform(boxC, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxC, &core.Rect{
 		Width:  12,
@@ -130,6 +133,7 @@ func main() {
 	boxD := world.Spawn()
 	world.AddTransform(boxD, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxD, &core.Rect{
 		Width:  12,
@@ -175,6 +179,7 @@ func main() {
 	boxE := world.Spawn()
 	world.AddTransform(boxE, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: float64(sh/2 - 3)},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxE, &core.Rect{
 		Width:  12,
@@ -201,6 +206,7 @@ func main() {
 	brailleEnt := world.Spawn()
 	world.AddTransform(brailleEnt, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: float64(sh - 7)},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	brailleDraw := &core.BitmapDrawable{Bitmap: brailleBm, Mode: core.EncodeBraille}
 	world.AddDrawable(brailleEnt, brailleDraw)
@@ -233,6 +239,7 @@ func main() {
 	hbEnt := world.Spawn()
 	world.AddTransform(hbEnt, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw - 20), Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	hbDraw := &core.BitmapDrawable{Bitmap: hbBm, Mode: core.EncodeHalfBlock}
 	world.AddDrawable(hbEnt, hbDraw)
@@ -252,6 +259,27 @@ func main() {
 		}
 		v := fmath.Triangle(t.Total / 9.0)
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-7), v)
+	})
+
+	// Layer 7: Rotating box — showcases rotation and scale.
+	rotBox := world.Spawn()
+	world.AddTransform(rotBox, &core.Transform{
+		Position: fmath.Vec3{X: float64(sw/2 - 3), Y: float64(sh/2 - 2)},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(rotBox, &core.Rect{
+		Width:  6,
+		Height: 3,
+		Rune:   '◇',
+		FG:     core.Color{R: 255, G: 180, B: 0},
+		BG:     core.Color{R: 40, G: 30, B: 0},
+	})
+	world.AddLayer(rotBox, 7)
+	world.AddRoot(rotBox)
+
+	world.AddBehavior(rotBox, func(t core.Time, e core.Entity, w *core.World) {
+		tr := w.Transform(e)
+		tr.Rotation = t.Total * fmath.DegToRad(45)
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.

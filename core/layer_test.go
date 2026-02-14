@@ -1,11 +1,15 @@
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"flicker/fmath"
+)
 
 func TestCompositor_SingleLayer(t *testing.T) {
 	world := NewWorld()
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{})
+	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(
 		box,
 		&Rect{Width: 3, Height: 2, Rune: 'X', FG: Color{255, 0, 0}, BG: Color{0, 0, 0}},
@@ -30,14 +34,14 @@ func TestCompositor_TwoLayers_Opaque(t *testing.T) {
 
 	// Layer 0: red 'A'
 	boxA := world.Spawn()
-	world.AddTransform(boxA, &Transform{})
+	world.AddTransform(boxA, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxA, &Rect{Width: 3, Height: 2, Rune: 'A', FG: Color{200, 0, 0}})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
 	// Layer 1: blue 'B' (opaque, fully overwrites)
 	boxB := world.Spawn()
-	world.AddTransform(boxB, &Transform{})
+	world.AddTransform(boxB, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, Rune: 'B', FG: Color{0, 0, 200}})
 	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
@@ -60,14 +64,14 @@ func TestCompositor_TwoLayers_SemiTransparent(t *testing.T) {
 
 	// Layer 0: red 'A', opaque
 	boxA := world.Spawn()
-	world.AddTransform(boxA, &Transform{})
+	world.AddTransform(boxA, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxA, &Rect{Width: 3, Height: 2, Rune: 'A', FG: Color{200, 0, 0}})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
 
 	// Layer 1: blue 'B', semi-transparent via material
 	boxB := world.Spawn()
-	world.AddTransform(boxB, &Transform{})
+	world.AddTransform(boxB, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxB, &Rect{Width: 3, Height: 2, Rune: 'B', FG: Color{0, 0, 200}})
 	world.AddLayer(boxB, 1)
 	world.AddMaterial(boxB, func(f Fragment) Cell {
@@ -99,13 +103,13 @@ func TestCompositor_LayerOrder(t *testing.T) {
 
 	// Add root on layer 5 first, then layer 2 — compositor should sort.
 	boxHigh := world.Spawn()
-	world.AddTransform(boxHigh, &Transform{})
+	world.AddTransform(boxHigh, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxHigh, &Rect{Width: 2, Height: 1, Rune: 'H', FG: Color{0, 255, 0}})
 	world.AddLayer(boxHigh, 5)
 	world.AddRoot(boxHigh)
 
 	boxLow := world.Spawn()
-	world.AddTransform(boxLow, &Transform{})
+	world.AddTransform(boxLow, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(boxLow, &Rect{Width: 2, Height: 1, Rune: 'L', FG: Color{255, 0, 0}})
 	world.AddLayer(boxLow, 2)
 	world.AddRoot(boxLow)
@@ -125,7 +129,7 @@ func TestCompositor_PostProcess(t *testing.T) {
 	world := NewWorld()
 
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{})
+	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(box, &Rect{Width: 2, Height: 1, Rune: 'P', FG: Color{100, 100, 100}})
 	world.AddLayer(box, 0)
 	world.AddRoot(box)
@@ -155,7 +159,7 @@ func TestCompositor_DefaultLayer(t *testing.T) {
 
 	// Entity without AddLayer should use default layer 0.
 	box := world.Spawn()
-	world.AddTransform(box, &Transform{})
+	world.AddTransform(box, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(box, &Rect{Width: 2, Height: 1, Rune: 'D'})
 	world.AddRoot(box)
 

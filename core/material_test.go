@@ -1,11 +1,15 @@
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"flicker/fmath"
+)
 
 func TestMaterialApplication(t *testing.T) {
 	world := NewWorld()
 	e := world.Spawn()
-	world.AddTransform(e, &Transform{})
+	world.AddTransform(e, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(e, &Rect{
 		Width:  3,
 		Height: 2,
@@ -56,7 +60,7 @@ func TestMaterialApplication(t *testing.T) {
 func TestMaterialPreservesAlpha(t *testing.T) {
 	world := NewWorld()
 	e := world.Spawn()
-	world.AddTransform(e, &Transform{})
+	world.AddTransform(e, &Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
 	world.AddDrawable(e, &Rect{
 		Width:  2,
 		Height: 2,

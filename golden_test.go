@@ -23,6 +23,7 @@ func TestBasicExample(t *testing.T) {
 	box := world.Spawn()
 	world.AddTransform(box, &core.Transform{
 		Position: fmath.Vec3{X: 10, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(box, &core.Rect{
 		Width:  20,
@@ -64,6 +65,7 @@ func TestAnimatedBehavior(t *testing.T) {
 	box := world.Spawn()
 	world.AddTransform(box, &core.Transform{
 		Position: fmath.Vec3{X: 5, Y: 1},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(box, &core.Rect{
 		Width:  10,
@@ -120,6 +122,7 @@ func TestOverlappingObjects(t *testing.T) {
 	boxA := world.Spawn()
 	world.AddTransform(boxA, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  12,
@@ -141,6 +144,7 @@ func TestOverlappingObjects(t *testing.T) {
 	boxB := world.Spawn()
 	world.AddTransform(boxB, &core.Transform{
 		Position: fmath.Vec3{X: 45, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  12,
@@ -197,6 +201,7 @@ func TestLayerBlending(t *testing.T) {
 	boxA := world.Spawn()
 	world.AddTransform(boxA, &core.Transform{
 		Position: fmath.Vec3{X: 5, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  15,
@@ -212,6 +217,7 @@ func TestLayerBlending(t *testing.T) {
 	boxB := world.Spawn()
 	world.AddTransform(boxB, &core.Transform{
 		Position: fmath.Vec3{X: 10, Y: 3},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  15,
@@ -260,6 +266,7 @@ func TestTween(t *testing.T) {
 	box := world.Spawn()
 	world.AddTransform(box, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 3},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(box, &core.Rect{
 		Width:  8,
@@ -324,6 +331,7 @@ func TestBlendModes(t *testing.T) {
 	boxA := world.Spawn()
 	world.AddTransform(boxA, &core.Transform{
 		Position: fmath.Vec3{X: 5, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxA, &core.Rect{
 		Width:  20,
@@ -339,6 +347,7 @@ func TestBlendModes(t *testing.T) {
 	boxB := world.Spawn()
 	world.AddTransform(boxB, &core.Transform{
 		Position: fmath.Vec3{X: 10, Y: 3},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  15,
@@ -358,6 +367,7 @@ func TestBlendModes(t *testing.T) {
 	boxC := world.Spawn()
 	world.AddTransform(boxC, &core.Transform{
 		Position: fmath.Vec3{X: 15, Y: 4},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxC, &core.Rect{
 		Width:  15,
@@ -411,6 +421,7 @@ func TestBitmapRendering(t *testing.T) {
 	brailleEnt := world.Spawn()
 	world.AddTransform(brailleEnt, &core.Transform{
 		Position: fmath.Vec3{X: 1, Y: 1},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(brailleEnt, &core.BitmapDrawable{
 		Bitmap: brailleBm,
@@ -430,6 +441,7 @@ func TestBitmapRendering(t *testing.T) {
 	hbEnt := world.Spawn()
 	world.AddTransform(hbEnt, &core.Transform{
 		Position: fmath.Vec3{X: 20, Y: 2},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(hbEnt, &core.BitmapDrawable{
 		Bitmap: hbBm,
@@ -452,4 +464,73 @@ func TestBitmapRendering(t *testing.T) {
 
 	g := goldie.New(t)
 	g.Assert(t, "bitmap_rendering", []byte(b.String()))
+}
+
+func TestTransformRotation(t *testing.T) {
+	const (
+		w      = 30
+		h      = 12
+		frames = 4
+		dt     = 0.25
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// A small box with rotation that changes each frame.
+	box := world.Spawn()
+	world.AddTransform(box, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 3},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(box, &core.Rect{
+		Width:  8,
+		Height: 4,
+		Rune:   '*',
+		FG:     core.Color{R: 200, G: 100, B: 50},
+	})
+	world.AddRoot(box)
+
+	// Child entity offset from parent — inherits parent's transform.
+	child := world.Spawn()
+	world.AddTransform(child, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 0},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(child, &core.Rect{
+		Width:  4,
+		Height: 2,
+		Rune:   '+',
+		FG:     core.Color{R: 50, G: 200, B: 100},
+	})
+	world.Attach(child, box)
+
+	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+		w.Transform(e).Rotation = t.Total * fmath.DegToRad(90)
+	})
+
+	for i := range frames {
+		ti := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, ti)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas, ti)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "transform_rotation", []byte(b.String()))
 }

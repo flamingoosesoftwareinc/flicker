@@ -68,12 +68,18 @@ High-resolution `Bitmap` pixel buffer with two encoding modes that map back to t
 
 `BitmapDrawable` implements `Drawable`, wrapping a `Bitmap` with an `EncodeMode` selector. Nil-safe (zero bounds, no-op draw). Bounds returns cell-space dimensions computed from pixel dimensions and encoding ratios.
 
+## Iteration 9: Extended Math (complete)
+
+`Dot` and `Cross` on Vec3. `Mat3` (row-major 3x3) with identity, multiply, transpose, determinant, inverse, apply, and constructors for translate, rotate, scale — the core type for 2D homogeneous transforms. `Mat4` (row-major 4x4) with the same operations plus orthographic and perspective projection matrices. 2D Perlin noise (`Noise2D`) with classic improved permutation table. Quadratic and cubic Bezier curve evaluation. Degree/radian conversion helpers.
+
+## Iteration 10: Transform Rotation & Scale (complete)
+
+`Transform` gains `Rotation` (float64 radians, 2D rotation around Z) and `Scale` (Vec3, where `{0,0,0}` means zero — no magic defaults). `LocalMatrix()` computes the TRS matrix (translate * rotate * scale). Render traversal (`renderEntity`) replaced position accumulation (`ox, oy, oz`) with hierarchical `Mat3` multiplication — parent transforms compose correctly through the scene graph. All call sites updated to set `Scale: {1,1,1}` explicitly. Golden tests regenerated.
+
 ## Roadmap: Foundation
 
 These foundation iterations unblock the feature work below. Order matters — each builds on the last.
 
-- **Iteration 9: Extended math** — `Dot`, `Cross` on Vec3. `Mat3`/`Mat4` with multiply, inverse, transpose. Perspective/orthographic projection matrices. Perlin/simplex noise. Bezier curves (quadratic, cubic). Degrees/radians helpers.
-- **Iteration 10: Transform rotation and scale** — Add `Rotation` (float64 radians, 2D for now) and `Scale` (Vec3) to Transform. Hierarchical composition via matrices. Update render traversal to apply full transform chain.
 - **Iteration 11: Asset loading** — Loader pattern for fonts (TTF via `golang.org/x/image/font`), images (PNG/JPEG via `image/png`, `image/jpeg`), 3D models (OBJ), and SVG. Resource cache keyed by path.
 - **Iteration 12: Camera and projection** — Camera entity with position/target. View matrix. Orthographic and perspective projection. Viewport bounds and culling. World-to-screen coordinate pipeline.
 
@@ -98,7 +104,7 @@ These are the target features, built on top of the foundations above. Dependenci
 flicker/
   core/
     entity.go      // Entity, World, parent/child relationships
-    transform.go   // Transform component (position via Vec3)
+    transform.go   // Transform component (position, rotation, scale) with LocalMatrix()
     drawable.go    // Drawable interface
     rect.go        // Rect drawable
     bitmap.go      // Bitmap pixel buffer, braille/half-block encoding, BitmapDrawable
@@ -109,7 +115,12 @@ flicker/
     layer.go       // Compositor, per-layer canvases, back-to-front compositing
   fmath/
     vec2.go        // Vec2 (X, Y float64), add, sub, scale, normalize, lerp
-    vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp
+    vec3.go        // Vec3 (X, Y, Z float64), add, sub, scale, normalize, lerp, dot, cross
+    angle.go       // DegToRad, RadToDeg
+    mat3.go        // Mat3 (row-major 3x3), 2D homogeneous transforms
+    mat4.go        // Mat4 (row-major 4x4), 3D transforms, ortho/perspective projection
+    noise.go       // Noise2D (2D Perlin noise)
+    bezier.go      // BezierQuadratic, BezierCubic
     interpolation.go // Lerp, InverseLerp, Remap, Clamp
     tween.go       // Tween (float64), TweenVec3 (Vec3) — stateful interpolators with easing
     easing.go      // Easing functions: linear, quad, cubic, elastic, bounce (all func(t float64) float64)
