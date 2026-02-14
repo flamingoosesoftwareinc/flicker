@@ -261,25 +261,39 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-7), v)
 	})
 
-	// Layer 7: Rotating box — showcases rotation and scale.
-	rotBox := world.Spawn()
-	world.AddTransform(rotBox, &core.Transform{
+	// Layer 7: Orbiting pair — parent rotates, child orbits around it.
+	rotPivot := world.Spawn()
+	world.AddTransform(rotPivot, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw/2 - 3), Y: float64(sh/2 - 2)},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(rotBox, &core.Rect{
-		Width:  6,
-		Height: 3,
+	world.AddDrawable(rotPivot, &core.Rect{
+		Width:  4,
+		Height: 2,
 		Rune:   '◇',
 		FG:     core.Color{R: 255, G: 180, B: 0},
 		BG:     core.Color{R: 40, G: 30, B: 0},
 	})
-	world.AddLayer(rotBox, 7)
-	world.AddRoot(rotBox)
+	world.AddLayer(rotPivot, 7)
+	world.AddRoot(rotPivot)
 
-	world.AddBehavior(rotBox, func(t core.Time, e core.Entity, w *core.World) {
+	// Child: offset from parent, orbits as parent rotates.
+	orbiter := world.Spawn()
+	world.AddTransform(orbiter, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 0},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddDrawable(orbiter, &core.Rect{
+		Width:  3,
+		Height: 1,
+		Rune:   '●',
+		FG:     core.Color{R: 255, G: 100, B: 200},
+	})
+	world.Attach(orbiter, rotPivot)
+
+	world.AddBehavior(rotPivot, func(t core.Time, e core.Entity, w *core.World) {
 		tr := w.Transform(e)
-		tr.Rotation = t.Total * fmath.DegToRad(45)
+		tr.Rotation = t.Total * fmath.DegToRad(60)
 	})
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
