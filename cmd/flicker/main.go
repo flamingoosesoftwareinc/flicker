@@ -371,52 +371,56 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
 	})
 
-	// Layer 11: Text — "FLICKER" with SDF threshold materialization.
+	// Layer 11-12: Text comparison — AA (top) vs Sharp (bottom).
 	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
 	if fontErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (skipping text layer)\n", fontErr)
 	} else {
-		textSize := float64(sh) * 1.4 // scale text to terminal height
-		textBm := asset.RasterizeText("FLICKER", asset.TextOptions{
+		textSize := float64(sh) * 0.8
+
+		// AA text — top third of screen.
+		aaBm := asset.RasterizeText("FLICKER", asset.TextOptions{
+			Font:      textFont,
+			Size:      textSize,
+			Color:     core.Color{R: 220, G: 240, B: 255},
+			AntiAlias: true,
+		})
+		if aaBm != nil {
+			aaDraw := &bitmap.Braille{Bitmap: aaBm}
+			aaW, aaH := aaDraw.Bounds()
+			aaEnt := world.Spawn()
+			world.AddTransform(aaEnt, &core.Transform{
+				Position: fmath.Vec3{
+					X: float64(sw/2) - float64(aaW)/2,
+					Y: float64(sh)/4 - float64(aaH)/2,
+				},
+				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
+			})
+			world.AddDrawable(aaEnt, aaDraw)
+			world.AddLayer(aaEnt, 11)
+			world.AddRoot(aaEnt)
+		}
+
+		// Sharp text (default) — bottom third of screen.
+		sharpBm := asset.RasterizeText("FLICKER", asset.TextOptions{
 			Font:  textFont,
 			Size:  textSize,
 			Color: core.Color{R: 220, G: 240, B: 255},
 		})
-		if textBm != nil {
-			textSDF := bitmap.ComputeSDF(textBm, 30)
-			textDraw := &bitmap.Braille{Bitmap: textBm}
-			textBW, textBH := textDraw.Bounds()
-
-			textEnt := world.Spawn()
-			world.AddTransform(textEnt, &core.Transform{
+		if sharpBm != nil {
+			sharpDraw := &bitmap.Braille{Bitmap: sharpBm}
+			shW, shH := sharpDraw.Bounds()
+			sharpEnt := world.Spawn()
+			world.AddTransform(sharpEnt, &core.Transform{
 				Position: fmath.Vec3{
-					X: float64(sw/2) - float64(textBW)/2,
-					Y: float64(sh/2) - float64(textBH)/2,
+					X: float64(sw/2) - float64(shW)/2,
+					Y: float64(sh)*3/4 - float64(shH)/2,
 				},
 				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
 			})
-			world.AddDrawable(textEnt, textDraw)
-			world.AddLayer(textEnt, 11)
-			world.AddRoot(textEnt)
-
-			// SDF threshold materialization: sweep threshold from
-			// most-negative (skeleton) to 0 (full shape) over ~3 seconds.
-			revealDuration := 3.0
-			mostNeg := 0.0
-			for _, d := range textSDF.Dist {
-				if d < mostNeg {
-					mostNeg = d
-				}
-			}
-			threshold := mostNeg
-			world.AddMaterial(textEnt, bitmap.BrailleThreshold(textSDF, &threshold))
-			world.AddBehavior(textEnt, func(t core.Time, _ core.Entity, _ *core.World) {
-				progress := t.Total / revealDuration
-				if progress > 1 {
-					progress = 1
-				}
-				threshold = mostNeg * (1 - progress)
-			})
+			world.AddDrawable(sharpEnt, sharpDraw)
+			world.AddLayer(sharpEnt, 12)
+			world.AddRoot(sharpEnt)
 		}
 	}
 

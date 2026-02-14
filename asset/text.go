@@ -13,9 +13,10 @@ import (
 
 // TextOptions configures text rasterization.
 type TextOptions struct {
-	Font  *Font
-	Size  float64    // pixels per em
-	Color core.Color // text fill color
+	Font      *Font
+	Size      float64    // pixels per em
+	Color     core.Color // text fill color
+	AntiAlias bool       // enable anti-aliasing (default: sharp edges)
 }
 
 // RasterizeText rasterizes a single line of text into a bitmap.
@@ -118,7 +119,11 @@ func RasterizeText(text string, opts TextOptions) *bitmap.Bitmap {
 		for x := range bmW {
 			a := mask.AlphaAt(x, y)
 			if a.A > 0 {
-				bm.Set(x, y, opts.Color, float64(a.A)/255.0)
+				alpha := float64(a.A) / 255.0
+				if !opts.AntiAlias && alpha > 0 {
+					alpha = 1.0
+				}
+				bm.Set(x, y, opts.Color, alpha)
 			}
 		}
 	}
