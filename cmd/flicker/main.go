@@ -36,11 +36,13 @@ func main() {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 	world.AddDrawable(boxA, &core.Rect{
-		Width:  12,
-		Height: 6,
-		Rune:   '░',
-		FG:     core.Color{R: 200, G: 60, B: 60},
-		BG:     core.Color{R: 140, G: 0, B: 0},
+		Width:   12,
+		Height:  6,
+		Rune:    '░',
+		FG:      core.Color{R: 180, G: 120, B: 60},
+		BG:      core.Color{R: 180, G: 120, B: 60},
+		FGAlpha: 0.7,
+		BGAlpha: 0.7,
 	})
 	world.AddLayer(boxA, 0)
 	world.AddRoot(boxA)
@@ -88,8 +90,8 @@ func main() {
 		Width:   12,
 		Height:  6,
 		Rune:    '▒',
-		FG:      core.Color{R: 60, G: 200, B: 60},
-		BG:      core.Color{R: 0, G: 140, B: 0},
+		FG:      core.Color{R: 180, G: 120, B: 60},
+		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -111,8 +113,8 @@ func main() {
 		Width:   12,
 		Height:  6,
 		Rune:    '▓',
-		FG:      core.Color{R: 60, G: 60, B: 200},
-		BG:      core.Color{R: 0, G: 0, B: 200},
+		FG:      core.Color{R: 180, G: 120, B: 60},
+		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -134,8 +136,8 @@ func main() {
 		Width:   12,
 		Height:  6,
 		Rune:    '█',
-		FG:      core.Color{R: 200, G: 200, B: 60},
-		BG:      core.Color{R: 140, G: 140, B: 0},
+		FG:      core.Color{R: 180, G: 120, B: 60},
+		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
@@ -177,8 +179,8 @@ func main() {
 		Width:   12,
 		Height:  6,
 		Rune:    '◆',
-		FG:      core.Color{R: 60, G: 200, B: 200},
-		BG:      core.Color{R: 0, G: 140, B: 140},
+		FG:      core.Color{R: 180, G: 120, B: 60},
+		BG:      core.Color{R: 180, G: 120, B: 60},
 		FGAlpha: 0.7,
 		BGAlpha: 0.7,
 	})
