@@ -16,6 +16,9 @@ const (
 	// EncodeHalfBlock maps 1x2 pixel pairs to half-block characters (▀/▄).
 	// Two independent colors per cell (FG=top, BG=bottom). Best for color images.
 	EncodeHalfBlock
+	// EncodeFullBlock maps 1x1 pixels to full-block characters (█).
+	// One color per cell. Simplest encoding, 1:1 pixel-to-cell mapping.
+	EncodeFullBlock
 )
 
 // brailleBits maps (dx, dy) within a 2x4 block to the corresponding braille dot bit.
@@ -266,6 +269,37 @@ func (b *Bitmap) HalfBlockCellAt(col, row int) Cell {
 	return cell
 }
 
+// DrawFullBlock encodes the bitmap into full-block characters on the canvas.
+// Each pixel becomes one cell at canvas position (cx+x, cy+y).
+func (b *Bitmap) DrawFullBlock(canvas *Canvas, cx, cy int) {
+	for y := range b.Height {
+		for x := range b.Width {
+			c, a := b.Get(x, y)
+			if a == 0 {
+				continue
+			}
+			canvas.Set(cx+x, cy+y, Cell{
+				Rune:    '█',
+				FG:      c,
+				FGAlpha: a,
+			})
+		}
+	}
+}
+
+// FullBlockCellAt returns the full-block-encoded Cell for the pixel at (col, row).
+func (b *Bitmap) FullBlockCellAt(col, row int) Cell {
+	c, a := b.Get(col, row)
+	if a == 0 {
+		return Cell{}
+	}
+	return Cell{
+		Rune:    '█',
+		FG:      c,
+		FGAlpha: a,
+	}
+}
+
 // BitmapDrawable wraps a Bitmap to implement the Drawable interface.
 type BitmapDrawable struct {
 	Bitmap *Bitmap
@@ -282,6 +316,8 @@ func (bd *BitmapDrawable) Draw(canvas *Canvas, x, y int) {
 		bd.Bitmap.DrawBraille(canvas, x, y)
 	case EncodeHalfBlock:
 		bd.Bitmap.DrawHalfBlock(canvas, x, y)
+	case EncodeFullBlock:
+		bd.Bitmap.DrawFullBlock(canvas, x, y)
 	}
 }
 
@@ -295,6 +331,8 @@ func (bd *BitmapDrawable) CellAt(x, y int) Cell {
 		return bd.Bitmap.BrailleCellAt(x, y)
 	case EncodeHalfBlock:
 		return bd.Bitmap.HalfBlockCellAt(x, y)
+	case EncodeFullBlock:
+		return bd.Bitmap.FullBlockCellAt(x, y)
 	}
 	return Cell{}
 }
@@ -309,6 +347,8 @@ func (bd *BitmapDrawable) Bounds() (int, int) {
 		return (bd.Bitmap.Width + 1) / 2, (bd.Bitmap.Height + 3) / 4
 	case EncodeHalfBlock:
 		return bd.Bitmap.Width, (bd.Bitmap.Height + 1) / 2
+	case EncodeFullBlock:
+		return bd.Bitmap.Width, bd.Bitmap.Height
 	}
 	return 0, 0
 }
@@ -321,7 +361,7 @@ func (bd *BitmapDrawable) Renderer() RenderFunc {
 	switch bd.Mode {
 	case EncodeBraille:
 		return bd.brailleRenderer()
-	case EncodeHalfBlock:
+	case EncodeHalfBlock, EncodeFullBlock:
 		return bd.forwardRenderer()
 	}
 	return func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell)) {}
