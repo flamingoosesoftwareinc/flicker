@@ -32,6 +32,14 @@ Color plumbing end-to-end (FG/BG through to tcell). Cell-level `Alpha float64` f
 
 Ordered canvas layers with per-entity layer assignment (`AddLayer`/`Layer` component). Pluggable `BlendMode func(d, s uint8, alpha float64) uint8` for per-channel color blending; `BlendNormal` (linear interpolation) is the default. `BlendColor` applies a `BlendMode` per-channel; `BlendCell` implements the "over" operator for terminal cells (alpha blending FG/BG, rune precedence: real src rune wins, empty src preserves dst text). `Canvas.Composite` applies cell-by-cell blending with a given `BlendMode`. `Compositor` owns per-layer canvases, renders each root's entity tree into its layer, sorts layers back-to-front, applies optional `LayerPostProcess` passes, then composites onto the destination canvas. Children inherit their root's layer. Unassigned entities default to layer 0. `core.Render` remains available for simple code that doesn't need layers.
 
+## Iteration 5: Photoshop-Style Blend Modes (complete)
+
+Full set of Photoshop-style per-channel blend modes in `core/blend.go`, all following the same pattern: normalize to [0,1], compute raw blend, lerp with alpha, convert back to uint8. Internal `blendLerp` helper eliminates boilerplate. Each `BlendMode` has a corresponding `ColorBlend` wrapper for direct use with `Compositor.SetBlend`.
+
+**Blend modes added:** Multiply, Screen, Overlay, HardLight, SoftLight, Difference, Exclusion, HardMix, Darken, Lighten, LinearDodge, LinearBurn, ColorDodge, ColorBurn. Categorized as Darken (Multiply, Darken, LinearBurn, ColorBurn), Lighten (Screen, Lighten, LinearDodge, ColorDodge), Contrast (Overlay, HardLight, SoftLight), Inversion (Difference, Exclusion), and Posterize (HardMix).
+
+Demo expanded to 5 layers: Red/Normal base, Green/Multiply, Blue/Screen, Yellow/Overlay, Cyan/Difference — each with distinct animations and `Alpha=0.7` so blending is visible in overlap regions. Golden test `TestBlendModes` verifies blended ANSI output from 3 overlapping layers (Normal, Multiply, Screen).
+
 ## What Comes Next
 
 - **Animation**: `Tween` system that interpolates component fields over time
@@ -52,6 +60,7 @@ flicker/
     rect.go        // Rect drawable
     behavior.go    // Behavior component + UpdateBehaviors system
     canvas.go      // Cell, Canvas (2D cell buffer)
+    blend.go       // BlendMode, ColorBlend, all Photoshop-style blend modes
     render.go      // Scene graph traversal, drawable → canvas
     layer.go       // Compositor, per-layer canvases, back-to-front compositing
   fmath/

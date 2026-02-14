@@ -24,7 +24,7 @@ func main() {
 	canvas := core.NewCanvas(sw, sh)
 	world := core.NewWorld()
 
-	// Box A: red-ish, renders underneath (added first).
+	// Layer 0: Red box — Normal blend (base layer), slow seesaw left→right.
 	boxA := world.Spawn()
 	world.AddTransform(boxA, &core.Transform{
 		Position: fmath.Vec3{X: 2, Y: 5},
@@ -56,7 +56,7 @@ func main() {
 		return cell
 	})
 
-	// Box B: blue-ish, renders on top (added second).
+	// Layer 1: Green box — Multiply blend, seesaw right→left (faster).
 	boxB := world.Spawn()
 	world.AddTransform(boxB, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw - 14), Y: 5},
@@ -64,9 +64,9 @@ func main() {
 	world.AddDrawable(boxB, &core.Rect{
 		Width:  12,
 		Height: 6,
-		Rune:   '▓',
-		FG:     core.Color{R: 60, G: 60, B: 200},
-		BG:     core.Color{R: 0, G: 0, B: 40},
+		Rune:   '▒',
+		FG:     core.Color{R: 60, G: 200, B: 60},
+		BG:     core.Color{R: 0, G: 40, B: 0},
 	})
 	world.AddLayer(boxB, 1)
 	world.AddRoot(boxB)
@@ -77,15 +77,84 @@ func main() {
 	})
 
 	world.AddMaterial(boxB, func(x, y int, t core.Time, cell core.Cell) core.Cell {
-		cell.Alpha = 0.5
-		gradient := float64(y) / 5.0
-		pulse := (math.Sin(2*math.Pi*t.Total+math.Pi) + 1) / 2 // offset phase
-		brightness := gradient*0.5 + pulse*0.5
-		cell.FG = core.Color{
-			R: uint8(float64(cell.FG.R) * brightness),
-			G: uint8(float64(cell.FG.G) * brightness),
-			B: uint8(float64(cell.FG.B) * brightness),
-		}
+		cell.Alpha = 0.7
+		return cell
+	})
+
+	// Layer 2: Blue box — Screen blend, vertical bounce.
+	boxC := world.Spawn()
+	world.AddTransform(boxC, &core.Transform{
+		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: 2},
+	})
+	world.AddDrawable(boxC, &core.Rect{
+		Width:  12,
+		Height: 6,
+		Rune:   '▓',
+		FG:     core.Color{R: 60, G: 60, B: 200},
+		BG:     core.Color{R: 0, G: 0, B: 40},
+	})
+	world.AddLayer(boxC, 2)
+	world.AddRoot(boxC)
+
+	world.AddBehavior(boxC, func(t core.Time, e core.Entity, w *core.World) {
+		v := fmath.Triangle(t.Total / 6.0)
+		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), v)
+	})
+
+	world.AddMaterial(boxC, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.7
+		return cell
+	})
+
+	// Layer 3: Yellow box — Overlay blend, diagonal drift.
+	boxD := world.Spawn()
+	world.AddTransform(boxD, &core.Transform{
+		Position: fmath.Vec3{X: 2, Y: 2},
+	})
+	world.AddDrawable(boxD, &core.Rect{
+		Width:  12,
+		Height: 6,
+		Rune:   '█',
+		FG:     core.Color{R: 200, G: 200, B: 60},
+		BG:     core.Color{R: 40, G: 40, B: 0},
+	})
+	world.AddLayer(boxD, 3)
+	world.AddRoot(boxD)
+
+	world.AddBehavior(boxD, func(t core.Time, e core.Entity, w *core.World) {
+		vx := fmath.Triangle(t.Total / 10.0)
+		vy := fmath.Triangle(t.Total / 12.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-14), vx)
+		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), vy)
+	})
+
+	world.AddMaterial(boxD, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.7
+		return cell
+	})
+
+	// Layer 4: Cyan box — Difference blend, opposite horizontal.
+	boxE := world.Spawn()
+	world.AddTransform(boxE, &core.Transform{
+		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: float64(sh/2 - 3)},
+	})
+	world.AddDrawable(boxE, &core.Rect{
+		Width:  12,
+		Height: 6,
+		Rune:   '◆',
+		FG:     core.Color{R: 60, G: 200, B: 200},
+		BG:     core.Color{R: 0, G: 40, B: 40},
+	})
+	world.AddLayer(boxE, 4)
+	world.AddRoot(boxE)
+
+	world.AddBehavior(boxE, func(t core.Time, e core.Entity, w *core.World) {
+		v := fmath.Triangle(t.Total / 7.0)
+		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
+	})
+
+	world.AddMaterial(boxE, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.7
 		return cell
 	})
 
@@ -98,6 +167,10 @@ func main() {
 	}()
 
 	comp := core.NewCompositor(sw, sh)
+	comp.SetBlend(1, core.MultiplyColorBlend)
+	comp.SetBlend(2, core.ScreenColorBlend)
+	comp.SetBlend(3, core.OverlayColorBlend)
+	comp.SetBlend(4, core.DifferenceColorBlend)
 
 	start := time.Now()
 	last := start

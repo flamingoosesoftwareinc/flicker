@@ -244,3 +244,87 @@ func TestLayerBlending(t *testing.T) {
 	g := goldie.New(t)
 	g.Assert(t, "layer_blending", []byte(b.String()))
 }
+
+func TestBlendModes(t *testing.T) {
+	const (
+		w = 40
+		h = 12
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// Layer 0: red box (Normal blend, base layer).
+	boxA := world.Spawn()
+	world.AddTransform(boxA, &core.Transform{
+		Position: fmath.Vec3{X: 5, Y: 2},
+	})
+	world.AddDrawable(boxA, &core.Rect{
+		Width:  20,
+		Height: 8,
+		Rune:   '░',
+		FG:     core.Color{R: 200, G: 60, B: 60},
+		BG:     core.Color{R: 80, G: 20, B: 20},
+	})
+	world.AddLayer(boxA, 0)
+	world.AddRoot(boxA)
+
+	// Layer 1: green box (Multiply blend), overlaps red.
+	boxB := world.Spawn()
+	world.AddTransform(boxB, &core.Transform{
+		Position: fmath.Vec3{X: 10, Y: 3},
+	})
+	world.AddDrawable(boxB, &core.Rect{
+		Width:  15,
+		Height: 6,
+		Rune:   '▒',
+		FG:     core.Color{R: 60, G: 200, B: 60},
+		BG:     core.Color{R: 20, G: 80, B: 20},
+	})
+	world.AddLayer(boxB, 1)
+	world.AddMaterial(boxB, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.8
+		return cell
+	})
+	world.AddRoot(boxB)
+
+	// Layer 2: blue box (Screen blend), overlaps both.
+	boxC := world.Spawn()
+	world.AddTransform(boxC, &core.Transform{
+		Position: fmath.Vec3{X: 15, Y: 4},
+	})
+	world.AddDrawable(boxC, &core.Rect{
+		Width:  15,
+		Height: 6,
+		Rune:   '▓',
+		FG:     core.Color{R: 60, G: 60, B: 200},
+		BG:     core.Color{R: 20, G: 20, B: 80},
+	})
+	world.AddLayer(boxC, 2)
+	world.AddMaterial(boxC, func(x, y int, t core.Time, cell core.Cell) core.Cell {
+		cell.Alpha = 0.8
+		return cell
+	})
+	world.AddRoot(boxC)
+
+	comp := core.NewCompositor(w, h)
+	comp.SetBlend(1, core.MultiplyColorBlend)
+	comp.SetBlend(2, core.ScreenColorBlend)
+
+	canvas.Clear()
+	canvas.DrawBorder()
+	comp.Composite(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "blend_modes", []byte(b.String()))
+}
