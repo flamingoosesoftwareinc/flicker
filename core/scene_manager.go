@@ -50,16 +50,16 @@ func (sm *SceneManager) Start() {
 }
 
 // Next transitions to the next scene. Does nothing if already at last scene.
-func (sm *SceneManager) Next(transitionFn TransitionFunc, duration float64) {
+func (sm *SceneManager) Next(shader TransitionShader, duration float64) {
 	if sm.current+1 < len(sm.scenes) {
-		sm.transitionTo(sm.current+1, transitionFn, duration)
+		sm.transitionTo(sm.current+1, shader, duration)
 	}
 }
 
 // Previous transitions to the previous scene. Does nothing if already at first scene.
-func (sm *SceneManager) Previous(transitionFn TransitionFunc, duration float64) {
+func (sm *SceneManager) Previous(shader TransitionShader, duration float64) {
 	if sm.current > 0 {
-		sm.transitionTo(sm.current-1, transitionFn, duration)
+		sm.transitionTo(sm.current-1, shader, duration)
 	}
 }
 
@@ -84,7 +84,7 @@ func (sm *SceneManager) GoTo(index int) {
 // transitionTo starts a transition to the target scene.
 func (sm *SceneManager) transitionTo(
 	targetIndex int,
-	transitionFn TransitionFunc,
+	shader TransitionShader,
 	duration float64,
 ) {
 	if targetIndex < 0 || targetIndex >= len(sm.scenes) {
@@ -104,7 +104,7 @@ func (sm *SceneManager) transitionTo(
 	// Create transition
 	from := sm.scenes[sm.current]
 	to := sm.scenes[targetIndex]
-	sm.transition = NewTransition(from, to, duration, transitionFn)
+	sm.transition = NewTransition(from, to, duration, shader)
 }
 
 // Update updates the current scene and any active transition.

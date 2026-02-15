@@ -1,10 +1,23 @@
 package core
 
-import "flicker/fmath"
+import (
+	"math"
 
-// TransitionFunc renders a transition between two scenes.
-// progress is in [0, 1] where 0 = fully from, 1 = fully to.
-type TransitionFunc func(from, to *Canvas, dst *Canvas, progress float64)
+	"flicker/fmath"
+)
+
+// TransitionFragment provides context for a transition fragment shader.
+type TransitionFragment struct {
+	X, Y       int     // Screen coordinates
+	FromCanvas *Canvas // Old scene canvas (for sampling)
+	ToCanvas   *Canvas // New scene canvas (for sampling)
+	Progress   float64 // Transition progress [0, 1]
+	Time       Time    // Current time
+}
+
+// TransitionShader is a per-pixel shader that composites two scenes.
+// Returns the final cell color for the given fragment.
+type TransitionShader func(f TransitionFragment) Cell
 
 // Transition manages state for a scene-to-scene transition.
 type Transition struct {
@@ -12,7 +25,7 @@ type Transition struct {
 	To       Scene
 	Duration float64
 	Elapsed  float64
-	Func     TransitionFunc
+	Shader   TransitionShader
 
 	// Scratch canvases for rendering from/to scenes
 	fromCanvas *Canvas
@@ -20,12 +33,12 @@ type Transition struct {
 }
 
 // NewTransition creates a transition between two scenes.
-func NewTransition(from, to Scene, duration float64, fn TransitionFunc) *Transition {
+func NewTransition(from, to Scene, duration float64, shader TransitionShader) *Transition {
 	return &Transition{
 		From:     from,
 		To:       to,
 		Duration: duration,
-		Func:     fn,
+		Shader:   shader,
 	}
 }
 
@@ -58,115 +71,139 @@ func (t *Transition) Render(dst *Canvas, time Time) {
 	t.toCanvas.Clear()
 	t.To.Render(t.toCanvas, time)
 
-	// Apply transition function
-	t.Func(t.fromCanvas, t.toCanvas, dst, t.Progress())
-}
-
-// CrossFade is a simple alpha blend transition.
-func CrossFade(from, to *Canvas, dst *Canvas, progress float64) {
+	// Apply transition shader per-pixel
+	progress := t.Progress()
 	for y := range dst.Height {
 		for x := range dst.Width {
-			fromCell := from.Get(x, y)
-			toCell := to.Get(x, y)
-
-			// Fade from's alpha down, to's alpha up
-			fromCell.FGAlpha *= (1.0 - progress)
-			fromCell.BGAlpha *= (1.0 - progress)
-			toCell.FGAlpha *= progress
-			toCell.BGAlpha *= progress
-
-			// Composite to over from with normal blending
-			dst.Set(x, y, BlendCell(fromCell, toCell, NormalColorBlend))
-		}
-	}
-}
-
-// WipeLeft is a left-to-right wipe transition.
-func WipeLeft(from, to *Canvas, dst *Canvas, progress float64) {
-	threshold := int(float64(dst.Width) * progress)
-	for y := range dst.Height {
-		for x := range dst.Width {
-			if x < threshold {
-				dst.Set(x, y, to.Get(x, y))
-			} else {
-				dst.Set(x, y, from.Get(x, y))
+			frag := TransitionFragment{
+				X:          x,
+				Y:          y,
+				FromCanvas: t.fromCanvas,
+				ToCanvas:   t.toCanvas,
+				Progress:   progress,
+				Time:       time,
 			}
+			dst.Set(x, y, t.Shader(frag))
 		}
 	}
 }
 
-// WipeRight is a right-to-left wipe transition.
-func WipeRight(from, to *Canvas, dst *Canvas, progress float64) {
-	threshold := int(float64(dst.Width) * (1.0 - progress))
-	for y := range dst.Height {
-		for x := range dst.Width {
-			if x >= threshold {
-				dst.Set(x, y, to.Get(x, y))
-			} else {
-				dst.Set(x, y, from.Get(x, y))
-			}
-		}
-	}
+// CrossFade is a simple alpha blend transition shader.
+func CrossFade(f TransitionFragment) Cell {
+	fromCell := f.FromCanvas.Get(f.X, f.Y)
+	toCell := f.ToCanvas.Get(f.X, f.Y)
+
+	// Fade from's alpha down, to's alpha up
+	fromCell.FGAlpha *= (1.0 - f.Progress)
+	fromCell.BGAlpha *= (1.0 - f.Progress)
+	toCell.FGAlpha *= f.Progress
+	toCell.BGAlpha *= f.Progress
+
+	// Composite to over from with normal blending
+	return BlendCell(fromCell, toCell, NormalColorBlend)
 }
 
-// WipeUp is a bottom-to-top wipe transition.
-func WipeUp(from, to *Canvas, dst *Canvas, progress float64) {
-	threshold := int(float64(dst.Height) * (1.0 - progress))
-	for y := range dst.Height {
-		for x := range dst.Width {
-			if y >= threshold {
-				dst.Set(x, y, to.Get(x, y))
-			} else {
-				dst.Set(x, y, from.Get(x, y))
-			}
-		}
+// WipeLeft is a left-to-right wipe transition shader.
+func WipeLeft(f TransitionFragment) Cell {
+	threshold := int(float64(f.FromCanvas.Width) * f.Progress)
+	if f.X < threshold {
+		return f.ToCanvas.Get(f.X, f.Y)
 	}
+	return f.FromCanvas.Get(f.X, f.Y)
 }
 
-// WipeDown is a top-to-bottom wipe transition.
-func WipeDown(from, to *Canvas, dst *Canvas, progress float64) {
-	threshold := int(float64(dst.Height) * progress)
-	for y := range dst.Height {
-		for x := range dst.Width {
-			if y < threshold {
-				dst.Set(x, y, to.Get(x, y))
-			} else {
-				dst.Set(x, y, from.Get(x, y))
-			}
-		}
+// WipeRight is a right-to-left wipe transition shader.
+func WipeRight(f TransitionFragment) Cell {
+	threshold := int(float64(f.FromCanvas.Width) * (1.0 - f.Progress))
+	if f.X >= threshold {
+		return f.ToCanvas.Get(f.X, f.Y)
 	}
+	return f.FromCanvas.Get(f.X, f.Y)
+}
+
+// WipeUp is a bottom-to-top wipe transition shader.
+func WipeUp(f TransitionFragment) Cell {
+	threshold := int(float64(f.FromCanvas.Height) * (1.0 - f.Progress))
+	if f.Y >= threshold {
+		return f.ToCanvas.Get(f.X, f.Y)
+	}
+	return f.FromCanvas.Get(f.X, f.Y)
+}
+
+// WipeDown is a top-to-bottom wipe transition shader.
+func WipeDown(f TransitionFragment) Cell {
+	threshold := int(float64(f.FromCanvas.Height) * f.Progress)
+	if f.Y < threshold {
+		return f.ToCanvas.Get(f.X, f.Y)
+	}
+	return f.FromCanvas.Get(f.X, f.Y)
 }
 
 // PushLeft slides the new scene in from the right, pushing the old scene left.
-func PushLeft(from, to *Canvas, dst *Canvas, progress float64) {
-	offset := int(float64(dst.Width) * progress)
-	for y := range dst.Height {
-		for x := range dst.Width {
-			fromX := x + offset
-			toX := x + offset - dst.Width
+func PushLeft(f TransitionFragment) Cell {
+	offset := int(float64(f.FromCanvas.Width) * f.Progress)
+	fromX := f.X + offset
+	toX := f.X + offset - f.FromCanvas.Width
 
-			if toX >= 0 && toX < dst.Width {
-				dst.Set(x, y, to.Get(toX, y))
-			} else if fromX >= 0 && fromX < dst.Width {
-				dst.Set(x, y, from.Get(fromX, y))
-			}
-		}
+	if toX >= 0 && toX < f.ToCanvas.Width {
+		return f.ToCanvas.Get(toX, f.Y)
+	} else if fromX >= 0 && fromX < f.FromCanvas.Width {
+		return f.FromCanvas.Get(fromX, f.Y)
 	}
+	return Cell{} // Empty cell if out of bounds
 }
 
 // PushRight slides the new scene in from the left, pushing the old scene right.
-func PushRight(from, to *Canvas, dst *Canvas, progress float64) {
-	offset := int(float64(dst.Width) * progress)
-	for y := range dst.Height {
-		for x := range dst.Width {
-			fromX := x - offset
-			toX := x - offset + dst.Width
+func PushRight(f TransitionFragment) Cell {
+	offset := int(float64(f.FromCanvas.Width) * f.Progress)
+	fromX := f.X - offset
+	toX := f.X - offset + f.FromCanvas.Width
 
-			if toX >= 0 && toX < dst.Width {
-				dst.Set(x, y, to.Get(toX, y))
-			} else if fromX >= 0 && fromX < dst.Width {
-				dst.Set(x, y, from.Get(fromX, y))
-			}
-		}
+	if toX >= 0 && toX < f.ToCanvas.Width {
+		return f.ToCanvas.Get(toX, f.Y)
+	} else if fromX >= 0 && fromX < f.FromCanvas.Width {
+		return f.FromCanvas.Get(fromX, f.Y)
 	}
+	return Cell{} // Empty cell if out of bounds
+}
+
+// RadialWipe reveals the new scene in a circle expanding from the center.
+func RadialWipe(f TransitionFragment) Cell {
+	centerX := float64(f.FromCanvas.Width) / 2.0
+	centerY := float64(f.FromCanvas.Height) / 2.0
+
+	dx := float64(f.X) - centerX
+	dy := float64(f.Y) - centerY
+	distance := math.Sqrt(dx*dx + dy*dy)
+
+	maxDistance := math.Sqrt(centerX*centerX + centerY*centerY)
+	threshold := maxDistance * f.Progress
+
+	if distance < threshold {
+		return f.ToCanvas.Get(f.X, f.Y)
+	}
+	return f.FromCanvas.Get(f.X, f.Y)
+}
+
+// Pixelate creates a pixelated dissolve effect.
+func Pixelate(f TransitionFragment) Cell {
+	// Pixelate in increasing block sizes, then reveal
+	blockSize := int(1.0 + (1.0-f.Progress)*8.0)
+	if blockSize < 1 {
+		blockSize = 1
+	}
+
+	blockX := (f.X / blockSize) * blockSize
+	blockY := (f.Y / blockSize) * blockSize
+
+	// Sample from block corner
+	if f.Progress > 0.7 {
+		// Final 30%: reveal new scene
+		return f.ToCanvas.Get(f.X, f.Y)
+	} else if f.Progress > 0.3 {
+		// Middle: pixelated new scene
+		return f.ToCanvas.Get(blockX, blockY)
+	}
+	// Start: pixelated old scene
+	return f.FromCanvas.Get(blockX, blockY)
 }
