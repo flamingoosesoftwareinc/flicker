@@ -88,6 +88,8 @@ func (c *Compositor) Composite(world *World, dst *Canvas, t Time) {
 						Time:   t,
 						Cell:   c.scratch.Get(x, y),
 						Source: c.scratch,
+						World:  world,
+						Entity: 0, // No specific entity for layer post-process
 					}
 					lc.Set(x, y, pp(f))
 				}

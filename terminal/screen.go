@@ -41,10 +41,15 @@ func (s *TcellScreen) Flush(canvas *core.Canvas) {
 				r = ' '
 			}
 			style := tcell.StyleDefault
-			if cell.FGAlpha > 0 || cell.BGAlpha > 0 {
-				style = style.
-					Foreground(tcell.NewRGBColor(int32(cell.FG.R), int32(cell.FG.G), int32(cell.FG.B))).
-					Background(tcell.NewRGBColor(int32(cell.BG.R), int32(cell.BG.G), int32(cell.BG.B)))
+			if cell.FGAlpha > 0 {
+				style = style.Foreground(
+					tcell.NewRGBColor(int32(cell.FG.R), int32(cell.FG.G), int32(cell.FG.B)),
+				)
+			}
+			if cell.BGAlpha > 0 {
+				style = style.Background(
+					tcell.NewRGBColor(int32(cell.BG.R), int32(cell.BG.G), int32(cell.BG.B)),
+				)
 			}
 			s.tcell.SetContent(x, y, r, nil, style)
 		}

@@ -33,16 +33,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	textSize := float64(sh) * 0.7
+	// Make text MUCH larger to see particles traveling in different directions.
+	textSize := float64(sh) * 1
 	textOpts := asset.TextOptions{
 		Font:  textFont,
 		Size:  textSize,
 		Color: core.Color{R: 255, G: 255, B: 255},
 	}
 
-	// Rasterize two text layouts: "GO" and "FLY"
+	// Rasterize two text layouts: "GO" and "FLYING" (wider for more directional variety)
 	layoutA := asset.RasterizeText("GO", textOpts)
-	layoutB := asset.RasterizeText("FLY", textOpts)
+	layoutB := asset.RasterizeText("FLYING", textOpts)
 
 	if layoutA == nil || layoutB == nil {
 		fmt.Fprintf(os.Stderr, "error: failed to rasterize text\n")
@@ -60,7 +61,7 @@ func main() {
 
 	// Single pixel bitmap for particles.
 	pixel := bitmap.New(1, 1)
-	pixel.SetDot(0, 0, core.Color{R: 100, G: 200, B: 255})
+	pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
 
 	// Calculate center offset to center the text.
 	offsetX := float64(sw/2) - float64(layoutA.Bitmap.Width)/2
@@ -77,6 +78,18 @@ func main() {
 		})
 		world.AddBody(p, &core.Body{})
 		world.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
+
+		// Add dynamic particle materials: directional appearance + velocity-based color
+		world.AddMaterial(p, core.ComposeMaterials(
+			particle.BrailleDirectional(),
+			particle.VelocityColor(particle.ColorGradient{
+				MinSpeed: 0.0,
+				MaxSpeed: 20.0,
+				MinColor: core.Color{R: 100, G: 150, B: 255}, // blue = slow
+				MaxColor: core.Color{R: 255, G: 100, B: 100}, // red = fast
+			}),
+		))
+
 		world.AddRoot(p)
 	}
 

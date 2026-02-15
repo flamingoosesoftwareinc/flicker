@@ -36,10 +36,16 @@ func (s *SimScreen) Flush(canvas *core.Canvas) {
 				r = ' '
 			}
 			if cell.FGAlpha > 0 || cell.BGAlpha > 0 {
-				fmt.Fprintf(&buf, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm%c\x1b[0m",
-					cell.FG.R, cell.FG.G, cell.FG.B,
-					cell.BG.R, cell.BG.G, cell.BG.B,
-					r)
+				// Only set foreground if FGAlpha > 0
+				if cell.FGAlpha > 0 {
+					fmt.Fprintf(&buf, "\x1b[38;2;%d;%d;%dm", cell.FG.R, cell.FG.G, cell.FG.B)
+				}
+				// Only set background if BGAlpha > 0
+				if cell.BGAlpha > 0 {
+					fmt.Fprintf(&buf, "\x1b[48;2;%d;%d;%dm", cell.BG.R, cell.BG.G, cell.BG.B)
+				}
+				buf.WriteRune(r)
+				buf.WriteString("\x1b[0m")
 			} else {
 				buf.WriteRune(r)
 			}

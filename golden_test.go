@@ -10,6 +10,7 @@ import (
 	"flicker/core"
 	"flicker/core/bitmap"
 	"flicker/fmath"
+	"flicker/particle"
 	"flicker/physics"
 	"flicker/terminal"
 	"github.com/sebdah/goldie/v2"
@@ -825,4 +826,78 @@ func TestParticleAttractor(t *testing.T) {
 
 	g := goldie.New(t)
 	g.Assert(t, "particle_attractor", []byte(b.String()))
+}
+
+func TestParticleAppearance(t *testing.T) {
+	const (
+		w = 60
+		h = 20
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	world := core.NewWorld()
+
+	// Single pixel bitmap for particles.
+	pixel := bitmap.New(1, 1)
+	pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
+
+	// Create particles with different velocities to test directional appearance.
+	positions := []struct {
+		x, y   float64
+		vx, vy float64
+		label  string
+	}{
+		{10, 5, 10, 0, "East"},   // moving right
+		{20, 5, 0, 10, "South"},  // moving down
+		{30, 5, -10, 0, "West"},  // moving left
+		{40, 5, 0, -10, "North"}, // moving up
+		{10, 10, 7, 7, "SE"},     // southeast
+		{20, 10, -7, 7, "SW"},    // southwest
+		{30, 10, 7, -7, "NE"},    // northeast
+		{40, 10, -7, -7, "NW"},   // northwest
+		{50, 5, 0, 0, "Idle"},    // stationary (should show default)
+		{50, 10, 20, 0, "Fast"},  // fast particle (red)
+		{50, 15, 1, 0, "Slow"},   // slow particle (blue)
+	}
+
+	for _, p := range positions {
+		ent := world.Spawn()
+		world.AddTransform(ent, &core.Transform{
+			Position: fmath.Vec3{X: p.x, Y: p.y},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		world.AddBody(ent, &core.Body{
+			Velocity: fmath.Vec2{X: p.vx, Y: p.vy},
+		})
+		world.AddDrawable(ent, &bitmap.Braille{Bitmap: pixel})
+
+		// Add particle materials for dynamic appearance.
+		world.AddMaterial(ent, core.ComposeMaterials(
+			particle.BrailleDirectional(),
+			particle.VelocityColor(particle.ColorGradient{
+				MinSpeed: 0.0,
+				MaxSpeed: 20.0,
+				MinColor: core.Color{R: 100, G: 150, B: 255}, // blue = slow
+				MaxColor: core.Color{R: 255, G: 100, B: 100}, // red = fast
+			}),
+		))
+
+		world.AddRoot(ent)
+	}
+
+	canvas := core.NewCanvas(w, h)
+	canvas.Clear()
+	canvas.DrawBorder()
+	core.Render(world, canvas, core.Time{})
+	screen.Flush(canvas)
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "particle_appearance", []byte(b.String()))
 }

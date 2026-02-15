@@ -37,6 +37,8 @@ func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
 					Time:   t,
 					Cell:   cell,
 					Source: c,
+					World:  w,
+					Entity: e,
 				}
 				cell = m(f)
 			}

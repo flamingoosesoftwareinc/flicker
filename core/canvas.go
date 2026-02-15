@@ -20,6 +20,10 @@ type Fragment struct {
 	Time             Time
 	Cell             Cell    // current cell at this position
 	Source           *Canvas // read neighbors via Source.Get(x, y)
+
+	// World and Entity enable materials to access component state (velocity, age, etc.)
+	World  *World
+	Entity Entity
 }
 
 type Canvas struct {
