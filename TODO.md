@@ -101,15 +101,16 @@ These foundation iterations unblock the feature work below. Order matters — ea
 
 - **Iteration 11: Asset loading (complete)** — OBJ mesh loader, PNG/JPEG image loader with downsampling, wireframe rasterizer, resource cache. All in `asset/` package.
 - **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. All forward-mapped drawables (HalfBlock, FullBlock, BGBlock) switched to inverse mapping via shared `inverseRenderer` — eliminates scan-line gaps under non-integer zoom. Demo: gentle circular pan + pronounced zoom pulse (0.7×–1.3×).
-- **Iteration 13: Text Rendering (complete)** — TTF font loading via `golang.org/x/image/font/sfnt`, glyph rasterization via `golang.org/x/image/vector` with analytical anti-aliasing. Single-line text layout with advance widths. SDF computation from rasterized bitmap using 8SSEDT algorithm. `inverseRenderer` fixed to emit local drawable coordinates (prerequisite for SDF materials). `asset/font.go`: `Font` type wrapping `sfnt.Font`, `LoadFont`, `GetOrLoadFont`, `Metrics`. `asset/text.go`: `RasterizeText` producing `*bitmap.Bitmap`. `core/bitmap/sdf.go`: `ComputeSDF` (8SSEDT), `At()`, `Gradient()`. Encoding-aware SDF threshold materials (`HalfBlockThreshold`, `BrailleThreshold`) as free functions for reusable reveal effects. Demo: "FLICKER" text with SDF threshold materialization effect revealing from skeleton outward over ~3 seconds. Golden test for static text rendering.
+- **Iteration 13: Text Rendering (complete)** — TTF font loading via `golang.org/x/image/font/sfnt`, glyph rasterization via `golang.org/x/image/vector` with analytical anti-aliasing. Single-line text layout with advance widths. SDF computation from rasterized bitmap using 8SSEDT algorithm. `inverseRenderer` fixed to emit local drawable coordinates (prerequisite for SDF materials). `asset/font.go`: `Font` type wrapping `sfnt.Font`, `LoadFont`, `GetOrLoadFont`, `Metrics`. `asset/text.go`: `TextLayout` struct with per-glyph positions (`Glyphs []Glyph`), `GlyphAt(x,y)`, `SplitGlyphs()` — foundation for per-character effects. `core/bitmap/sdf.go`: `ComputeSDF` (8SSEDT), `At()`, `Gradient()`. Encoding-aware SDF threshold materials (`HalfBlockThreshold`, `BrailleThreshold`) as free functions. `core/entity.go`: `ComposeMaterials` for stacking materials on any entity. `textfx/` package: reusable text effects (typewriter, wave, staggered fade). Demo: "FLICKER" text with SDF threshold materialization, plus typewriter/wave/fade effects. Golden test for static text rendering.
 
 ## Roadmap: Features
 
 These are the target features, built on top of the foundations above. Dependencies noted.
 
 - **Text rendering (complete)** — Load Google Fonts TTFs, rasterize glyphs into bitmap buffer, render as braille/block cells. Text effects: typewriter, scramble-reveal, count up/down.
-- **Analytical SDF primitives** — `sdf/` package with common 2D signed distance functions sourced from [iquilezles.org/articles/distfunctions2d](https://iquilezles.org/articles/distfunctions2d/). Circle, box, segment, arc, bezier, etc. Composable via union/intersection/subtraction. Separate from the bitmap-based SDF in `core/bitmap/sdf.go` which computes distance fields from rasterized shapes.
-- **Particle systems** — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Sub-cell rendering for pixel-precise particles. Text materialization from particles.
+- **Text: multi-line & kerning** — Line wrapping, multi-line layout with line height control. Kerning pair adjustments for professional typography. Variable font axis interpolation (weight animation).
+- **Analytical SDF primitives (complete)** — `sdf/` package with 2D signed distance functions from [iquilezles.org/articles/distfunctions2d](https://iquilezles.org/articles/distfunctions2d/). Primitives: Circle, Box, RoundedBox, Segment, Triangle, EquilateralTriangle, Rhombus, Pentagon, Hexagon, Ellipse, Arc, Pie. Operations: Union, Subtract, Intersect, SmoothUnion, SmoothSubtract, SmoothIntersect. Pure functions taking `fmath.Vec2`, returning distance. Separate from bitmap-based SDF in `core/bitmap/sdf.go`.
+- **Particle systems** — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Bitmap sampling: treat any bitmap as a point cloud (spawn particles at pixel positions). Point cloud interpolation: animate particles from one bitmap's positions to another's. Sub-cell rendering for pixel-precise particles.
 - **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
 - **Physics: springs and effectors** — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
 - **SVG rendering** — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
@@ -122,7 +123,7 @@ These are the target features, built on top of the foundations above. Dependenci
 ```
 flicker/
   core/
-    entity.go      // Entity, World, parent/child relationships
+    entity.go      // Entity, World, parent/child relationships, ComposeMaterials
     camera.go      // Camera component, ViewMatrix (orthographic view transform)
     transform.go   // Transform component (position, rotation, scale) with LocalMatrix()
     drawable.go    // Drawable interface, RenderFunc
@@ -156,9 +157,18 @@ flicker/
     obj.go         // OBJ mesh loader
     image.go       // PNG/JPEG image loader → bitmap.Bitmap
     font.go        // Font type, LoadFont, GetOrLoadFont, Metrics
-    text.go        // RasterizeText (layout + rasterize) → bitmap.Bitmap
+    text.go        // TextLayout, RasterizeText (layout + rasterize) → TextLayout
     rasterize.go   // Wireframe rasterizer (mesh → bitmap)
     cache.go       // Resource cache keyed by path
+  textfx/
+    encoding.go    // Encoding enum (HalfBlock, Braille, FullBlock), glyphAtForEncoding helper
+    typewriter.go  // TypewriterMaterial (left-to-right reveal), TypewriterBehavior
+    fade.go        // StaggeredFadeMaterial (per-character alpha fade with delay)
+    wave.go        // Wave (multi-entity vertical oscillation with phase offsets)
+  sdf/
+    sdf.go         // 2D signed distance functions: primitives (Circle, Box, Triangle, polygons, Ellipse, Arc, Pie), operations (Union, Subtract, Intersect, smooth variants)
+    sdf_test.go
+    example_test.go
   terminal/
     screen.go      // Screen interface, TcellScreen (tcell backend)
     simscreen.go   // SimScreen (in-memory backend for testing)
@@ -169,4 +179,4 @@ flicker/
   testdata/        // Golden files
 ```
 
-`fmath` depends on nothing. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
+`fmath` depends on nothing. `sdf` depends on `fmath`. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `textfx` depends on `core`, `core/bitmap`, `asset`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
