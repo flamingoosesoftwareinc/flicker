@@ -24,20 +24,83 @@ func BitmapToCloud(bm *bitmap.Bitmap) []fmath.Vec2 {
 }
 
 // DistributeTargets assigns target positions from cloud to entities.
-// Simple strategy: round-robin assignment (entities[i] gets cloud[i % len(cloud)]).
+// If cloud has more points than entities, spawns additional particles to fill the gaps.
+// Returns all entities (original + newly spawned).
 // Adds InterpolateToTarget behavior to each entity.
 func DistributeTargets(
 	entities []core.Entity,
 	cloud []fmath.Vec2,
 	speed float64,
 	world *core.World,
-) {
+) []core.Entity {
 	if len(cloud) == 0 {
-		return
+		return entities
 	}
 
+	// Assign targets to existing entities.
 	for i, e := range entities {
-		target := cloud[i%len(cloud)]
-		world.AddBehavior(e, InterpolateToTarget(target, speed))
+		if i < len(cloud) {
+			world.AddBehavior(e, InterpolateToTarget(cloud[i], speed))
+		} else {
+			// More entities than targets - round-robin wrap.
+			world.AddBehavior(e, InterpolateToTarget(cloud[i%len(cloud)], speed))
+		}
 	}
+
+	// If cloud has more points than entities, spawn new particles for the extra points.
+	if len(cloud) > len(entities) {
+		for i := len(entities); i < len(cloud); i++ {
+			// Get template from first entity (copy components).
+			template := entities[0]
+			templateTransform := world.Transform(template)
+			templateDrawable := world.Drawable(template)
+			templateMaterial := world.Material(template)
+			templateBody := world.Body(template)
+			templateLayer := world.Layer(template)
+
+			// Spawn new particle.
+			p := world.Spawn()
+
+			// Copy transform (will be moved to target by behavior).
+			if templateTransform != nil {
+				world.AddTransform(p, &core.Transform{
+					Position: templateTransform.Position,
+					Rotation: templateTransform.Rotation,
+					Scale:    templateTransform.Scale,
+				})
+			}
+
+			// Copy body.
+			if templateBody != nil {
+				world.AddBody(p, &core.Body{
+					Velocity:     templateBody.Velocity,
+					Acceleration: templateBody.Acceleration,
+				})
+			}
+
+			// Copy drawable (reuse same drawable instance - safe for read-only data).
+			if templateDrawable != nil {
+				world.AddDrawable(p, templateDrawable)
+			}
+
+			// Copy material.
+			if templateMaterial != nil {
+				world.AddMaterial(p, templateMaterial)
+			}
+
+			// Copy layer.
+			world.AddLayer(p, templateLayer)
+
+			// Add to roots.
+			world.AddRoot(p)
+
+			// Assign target.
+			world.AddBehavior(p, InterpolateToTarget(cloud[i], speed))
+
+			// Add to entities list.
+			entities = append(entities, p)
+		}
+	}
+
+	return entities
 }

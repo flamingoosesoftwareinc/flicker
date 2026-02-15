@@ -104,7 +104,7 @@ func main() {
 			startTime = t.Total
 		}
 
-		// At 2 seconds, distribute targets.
+		// At 2 seconds, distribute targets (may spawn additional particles).
 		if !targetDistributed && t.Total-startTime >= 2.0 {
 			targetDistributed = true
 			// Offset cloud B to center it as well.
@@ -115,7 +115,8 @@ func main() {
 					Y: pos.Y + offsetY,
 				}
 			}
-			particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
+			// DistributeTargets returns all entities (including newly spawned ones).
+			particles = particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
 		}
 	})
 
