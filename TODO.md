@@ -103,6 +103,10 @@ These foundation iterations unblock the feature work below. Order matters — ea
 - **Iteration 12: Orthographic Camera (complete)** — `Camera` component with `Zoom` (zero-value defaults to 1.0). `ViewMatrix()` computes `Translate(screenCenter) × Scale(zoom) × Rotate(-rotation) × Translate(-pos)`, centering the camera's world position on screen. `World` holds `cameras` map and `activeCamera` entity. `viewMatrix()` helper in `render.go` returns identity when no active camera — fully backward compatible. Both `Render()` and `Compositor.Composite()` use the view matrix as the initial parent transform. Viewport culling deferred — `Canvas.Set` already clips silently, negligible cost for ~10-50 entities. All forward-mapped drawables (HalfBlock, FullBlock, BGBlock) switched to inverse mapping via shared `inverseRenderer` — eliminates scan-line gaps under non-integer zoom. Demo: gentle circular pan + pronounced zoom pulse (0.7×–1.3×).
 - **Iteration 13: Text Rendering (complete)** — TTF font loading via `golang.org/x/image/font/sfnt`, glyph rasterization via `golang.org/x/image/vector` with analytical anti-aliasing. Single-line text layout with advance widths. SDF computation from rasterized bitmap using 8SSEDT algorithm. `inverseRenderer` fixed to emit local drawable coordinates (prerequisite for SDF materials). `asset/font.go`: `Font` type wrapping `sfnt.Font`, `LoadFont`, `GetOrLoadFont`, `Metrics`. `asset/text.go`: `TextLayout` struct with per-glyph positions (`Glyphs []Glyph`), `GlyphAt(x,y)`, `SplitGlyphs()` — foundation for per-character effects. `core/bitmap/sdf.go`: `ComputeSDF` (8SSEDT), `At()`, `Gradient()`. Encoding-aware SDF threshold materials (`HalfBlockThreshold`, `BrailleThreshold`) as free functions. `core/entity.go`: `ComposeMaterials` for stacking materials on any entity. `textfx/` package: reusable text effects (typewriter, wave, staggered fade). Demo: "FLICKER" text with SDF threshold materialization, plus typewriter/wave/fade effects. Golden test for static text rendering.
 
+## Use Case
+
+Terminal-based slideshow and motion graphics engine for video content creation. Primary workflow: coding agents convert blog posts + brand assets into slide scripts, render to video with voice-over sync.
+
 ## Roadmap: Features
 
 These are the target features, built on top of the foundations above. Dependencies noted.
@@ -112,12 +116,15 @@ These are the target features, built on top of the foundations above. Dependenci
 - **Analytical SDF primitives (complete)** — `sdf/` package with 2D signed distance functions from [iquilezles.org/articles/distfunctions2d](https://iquilezles.org/articles/distfunctions2d/). Primitives: Circle, Box, RoundedBox, Segment, Triangle, EquilateralTriangle, Rhombus, Pentagon, Hexagon, Ellipse, Arc, Pie. Operations: Union, Subtract, Intersect, SmoothUnion, SmoothSubtract, SmoothIntersect. Pure functions taking `fmath.Vec2`, returning distance. Separate from bitmap-based SDF in `core/bitmap/sdf.go`.
 - **Particle systems (complete)** — `physics/` package: generic physics behaviors (EulerIntegration, VerletIntegration, Attractor, Repulsor, Drag, Gravity, Turbulence, Spring) that work on any entity with Body + Transform. `particle/` package: particle-specific helpers (BitmapToCloud, DistributeParticlesToTargets, InterpolateToTarget, Emit, AgeAndDespawn), multi-phase transition system (PhaseContext, PhaseController, TransitionPhase), phase implementations (BehaviorPhase, KeyframePhase, CurvePhase), PointCloudSequence orchestrator. `Body` component (velocity, acceleration) and `Age` component (age, lifetime) in `core/`. Point cloud morphing: bitmap → point cloud → particle distribution → multi-phase transitions (burst, turbulence, smooth easing, curves). Demo: "GO" → "BURST" → ... with varied phase combinations.
 - **Particle materials (complete)** — Dynamic particle appearance based on component state. `Fragment` extended with `World` and `Entity` fields. Material helpers: `BrailleDirectional()` (velocity → directional Braille patterns), `VelocityColor()` (speed → color gradient), `IdleAndMotion()` (idle animation + motion), `SpeedStates()`, `AgeBasedSize()`, `RainbowTime()`. Pattern: component-based appearance materials read entity state from Fragment and return modified cells. All materials guard against nil components.
-- **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
+- **Scene/slide system (complete)** — `Scene` interface with lifecycle hooks (OnEnter/OnUpdate/OnExit/Render). `BasicScene` owns isolated World + Compositor per slide. `SceneManager` manages linear scene sequence with Next/Previous/GoTo navigation. Foundation for multi-slide presentations. Demo: 3 slides (Intro, Particle morph, Thanks) with spacebar navigation and cross-fade transitions. Future: `Timeline` orchestrator for sequencing scenes with start/end times, parallel/serial composition, keyframe tracks.
+- **Slide transitions (complete)** — `Transition` struct with pluggable `TransitionFunc`. Built-in transitions: CrossFade, WipeLeft/Right/Up/Down, PushLeft/Right. Transitions render both from/to scenes and composite based on progress [0,1]. Future: Custom transition shaders via LayerPostProcess integration.
+- **Scripting** — Lua bindings over Go API (gopher-lua). Primary interface for agent-generated content. Fluent API for scenes (`scene:text()`, `scene:particleMorph()`, `timeline:add()`). Hot reload for iteration. High-level helpers wrap low-level primitives for agent ergonomics.
+- **Theme/brand system** — Reusable color palettes, fonts, layout templates. Asset library for logos, brand elements. Style presets for materials/animations. Agents reference theme instead of hardcoding values.
+- **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity. Configurable from Lua.
+- **Playback/recording** — Frame-by-frame export to image sequence or video. VHS / asciinema integration. Deterministic playback with fixed timestep.
+- **Audio sync** — Timing markers for voice-over synchronization. Subtitle rendering synced to transcript timestamps. Frame-accurate coordination between slides and narration.
 - **Physics: springs and effectors** — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
 - **SVG rendering** — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
-- **Scenes/slides** — Ordered scene list, transitions between scenes.
-- **Scripting** — Lua bindings over the Go API.
-- **Playback/recording** — VHS / asciinema integration.
 
 ## Package Structure
 
@@ -133,6 +140,9 @@ flicker/
     blend.go       // BlendMode, ColorBlend, all Photoshop-style blend modes
     render.go      // Scene graph traversal, drawable → canvas
     layer.go       // Compositor, per-layer canvases, back-to-front compositing
+    scene.go       // Scene interface, BasicScene (isolated world per slide)
+    scene_manager.go // SceneManager (linear scene sequencing)
+    transition.go  // Transition, TransitionFunc, CrossFade/Wipe/Push transitions
   core/bitmap/
     bitmap.go      // Bitmap pixel buffer, New(), Set/Get/SetDot/Clear/Line
     braille.go     // Braille drawable (2x4 dots per cell)

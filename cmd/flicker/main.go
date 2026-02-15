@@ -24,7 +24,6 @@ func main() {
 
 	sw, sh := screen.Size()
 	canvas := core.NewCanvas(sw, sh)
-	world := core.NewWorld()
 
 	// Load font for text rendering.
 	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
@@ -33,157 +32,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Text rendering setup
-	textSize := float64(sh) * 0.8
-	textOpts := asset.TextOptions{
-		Font:  textFont,
-		Size:  textSize,
-		Color: core.Color{R: 255, G: 255, B: 255},
-	}
+	// Create scene manager
+	sm := core.NewSceneManager(sw, sh)
 
-	// Create different words to demonstrate various transition types
-	words := []string{
-		"GO",      // Start
-		"BURST",   // Burst transition
-		"CURVE",   // Curved arc transition
-		"EASE",    // Keyframe with easing
-		"SEEK",    // Direct seek (behavior)
-		"SWIRL",   // Multi-phase: turbulence + seek
-		"ARC",     // Another curve
-		"SMOOTH",  // Smooth easing
-		"EXPLODE", // Burst again
-		"END",     // Final
-	}
+	// Scene 1: Intro - Static "INTRO" text
+	scene1 := createIntroScene(sw, sh, textFont)
+	sm.Add(scene1)
 
-	// Rasterize all text layouts
-	layouts := make([]*asset.TextLayout, len(words))
-	clouds := make([][]fmath.Vec2, len(words))
+	// Scene 2: Particle morph demo
+	scene2 := createParticleScene(sw, sh, textFont)
+	sm.Add(scene2)
 
-	for i, word := range words {
-		layout := asset.RasterizeText(word, textOpts)
-		if layout == nil {
-			fmt.Fprintf(os.Stderr, "error: failed to rasterize text: %s\n", word)
-			os.Exit(1)
-		}
-		layouts[i] = layout
-		clouds[i] = particle.BitmapToCloud(layout.Bitmap)
-	}
+	// Scene 3: Thanks - "THANKS" with rainbow effect
+	scene3 := createThanksScene(sw, sh, textFont)
+	sm.Add(scene3)
 
-	// Single pixel bitmap for particles
-	pixel := bitmap.New(1, 1)
-	pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
-
-	// Calculate center offset for initial cloud
-	offsetX := float64(sw/2) - float64(layouts[0].Bitmap.Width)/2
-	offsetY := float64(sh/2) - float64(layouts[0].Bitmap.Height)/2
-
-	// Offset initial cloud
-	initialCloud := make([]fmath.Vec2, len(clouds[0]))
-	for i, pos := range clouds[0] {
-		initialCloud[i] = fmath.Vec2{
-			X: pos.X + offsetX,
-			Y: pos.Y + offsetY,
-		}
-	}
-
-	// Create particle material: directional appearance + time-based rainbow
-	material := core.ComposeMaterials(
-		particle.BrailleDirectional(),
-		particle.RainbowTime(2.0),
-	)
-
-	// Create point cloud sequence
-	seq := particle.NewPointCloudSequence(
-		world,
-		initialCloud,
-		&bitmap.Braille{Bitmap: pixel},
-		material,
-		0, // layer
-	)
-
-	// Add targets with different phase combinations
-	for i := 1; i < len(words); i++ {
-		targetCloud := clouds[i]
-		targetLayout := layouts[i]
-
-		// Center target cloud
-		targetOffsetX := float64(sw/2) - float64(targetLayout.Bitmap.Width)/2
-		offsetTargetCloud := make([]fmath.Vec2, len(targetCloud))
-		for j, pos := range targetCloud {
-			offsetTargetCloud[j] = fmath.Vec2{
-				X: pos.X + targetOffsetX,
-				Y: pos.Y + offsetY,
-			}
-		}
-
-		// Create strategy dynamically (ClosestPoint needs current particle state)
-		var strategy particle.DistributionStrategy
-		switch i % 3 {
-		case 0:
-			strategy = particle.LinearDistribution()
-		case 1:
-			strategy = particle.RoundRobinDistribution()
-		case 2:
-			// Create ClosestPoint with current particles each time
-			strategy = particle.ClosestPointDistribution(seq.Particles(), offsetTargetCloud, world)
-		}
-
-		// Create different phase combinations for each transition
-		var phases []particle.TransitionPhase
-		duration := 6.0
-
-		switch i % 5 {
-		case 0:
-			// Direct seek (single behavior phase)
-			phases = []particle.TransitionPhase{
-				particle.SeekPhase(),
-			}
-
-		case 1:
-			// Burst + seek (two behavior phases)
-			burstDist := float64(sh) * 0.4
-			phases = []particle.TransitionPhase{
-				particle.BurstPhase(burstDist), // 50% of duration
-				particle.SeekPhase(),           // 50% of duration
-			}
-
-		case 2:
-			// Keyframe with smooth easing
-			phases = []particle.TransitionPhase{
-				&particle.KeyframePhase{Easing: particle.EaseInOutQuad},
-			}
-
-		case 3:
-			// Curved arc motion
-			arcHeight := float64(sh) * 0.3
-			phases = []particle.TransitionPhase{
-				&particle.CurvePhase{ArcHeight: arcHeight},
-			}
-
-		case 4:
-			// Multi-phase: turbulence, then smooth keyframe seek
-			phases = []particle.TransitionPhase{
-				particle.TurbulencePhase(0.05, 30.0),                   // 33% turbulence
-				&particle.KeyframePhase{Easing: particle.EaseOutCubic}, // 67% smooth ease
-			}
-		}
-
-		seq.AddTarget(particle.MorphTarget{
-			Cloud:    offsetTargetCloud,
-			Duration: duration,
-			Strategy: strategy,
-			Phases:   phases,
-		})
-	}
-
-	// Camera
-	cam := world.Spawn()
-	world.AddTransform(cam, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw) / 2.0, Y: float64(sh) / 2.0},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddCamera(cam, &core.Camera{Zoom: 1})
-	world.SetActiveCamera(cam)
+	// Start with first scene
+	sm.Start()
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input
 	events := make(chan tcell.Event, 1)
@@ -193,16 +58,13 @@ func main() {
 		}
 	}()
 
-	const stepSize = 1.0 / 60.0
-
 	var simTime float64
-	paused := false
 	last := time.Now()
 
 	for {
 		// Drain events (non-blocking)
-		step := false
 		quit := false
+		nextSlide := false
 		for draining := true; draining; {
 			select {
 			case ev := <-events:
@@ -210,12 +72,8 @@ func main() {
 					switch {
 					case kev.Key() == tcell.KeyEscape:
 						quit = true
-					case kev.Key() == tcell.KeyRight:
-						step = true
 					case kev.Rune() == ' ':
-						paused = !paused
-					case kev.Rune() == '.':
-						step = true
+						nextSlide = true
 					case kev.Rune() == 'q':
 						quit = true
 					}
@@ -227,31 +85,169 @@ func main() {
 		if quit {
 			return
 		}
+		if nextSlide && !sm.IsTransitioning() {
+			sm.Next(core.CrossFade, 1.0)
+		}
 
 		now := time.Now()
 		wallDelta := now.Sub(last).Seconds()
 		last = now
-
-		var simDelta float64
-		switch {
-		case step:
-			simDelta = stepSize
-			paused = true
-		case !paused:
-			simDelta = wallDelta
-		}
-		simTime += simDelta
+		simTime += wallDelta
 
 		t := core.Time{
 			Total: simTime,
-			Delta: simDelta,
+			Delta: wallDelta,
 		}
 
-		core.UpdateBehaviors(world, t)
+		sm.Update(t)
 
 		canvas.Clear()
 		canvas.DrawBorder()
-		core.Render(world, canvas, t)
+		sm.Render(canvas, t)
 		screen.Flush(canvas)
 	}
+}
+
+// createIntroScene creates a static "INTRO" text scene.
+func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
+	scene := core.NewBasicScene(sw, sh)
+
+	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		// Rasterize "INTRO" text
+		textSize := float64(sh) * 0.6
+		layout := asset.RasterizeText("INTRO", asset.TextOptions{
+			Font:  font,
+			Size:  textSize,
+			Color: core.Color{R: 100, G: 200, B: 255},
+		})
+
+		// Center text
+		offsetX := float64(sw/2) - float64(layout.Bitmap.Width)/2
+		offsetY := float64(sh/2) - float64(layout.Bitmap.Height)/2
+
+		// Create text entity
+		text := w.Spawn()
+		w.AddTransform(text, &core.Transform{
+			Position: fmath.Vec3{X: offsetX, Y: offsetY},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		w.AddDrawable(text, &bitmap.HalfBlock{Bitmap: layout.Bitmap})
+		w.AddRoot(text)
+	})
+
+	return scene
+}
+
+// createParticleScene creates a particle morph scene.
+func createParticleScene(sw, sh int, font *asset.Font) *core.BasicScene {
+	scene := core.NewBasicScene(sw, sh)
+
+	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		textSize := float64(sh) * 0.8
+
+		// Create words for morphing
+		words := []string{"GO", "BURST", "END"}
+		layouts := make([]*asset.TextLayout, len(words))
+		clouds := make([][]fmath.Vec2, len(words))
+
+		for i, word := range words {
+			layouts[i] = asset.RasterizeText(word, asset.TextOptions{
+				Font:  font,
+				Size:  textSize,
+				Color: core.Color{R: 255, G: 255, B: 255},
+			})
+			clouds[i] = particle.BitmapToCloud(layouts[i].Bitmap)
+		}
+
+		// Single pixel bitmap for particles
+		pixel := bitmap.New(1, 1)
+		pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
+
+		// Center initial cloud
+		offsetX := float64(sw/2) - float64(layouts[0].Bitmap.Width)/2
+		offsetY := float64(sh/2) - float64(layouts[0].Bitmap.Height)/2
+
+		initialCloud := make([]fmath.Vec2, len(clouds[0]))
+		for i, pos := range clouds[0] {
+			initialCloud[i] = fmath.Vec2{X: pos.X + offsetX, Y: pos.Y + offsetY}
+		}
+
+		// Create particle material
+		material := core.ComposeMaterials(
+			particle.BrailleDirectional(),
+			particle.RainbowTime(2.0),
+		)
+
+		// Create point cloud sequence
+		seq := particle.NewPointCloudSequence(
+			w,
+			initialCloud,
+			&bitmap.Braille{Bitmap: pixel},
+			material,
+			0,
+		)
+
+		// Add morph targets
+		for i := 1; i < len(words); i++ {
+			targetOffsetX := float64(sw/2) - float64(layouts[i].Bitmap.Width)/2
+			offsetTargetCloud := make([]fmath.Vec2, len(clouds[i]))
+			for j, pos := range clouds[i] {
+				offsetTargetCloud[j] = fmath.Vec2{X: pos.X + targetOffsetX, Y: pos.Y + offsetY}
+			}
+
+			var phases []particle.TransitionPhase
+			if i == 1 {
+				// Burst transition
+				phases = []particle.TransitionPhase{
+					particle.BurstPhase(float64(sh) * 0.4),
+					particle.SeekPhase(),
+				}
+			} else {
+				// Smooth keyframe
+				phases = []particle.TransitionPhase{
+					&particle.KeyframePhase{Easing: particle.EaseInOutQuad},
+				}
+			}
+
+			seq.AddTarget(particle.MorphTarget{
+				Cloud:    offsetTargetCloud,
+				Duration: 4.0,
+				Strategy: particle.LinearDistribution(),
+				Phases:   phases,
+			})
+		}
+	})
+
+	return scene
+}
+
+// createThanksScene creates a "THANKS" scene with rainbow effect.
+func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
+	scene := core.NewBasicScene(sw, sh)
+
+	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		// Rasterize "THANKS" text
+		textSize := float64(sh) * 0.5
+		layout := asset.RasterizeText("THANKS", asset.TextOptions{
+			Font:  font,
+			Size:  textSize,
+			Color: core.Color{R: 255, G: 255, B: 255},
+		})
+
+		// Center text
+		offsetX := float64(sw/2) - float64(layout.Bitmap.Width)/2
+		offsetY := float64(sh/2) - float64(layout.Bitmap.Height)/2
+
+		// Create text entity with rainbow material
+		text := w.Spawn()
+		w.AddTransform(text, &core.Transform{
+			Position: fmath.Vec3{X: offsetX, Y: offsetY},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		w.AddDrawable(text, &bitmap.HalfBlock{Bitmap: layout.Bitmap})
+		w.AddMaterial(text, particle.RainbowTime(3.0))
+		w.AddRoot(text)
+	})
+
+	return scene
 }
