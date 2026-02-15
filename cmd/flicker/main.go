@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
@@ -127,68 +126,15 @@ func main() {
 					}
 				}
 
-				// Distribute targets with varied speeds (30-50) for more organic motion.
-				// We'll manually assign InterpolateToTarget with random speeds instead of
-				// using DistributeTargets which uses a fixed speed.
-				for i, p := range particles {
-					targetIdx := i % len(offsetCloudB)
-					randomSpeed := 30.0 + rand.Float64()*20.0 // random speed between 30-50
-					w.AddBehavior(
-						p,
-						core.NewBehavior(
-							particle.InterpolateToTarget(offsetCloudB[targetIdx], randomSpeed),
-						),
-					)
-				}
-
-				// Handle extra targets if cloud B has more points than particles
-				if len(offsetCloudB) > len(particles) {
-					for i := len(particles); i < len(offsetCloudB); i++ {
-						// Spawn new particle
-						p := w.Spawn()
-
-						// Pick a random existing particle as template to distribute spawns
-						// across the "GO" cloud instead of all spawning from the same position.
-						randomIdx := rand.Intn(len(particles))
-						template := particles[randomIdx]
-
-						if tr := w.Transform(template); tr != nil {
-							w.AddTransform(p, &core.Transform{
-								Position: tr.Position, // Start at a random cloud A position
-								Rotation: tr.Rotation,
-								Scale:    tr.Scale,
-							})
-						}
-						if body := w.Body(template); body != nil {
-							w.AddBody(p, &core.Body{
-								Velocity:     body.Velocity,
-								Acceleration: body.Acceleration,
-							})
-						}
-						if drawable := w.Drawable(template); drawable != nil {
-							w.AddDrawable(p, drawable)
-						}
-						if material := w.Material(template); material != nil {
-							w.AddMaterial(p, material)
-						}
-						w.AddLayer(p, w.Layer(template))
-
-						// Also add turbulence to newly spawned particles
-						turbulence := w.AddBehavior(p, core.NewBehavior(physics.Turbulence(0.05, 30.0))).(*core.FuncBehavior)
-						turbulence.SetEnabled(false) // Disabled since we're past transition time
-
-						randomSpeed := 30.0 + rand.Float64()*20.0
-						w.AddBehavior(
-							p,
-							core.NewBehavior(
-								particle.InterpolateToTarget(offsetCloudB[i], randomSpeed),
-							),
-						)
-						w.AddRoot(p)
-
-						particles = append(particles, p)
-					}
-				}
+				// Distribute targets using linear distribution strategy.
+				// This creates 1:1 mapping and spawns extra particles from sequential sources.
+				particles = particle.DistributeTargets(
+					particles,
+					offsetCloudB,
+					40.0, // Fast movement speed
+					particle.LinearDistribution(),
+					w,
+				)
 			}
 		}),
 	)

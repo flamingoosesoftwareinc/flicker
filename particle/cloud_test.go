@@ -71,8 +71,8 @@ func TestDistributeTargets(t *testing.T) {
 
 	speed := 5.0
 
-	// Distribute targets.
-	result := DistributeTargets(entities, cloud, speed, w)
+	// Distribute targets using round-robin strategy.
+	result := DistributeTargets(entities, cloud, speed, RoundRobinDistribution(), w)
 
 	// Should return same entities (no spawning when cloud < entities).
 	if len(result) != len(entities) {
@@ -115,7 +115,7 @@ func TestDistributeTargetsEmptyCloud(t *testing.T) {
 	cloud := []fmath.Vec2{}
 
 	// Should not crash with empty cloud.
-	result := DistributeTargets(entities, cloud, 1.0, w)
+	result := DistributeTargets(entities, cloud, 1.0, RoundRobinDistribution(), w)
 
 	// Should return original entities unchanged.
 	if len(result) != len(entities) {
@@ -159,8 +159,8 @@ func TestDistributeTargetsSpawnsNewParticles(t *testing.T) {
 
 	speed := 5.0
 
-	// Distribute targets - should spawn 4 new particles.
-	result := DistributeTargets(entities, cloud, speed, w)
+	// Distribute targets - should spawn 4 new particles using round-robin strategy.
+	result := DistributeTargets(entities, cloud, speed, RoundRobinDistribution(), w)
 
 	// Should have 7 entities total now.
 	if len(result) != 7 {
