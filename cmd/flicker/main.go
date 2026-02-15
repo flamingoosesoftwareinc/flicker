@@ -35,17 +35,21 @@ func main() {
 	// Create scene manager
 	sm := core.NewSceneManager(sw, sh)
 
-	// Scene 1: Intro - Static "INTRO" text
+	// Scene 1: Intro - Animated text slide-in using Timeline
 	scene1 := createIntroScene(sw, sh, textFont)
 	sm.Add(scene1)
 
-	// Scene 2: Particle morph demo
-	scene2 := createParticleScene(sw, sh, textFont)
+	// Scene 2: Timeline demo - Showcase Timeline features
+	scene2 := createTimelineScene(sw, sh, textFont)
 	sm.Add(scene2)
 
-	// Scene 3: Thanks - "THANKS" with rainbow effect
-	scene3 := createThanksScene(sw, sh, textFont)
+	// Scene 3: Particle morph demo
+	scene3 := createParticleScene(sw, sh, textFont)
 	sm.Add(scene3)
+
+	// Scene 4: Thanks - Animated "THANKS" with Timeline
+	scene4 := createThanksScene(sw, sh, textFont)
+	sm.Add(scene4)
 
 	// Transition shaders to cycle through
 	transitions := []core.TransitionShader{
@@ -121,9 +125,10 @@ func main() {
 	}
 }
 
-// createIntroScene creates a static "INTRO" text scene.
+// createIntroScene creates an animated "INTRO" text scene using Timeline.
 func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
+	var timeline *core.Timeline
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		// Rasterize "INTRO" text
@@ -134,18 +139,115 @@ func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			Color: core.Color{R: 100, G: 200, B: 255},
 		})
 
-		// Center text
-		offsetX := float64(sw/2) - float64(layout.Bitmap.Width)/2
-		offsetY := float64(sh/2) - float64(layout.Bitmap.Height)/2
+		// Center position (target)
+		centerX := float64(sw/2) - float64(layout.Bitmap.Width)/2
+		centerY := float64(sh/2) - float64(layout.Bitmap.Height)/2
 
-		// Create text entity
+		// Create text entity (start off-screen to the left)
 		text := w.Spawn()
 		w.AddTransform(text, &core.Transform{
-			Position: fmath.Vec3{X: offsetX, Y: offsetY},
+			Position: fmath.Vec3{X: -float64(layout.Bitmap.Width), Y: centerY},
 			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 		})
 		w.AddDrawable(text, &bitmap.HalfBlock{Bitmap: layout.Bitmap})
 		w.AddRoot(text)
+
+		// Create Timeline for slide-in animation
+		timeline = core.NewTimeline(w)
+		track := timeline.AddTrack()
+
+		// Slide in from left with easing
+		track.Add(core.NewPropertyTweenClip(
+			text,
+			"position.x",
+			-float64(layout.Bitmap.Width),
+			centerX,
+			1.5,
+		).WithEasing(fmath.EaseOutCubic))
+
+		timeline.Start(core.Time{Total: 0})
+	})
+
+	scene.SetExit(func(w *core.World) {
+		if timeline != nil {
+			timeline.Cleanup()
+		}
+	})
+
+	return scene
+}
+
+// createTimelineScene demonstrates Timeline features with multiple text animations.
+func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
+	scene := core.NewBasicScene(sw, sh)
+	var timeline *core.Timeline
+
+	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		timeline = core.NewTimeline(w)
+
+		// Word 1: "TIMELINE" - Fade in from top
+		word1 := "TIMELINE"
+		layout1 := asset.RasterizeText(word1, asset.TextOptions{
+			Font:  font,
+			Size:  float64(sh) * 0.3,
+			Color: core.Color{R: 255, G: 100, B: 100},
+		})
+		centerX1 := float64(sw/2) - float64(layout1.Bitmap.Width)/2
+		targetY1 := float64(sh) * 0.25
+
+		text1 := w.Spawn()
+		w.AddTransform(text1, &core.Transform{
+			Position: fmath.Vec3{X: centerX1, Y: -float64(layout1.Bitmap.Height)},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		w.AddDrawable(text1, &bitmap.HalfBlock{Bitmap: layout1.Bitmap})
+		w.AddRoot(text1)
+
+		// Word 2: "DEMO" - Scale up from center
+		word2 := "DEMO"
+		layout2 := asset.RasterizeText(word2, asset.TextOptions{
+			Font:  font,
+			Size:  float64(sh) * 0.4,
+			Color: core.Color{R: 100, G: 255, B: 100},
+		})
+		centerX2 := float64(sw/2) - float64(layout2.Bitmap.Width)/2
+		centerY2 := float64(sh) * 0.55
+
+		text2 := w.Spawn()
+		w.AddTransform(text2, &core.Transform{
+			Position: fmath.Vec3{X: centerX2, Y: centerY2},
+			Scale:    fmath.Vec3{X: 0.1, Y: 0.1, Z: 1},
+		})
+		w.AddDrawable(text2, &bitmap.HalfBlock{Bitmap: layout2.Bitmap})
+		w.AddRoot(text2)
+
+		// Create animation tracks
+		// Track 1: Word 1 slides down with bounce
+		track1 := timeline.AddTrack()
+		track1.At(0.0, core.NewPropertyTweenClip(
+			text1,
+			"position.y",
+			-float64(layout1.Bitmap.Height),
+			targetY1,
+			1.2,
+		).WithEasing(fmath.EaseOutBounce))
+
+		// Track 2: Word 2 scales up after word 1 appears
+		track2 := timeline.AddTrack()
+		track2.At(0.8, core.NewParallelClip(
+			core.NewPropertyTweenClip(text2, "scale.x", 0.1, 1.0, 1.0).
+				WithEasing(fmath.EaseOutElastic),
+			core.NewPropertyTweenClip(text2, "scale.y", 0.1, 1.0, 1.0).
+				WithEasing(fmath.EaseOutElastic),
+		))
+
+		timeline.Start(core.Time{Total: 0})
+	})
+
+	scene.SetExit(func(w *core.World) {
+		if timeline != nil {
+			timeline.Cleanup()
+		}
 	})
 
 	return scene
@@ -234,9 +336,10 @@ func createParticleScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	return scene
 }
 
-// createThanksScene creates a "THANKS" scene with rainbow effect.
+// createThanksScene creates an animated "THANKS" scene with Timeline and rainbow effect.
 func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
+	var timeline *core.Timeline
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		// Rasterize "THANKS" text
@@ -248,18 +351,41 @@ func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		})
 
 		// Center text
-		offsetX := float64(sw/2) - float64(layout.Bitmap.Width)/2
-		offsetY := float64(sh/2) - float64(layout.Bitmap.Height)/2
+		centerX := float64(sw/2) - float64(layout.Bitmap.Width)/2
+		centerY := float64(sh/2) - float64(layout.Bitmap.Height)/2
 
-		// Create text entity with rainbow material
+		// Create text entity with rainbow material (start small)
 		text := w.Spawn()
 		w.AddTransform(text, &core.Transform{
-			Position: fmath.Vec3{X: offsetX, Y: offsetY},
-			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+			Position: fmath.Vec3{X: centerX, Y: centerY},
+			Scale:    fmath.Vec3{X: 0.3, Y: 0.3, Z: 1},
+			Rotation: 0,
 		})
 		w.AddDrawable(text, &bitmap.HalfBlock{Bitmap: layout.Bitmap})
 		w.AddMaterial(text, particle.RainbowTime(3.0))
 		w.AddRoot(text)
+
+		// Create Timeline animation
+		timeline = core.NewTimeline(w)
+		track := timeline.AddTrack()
+
+		// Scale up and rotate in parallel
+		track.Add(core.NewParallelClip(
+			core.NewPropertyTweenClip(text, "scale.x", 0.3, 1.0, 1.5).
+				WithEasing(fmath.EaseOutElastic),
+			core.NewPropertyTweenClip(text, "scale.y", 0.3, 1.0, 1.5).
+				WithEasing(fmath.EaseOutElastic),
+			core.NewPropertyTweenClip(text, "rotation", -0.5, 0.0, 1.5).
+				WithEasing(fmath.EaseOutCubic),
+		))
+
+		timeline.Start(core.Time{Total: 0})
+	})
+
+	scene.SetExit(func(w *core.World) {
+		if timeline != nil {
+			timeline.Cleanup()
+		}
 	})
 
 	return scene
