@@ -5,6 +5,36 @@ type Entity uint64
 // Material is a per-entity fragment shader applied after drawing.
 type Material func(f Fragment) Cell
 
+// ComposeMaterials combines multiple materials into a single material that
+// applies them in sequence. Each material receives the output of the previous
+// one as f.Cell. Use this when multiple effects need to modify the same entity.
+// Returns nil if no materials are provided, or the single material if only one.
+func ComposeMaterials(materials ...Material) Material {
+	// Filter out nil materials.
+	filtered := make([]Material, 0, len(materials))
+	for _, m := range materials {
+		if m != nil {
+			filtered = append(filtered, m)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return nil
+	}
+	if len(filtered) == 1 {
+		return filtered[0]
+	}
+
+	return func(f Fragment) Cell {
+		cell := f.Cell
+		for _, mat := range filtered {
+			f.Cell = cell
+			cell = mat(f)
+		}
+		return cell
+	}
+}
+
 type World struct {
 	next         Entity
 	transforms   map[Entity]*Transform

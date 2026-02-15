@@ -11,6 +11,7 @@ import (
 	"flicker/core/bitmap"
 	"flicker/fmath"
 	"flicker/terminal"
+	"flicker/textfx"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -371,7 +372,7 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
 	})
 
-	// Layer 11-13: Text effects showcase.
+	// Layer 11-13: Text effects showcase using textfx package.
 	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
 	if fontErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (skipping text layer)\n", fontErr)
@@ -401,40 +402,30 @@ func main() {
 			world.AddRoot(typeEnt)
 
 			charsRevealed := 0.0
-			world.AddMaterial(typeEnt, func(f core.Fragment) core.Cell {
-				glyphIdx := typeLayout.GlyphAt(f.X, f.Y*2)
-				if glyphIdx < 0 || float64(glyphIdx) >= charsRevealed {
-					return core.Cell{}
-				}
-				return f.Cell
-			})
-			world.AddBehavior(typeEnt, func(t core.Time, _ core.Entity, _ *core.World) {
-				charsRevealed = math.Min(float64(len(typeLayout.Glyphs)), t.Total*3.0)
-			})
+			world.AddMaterial(
+				typeEnt,
+				textfx.TypewriterMaterial(typeLayout, textfx.HalfBlock, &charsRevealed),
+			)
+			world.AddBehavior(
+				typeEnt,
+				textfx.TypewriterBehavior(&charsRevealed, 3.0, len(typeLayout.Glyphs)),
+			)
 		}
 
 		// Effect 2: Per-character wave (middle).
 		waveLayout := asset.RasterizeText("FLICKER", textOpts)
 		if waveLayout != nil {
-			glyphBitmaps := waveLayout.SplitGlyphs()
-			for i, glyph := range waveLayout.Glyphs {
-				charEnt := world.Spawn()
-				baseX := float64(sw/2) - float64(waveLayout.Bitmap.Width)/2 + float64(glyph.X)
-				baseY := float64(sh) / 2
-				world.AddTransform(charEnt, &core.Transform{
-					Position: fmath.Vec3{X: baseX, Y: baseY},
-					Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-				})
-				world.AddDrawable(charEnt, &bitmap.HalfBlock{Bitmap: glyphBitmaps[i]})
-				world.AddLayer(charEnt, 12)
-				world.AddRoot(charEnt)
-
-				phase := float64(i) * 0.5
-				world.AddBehavior(charEnt, func(t core.Time, e core.Entity, w *core.World) {
-					offset := 3 * math.Sin(t.Total*2+phase)
-					w.Transform(e).Position.Y = baseY + offset
-				})
-			}
+			textfx.Wave(world, waveLayout, textfx.WaveOptions{
+				BasePosition: fmath.Vec3{
+					X: float64(sw/2) - float64(waveLayout.Bitmap.Width)/2,
+					Y: float64(sh) / 2,
+				},
+				Encoding:     textfx.HalfBlock,
+				Layer:        12,
+				Amplitude:    3.0,
+				Frequency:    1.0,
+				PhasePerChar: 0.5,
+			})
 		}
 
 		// Effect 3: Staggered fade-in (bottom third).
@@ -454,19 +445,10 @@ func main() {
 			world.AddLayer(fadeEnt, 13)
 			world.AddRoot(fadeEnt)
 
-			world.AddMaterial(fadeEnt, func(f core.Fragment) core.Cell {
-				glyphIdx := fadeLayout.GlyphAt(f.X, f.Y*2)
-				if glyphIdx < 0 {
-					return f.Cell
-				}
-				delay := float64(glyphIdx) * 0.15
-				elapsed := f.Time.Total - delay
-				alpha := fmath.Clamp(elapsed/0.5, 0, 1)
-				cell := f.Cell
-				cell.FGAlpha *= alpha
-				cell.BGAlpha *= alpha
-				return cell
-			})
+			world.AddMaterial(
+				fadeEnt,
+				textfx.StaggeredFadeMaterial(fadeLayout, textfx.HalfBlock, 0.15, 0.5),
+			)
 		}
 	}
 
