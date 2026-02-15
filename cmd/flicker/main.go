@@ -371,56 +371,102 @@ func main() {
 		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
 	})
 
-	// Layer 11-12: Text comparison — AA (top) vs Sharp (bottom).
+	// Layer 11-13: Text effects showcase.
 	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
 	if fontErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (skipping text layer)\n", fontErr)
 	} else {
-		textSize := float64(sh) * 0.8
-
-		// AA text — top third of screen.
-		aaLayout := asset.RasterizeText("FLICKER", asset.TextOptions{
-			Font:      textFont,
-			Size:      textSize,
-			Color:     core.Color{R: 220, G: 240, B: 255},
-			AntiAlias: true,
-		})
-		if aaLayout != nil {
-			aaDraw := &bitmap.Braille{Bitmap: aaLayout.Bitmap}
-			aaW, aaH := aaDraw.Bounds()
-			aaEnt := world.Spawn()
-			world.AddTransform(aaEnt, &core.Transform{
-				Position: fmath.Vec3{
-					X: float64(sw/2) - float64(aaW)/2,
-					Y: float64(sh)/4 - float64(aaH)/2,
-				},
-				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
-			})
-			world.AddDrawable(aaEnt, aaDraw)
-			world.AddLayer(aaEnt, 11)
-			world.AddRoot(aaEnt)
-		}
-
-		// Sharp text (default) — bottom third of screen.
-		sharpLayout := asset.RasterizeText("FLICKER", asset.TextOptions{
+		textSize := float64(sh) * 0.6
+		textOpts := asset.TextOptions{
 			Font:  textFont,
 			Size:  textSize,
 			Color: core.Color{R: 220, G: 240, B: 255},
-		})
-		if sharpLayout != nil {
-			sharpDraw := &bitmap.Braille{Bitmap: sharpLayout.Bitmap}
-			shW, shH := sharpDraw.Bounds()
-			sharpEnt := world.Spawn()
-			world.AddTransform(sharpEnt, &core.Transform{
+		}
+
+		// Effect 1: Typewriter reveal (top third).
+		typeLayout := asset.RasterizeText("FLICKER", textOpts)
+		if typeLayout != nil {
+			typeDraw := &bitmap.HalfBlock{Bitmap: typeLayout.Bitmap}
+			typeW, typeH := typeDraw.Bounds()
+			typeEnt := world.Spawn()
+			world.AddTransform(typeEnt, &core.Transform{
 				Position: fmath.Vec3{
-					X: float64(sw/2) - float64(shW)/2,
-					Y: float64(sh)*3/4 - float64(shH)/2,
+					X: float64(sw/2) - float64(typeW)/2,
+					Y: float64(sh)/6 - float64(typeH)/2,
 				},
 				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
 			})
-			world.AddDrawable(sharpEnt, sharpDraw)
-			world.AddLayer(sharpEnt, 12)
-			world.AddRoot(sharpEnt)
+			world.AddDrawable(typeEnt, typeDraw)
+			world.AddLayer(typeEnt, 11)
+			world.AddRoot(typeEnt)
+
+			charsRevealed := 0.0
+			world.AddMaterial(typeEnt, func(f core.Fragment) core.Cell {
+				glyphIdx := typeLayout.GlyphAt(f.X, f.Y*2)
+				if glyphIdx < 0 || float64(glyphIdx) >= charsRevealed {
+					return core.Cell{}
+				}
+				return f.Cell
+			})
+			world.AddBehavior(typeEnt, func(t core.Time, _ core.Entity, _ *core.World) {
+				charsRevealed = math.Min(float64(len(typeLayout.Glyphs)), t.Total*3.0)
+			})
+		}
+
+		// Effect 2: Per-character wave (middle).
+		waveLayout := asset.RasterizeText("FLICKER", textOpts)
+		if waveLayout != nil {
+			glyphBitmaps := waveLayout.SplitGlyphs()
+			for i, glyph := range waveLayout.Glyphs {
+				charEnt := world.Spawn()
+				baseX := float64(sw/2) - float64(waveLayout.Bitmap.Width)/2 + float64(glyph.X)
+				baseY := float64(sh) / 2
+				world.AddTransform(charEnt, &core.Transform{
+					Position: fmath.Vec3{X: baseX, Y: baseY},
+					Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+				})
+				world.AddDrawable(charEnt, &bitmap.HalfBlock{Bitmap: glyphBitmaps[i]})
+				world.AddLayer(charEnt, 12)
+				world.AddRoot(charEnt)
+
+				phase := float64(i) * 0.5
+				world.AddBehavior(charEnt, func(t core.Time, e core.Entity, w *core.World) {
+					offset := 3 * math.Sin(t.Total*2+phase)
+					w.Transform(e).Position.Y = baseY + offset
+				})
+			}
+		}
+
+		// Effect 3: Staggered fade-in (bottom third).
+		fadeLayout := asset.RasterizeText("FLICKER", textOpts)
+		if fadeLayout != nil {
+			fadeDraw := &bitmap.HalfBlock{Bitmap: fadeLayout.Bitmap}
+			fadeW, fadeH := fadeDraw.Bounds()
+			fadeEnt := world.Spawn()
+			world.AddTransform(fadeEnt, &core.Transform{
+				Position: fmath.Vec3{
+					X: float64(sw/2) - float64(fadeW)/2,
+					Y: float64(sh)*5/6 - float64(fadeH)/2,
+				},
+				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
+			})
+			world.AddDrawable(fadeEnt, fadeDraw)
+			world.AddLayer(fadeEnt, 13)
+			world.AddRoot(fadeEnt)
+
+			world.AddMaterial(fadeEnt, func(f core.Fragment) core.Cell {
+				glyphIdx := fadeLayout.GlyphAt(f.X, f.Y*2)
+				if glyphIdx < 0 {
+					return f.Cell
+				}
+				delay := float64(glyphIdx) * 0.15
+				elapsed := f.Time.Total - delay
+				alpha := fmath.Clamp(elapsed/0.5, 0, 1)
+				cell := f.Cell
+				cell.FGAlpha *= alpha
+				cell.BGAlpha *= alpha
+				return cell
+			})
 		}
 	}
 
