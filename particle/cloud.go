@@ -202,15 +202,18 @@ func ClosestPointDistribution(
 	}
 }
 
-// DistributeTargets assigns target positions from cloud to entities using a distribution strategy.
+// DistributeParticlesToTargets assigns particles to target positions using a distribution strategy.
+// This is a structural operation that handles particle-to-target assignment and spawning,
+// performed at the boundary between morph targets (not during phase execution).
+//
 // If cloud has more points than entities, spawns additional particles to fill the gaps.
 // Returns all entities (original + newly spawned).
-// Adds InterpolateToTarget behavior to each entity if speed > 0.
-// Use speed <= 0 to skip behavior creation (e.g., when phase system handles movement).
-func DistributeTargets(
+//
+// Note: This function does NOT add movement behaviors. Phases are responsible for
+// adding whatever behaviors/keyframes/curves they need to move particles to their targets.
+func DistributeParticlesToTargets(
 	entities []core.Entity,
 	cloud []fmath.Vec2,
-	speed float64,
 	strategy DistributionStrategy,
 	world *core.World,
 ) []core.Entity {
@@ -220,15 +223,6 @@ func DistributeTargets(
 
 	// Compute target mapping using strategy.
 	mapping := strategy(len(entities), len(cloud))
-
-	// Assign targets to existing entities using strategy mapping.
-	// Only add behaviors if speed > 0 (phase system uses speed <= 0 to skip behavior creation)
-	if speed > 0 {
-		for i, e := range entities {
-			targetIdx := mapping.EntityTargets[i]
-			world.AddBehavior(e, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
-		}
-	}
 
 	// If cloud has more points than entities, spawn new particles for the extra points.
 	if len(cloud) > len(entities) {
@@ -278,14 +272,9 @@ func DistributeTargets(
 			// Add to roots.
 			world.AddRoot(p)
 
-			// Assign target using strategy mapping.
-			// Only add behavior if speed > 0 (phase system handles movement)
-			if speed > 0 {
-				targetIdx := mapping.SpawnTargets[i]
-				world.AddBehavior(p, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
-			}
-
 			// Add to entities list.
+			// Note: Target assignment is recorded in mapping.SpawnTargets[i],
+			// but phases are responsible for adding movement behaviors.
 			entities = append(entities, p)
 		}
 	}

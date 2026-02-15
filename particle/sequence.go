@@ -144,14 +144,12 @@ func (s *PointCloudSequence) startNextTarget(currentTime float64) {
 	s.targetStartTime = currentTime
 	s.isTransitioning = true
 
-	// Apply distribution strategy to assign particles to targets
+	// Apply distribution strategy to assign particles to targets.
+	// This is a structural operation - phases handle movement.
 	oldParticleCount := len(s.particles)
-
-	// Phase system handles movement, so skip behavior creation (speed <= 0)
-	s.particles = DistributeTargets(
+	s.particles = DistributeParticlesToTargets(
 		s.particles,
 		target.Cloud,
-		0, // Speed 0 = don't add InterpolateToTarget behaviors (phases control movement)
 		target.Strategy,
 		s.world,
 	)

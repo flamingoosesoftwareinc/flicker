@@ -51,7 +51,7 @@ func TestBitmapToCloudEmpty(t *testing.T) {
 	}
 }
 
-func TestDistributeTargets(t *testing.T) {
+func TestDistributeParticlesToTargets(t *testing.T) {
 	w := core.NewWorld()
 
 	// Create 10 entities.
@@ -69,53 +69,26 @@ func TestDistributeTargets(t *testing.T) {
 		{X: 30, Y: 30},
 	}
 
-	speed := 5.0
-
-	// Distribute targets using round-robin strategy.
-	result := DistributeTargets(entities, cloud, speed, RoundRobinDistribution(), w)
+	// Distribute particles to targets using round-robin strategy.
+	result := DistributeParticlesToTargets(entities, cloud, RoundRobinDistribution(), w)
 
 	// Should return same entities (no spawning when cloud < entities).
 	if len(result) != len(entities) {
 		t.Errorf("Expected %d entities, got %d", len(entities), len(result))
 	}
 
-	// Verify all entities have behaviors.
-	for i, e := range result {
-		if len(w.Behaviors(e)) == 0 {
-			t.Errorf("Entity %d should have behavior", i)
-		}
-	}
-
-	// Run behaviors to verify they move towards targets.
-	// Entity 0 should move towards cloud[0], entity 1 towards cloud[1], etc.
-	// Entity 3 should wrap to cloud[0], entity 4 to cloud[1], etc.
-	for i := 0; i < 10; i++ {
-		e := result[i]
-		behavior := w.Behaviors(e)[0]
-		behavior.Update(core.Time{Delta: 1.0}, e, w)
-
-		transform := w.Transform(e)
-
-		// After 1 second at speed 5, should have moved towards target.
-		// Can't verify exact position (depends on distance), but should be closer.
-		// Just verify it moved in the right direction.
-		if i%3 == 0 {
-			// Should move towards (10, 10).
-			if transform.Position.X <= 0 {
-				t.Errorf("Entity %d should have moved towards target", i)
-			}
-		}
-	}
+	// Note: This function only handles structural distribution.
+	// It does NOT add behaviors - that's the responsibility of phases.
 }
 
-func TestDistributeTargetsEmptyCloud(t *testing.T) {
+func TestDistributeParticlesToTargetsEmptyCloud(t *testing.T) {
 	w := core.NewWorld()
 
 	entities := []core.Entity{w.Spawn()}
 	cloud := []fmath.Vec2{}
 
 	// Should not crash with empty cloud.
-	result := DistributeTargets(entities, cloud, 1.0, RoundRobinDistribution(), w)
+	result := DistributeParticlesToTargets(entities, cloud, RoundRobinDistribution(), w)
 
 	// Should return original entities unchanged.
 	if len(result) != len(entities) {
@@ -125,7 +98,7 @@ func TestDistributeTargetsEmptyCloud(t *testing.T) {
 	// No panic = success.
 }
 
-func TestDistributeTargetsSpawnsNewParticles(t *testing.T) {
+func TestDistributeParticlesToTargetsSpawnsNewParticles(t *testing.T) {
 	w := core.NewWorld()
 
 	// Create 3 entities with full components.
@@ -157,21 +130,16 @@ func TestDistributeTargetsSpawnsNewParticles(t *testing.T) {
 		{X: 70, Y: 70},
 	}
 
-	speed := 5.0
-
-	// Distribute targets - should spawn 4 new particles using round-robin strategy.
-	result := DistributeTargets(entities, cloud, speed, RoundRobinDistribution(), w)
+	// Distribute particles to targets - should spawn 4 new particles using round-robin strategy.
+	result := DistributeParticlesToTargets(entities, cloud, RoundRobinDistribution(), w)
 
 	// Should have 7 entities total now.
 	if len(result) != 7 {
 		t.Errorf("Expected 7 entities (3 original + 4 spawned), got %d", len(result))
 	}
 
-	// Verify all entities have behaviors and components.
+	// Verify all entities have structural components (but NOT behaviors - phases add those).
 	for i, e := range result {
-		if len(w.Behaviors(e)) == 0 {
-			t.Errorf("Entity %d should have behavior", i)
-		}
 		if w.Transform(e) == nil {
 			t.Errorf("Entity %d should have transform", i)
 		}
