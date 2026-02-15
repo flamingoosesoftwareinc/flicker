@@ -89,19 +89,41 @@ func (t *Transition) Render(dst *Canvas, time Time) {
 }
 
 // CrossFade is a simple alpha blend transition shader.
-// Always blends both scenes together for a true cross-fade effect.
+// Directly interpolates colors and alphas for a true cross-fade effect.
 func CrossFade(f TransitionFragment) Cell {
 	fromCell := f.FromCanvas.Get(f.X, f.Y)
 	toCell := f.ToCanvas.Get(f.X, f.Y)
 
-	// Fade from's alpha down, to's alpha up
-	fromCell.FGAlpha *= (1.0 - f.Progress)
-	fromCell.BGAlpha *= (1.0 - f.Progress)
-	toCell.FGAlpha *= f.Progress
-	toCell.BGAlpha *= f.Progress
+	// Lerp colors
+	fg := lerpColor(fromCell.FG, toCell.FG, f.Progress)
+	bg := lerpColor(fromCell.BG, toCell.BG, f.Progress)
 
-	// Always blend both cells (even if one is empty)
-	return BlendCell(fromCell, toCell, NormalColorBlend)
+	// Lerp alphas
+	fgAlpha := fromCell.FGAlpha*(1-f.Progress) + toCell.FGAlpha*f.Progress
+	bgAlpha := fromCell.BGAlpha*(1-f.Progress) + toCell.BGAlpha*f.Progress
+
+	// Choose rune based on progress (sharp transition at 50%)
+	rune := fromCell.Rune
+	if f.Progress > 0.5 {
+		rune = toCell.Rune
+	}
+
+	return Cell{
+		FG:      fg,
+		BG:      bg,
+		Rune:    rune,
+		FGAlpha: fgAlpha,
+		BGAlpha: bgAlpha,
+	}
+}
+
+// lerpColor linearly interpolates between two colors.
+func lerpColor(a, b Color, t float64) Color {
+	return Color{
+		R: uint8(float64(a.R)*(1-t) + float64(b.R)*t),
+		G: uint8(float64(a.G)*(1-t) + float64(b.G)*t),
+		B: uint8(float64(a.B)*(1-t) + float64(b.B)*t),
+	}
 }
 
 // WipeLeft is a left-to-right wipe transition shader.
