@@ -158,37 +158,76 @@ func createParticleScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		textSize := float64(sh) * 0.8
 
-		// Rasterize "PARTICLES" text as bitmap
-		layout := asset.RasterizeText("PARTICLES", asset.TextOptions{
-			Font:  font,
-			Size:  textSize,
-			Color: core.Color{R: 255, G: 255, B: 255},
-		})
+		// Create words for morphing
+		words := []string{"GO", "BURST", "END"}
+		layouts := make([]*asset.TextLayout, len(words))
+		clouds := make([][]fmath.Vec2, len(words))
 
-		// Convert to point cloud
-		cloud := particle.BitmapToCloud(layout.Bitmap)
-
-		// Center the cloud
-		offsetX := float64(sw/2) - float64(layout.Bitmap.Width)/2
-		offsetY := float64(sh/2) - float64(layout.Bitmap.Height)/2
+		for i, word := range words {
+			layouts[i] = asset.RasterizeText(word, asset.TextOptions{
+				Font:  font,
+				Size:  textSize,
+				Color: core.Color{R: 255, G: 255, B: 255},
+			})
+			clouds[i] = particle.BitmapToCloud(layouts[i].Bitmap)
+		}
 
 		// Single pixel bitmap for particles
 		pixel := bitmap.New(1, 1)
 		pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
 
-		// Create particle material
-		material := particle.RainbowTime(2.0)
+		// Center initial cloud
+		offsetX := float64(sw/2) - float64(layouts[0].Bitmap.Width)/2
+		offsetY := float64(sh/2) - float64(layouts[0].Bitmap.Height)/2
 
-		// Spawn particles as individual entities
-		for _, pos := range cloud {
-			p := w.Spawn()
-			w.AddTransform(p, &core.Transform{
-				Position: fmath.Vec3{X: pos.X + offsetX, Y: pos.Y + offsetY},
-				Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		initialCloud := make([]fmath.Vec2, len(clouds[0]))
+		for i, pos := range clouds[0] {
+			initialCloud[i] = fmath.Vec2{X: pos.X + offsetX, Y: pos.Y + offsetY}
+		}
+
+		// Create particle material
+		material := core.ComposeMaterials(
+			particle.BrailleDirectional(),
+			particle.RainbowTime(2.0),
+		)
+
+		// Create point cloud sequence
+		seq := particle.NewPointCloudSequence(
+			w,
+			initialCloud,
+			&bitmap.Braille{Bitmap: pixel},
+			material,
+			0,
+		)
+
+		// Add morph targets
+		for i := 1; i < len(words); i++ {
+			targetOffsetX := float64(sw/2) - float64(layouts[i].Bitmap.Width)/2
+			offsetTargetCloud := make([]fmath.Vec2, len(clouds[i]))
+			for j, pos := range clouds[i] {
+				offsetTargetCloud[j] = fmath.Vec2{X: pos.X + targetOffsetX, Y: pos.Y + offsetY}
+			}
+
+			var phases []particle.TransitionPhase
+			if i == 1 {
+				// Burst transition
+				phases = []particle.TransitionPhase{
+					particle.BurstPhase(float64(sh) * 0.4),
+					particle.SeekPhase(),
+				}
+			} else {
+				// Smooth keyframe
+				phases = []particle.TransitionPhase{
+					&particle.KeyframePhase{Easing: particle.EaseInOutQuad},
+				}
+			}
+
+			seq.AddTarget(particle.MorphTarget{
+				Cloud:    offsetTargetCloud,
+				Duration: 4.0,
+				Strategy: particle.LinearDistribution(),
+				Phases:   phases,
 			})
-			w.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
-			w.AddMaterial(p, material)
-			w.AddRoot(p)
 		}
 	})
 
