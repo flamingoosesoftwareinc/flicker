@@ -84,6 +84,93 @@ func RoundRobinDistribution() DistributionStrategy {
 	}
 }
 
+// ClosestPointDistribution assigns each entity to its nearest target using greedy matching.
+// This minimizes total travel distance and creates more natural-looking morphs.
+func ClosestPointDistribution(
+	entities []core.Entity,
+	targets []fmath.Vec2,
+	world *core.World,
+) DistributionStrategy {
+	return func(entityCount, targetCount int) TargetMapping {
+		mapping := TargetMapping{
+			EntityTargets: make([]int, entityCount),
+		}
+
+		// Build position list for entities
+		entityPositions := make([]fmath.Vec2, entityCount)
+		for i := 0; i < entityCount; i++ {
+			tr := world.Transform(entities[i])
+			if tr != nil {
+				entityPositions[i] = fmath.Vec2{X: tr.Position.X, Y: tr.Position.Y}
+			}
+		}
+
+		// Track which targets are already assigned
+		targetAssigned := make([]bool, targetCount)
+
+		// Greedy assignment: for each entity, assign to nearest unassigned target
+		for i := 0; i < entityCount; i++ {
+			bestTarget := -1
+			bestDist := 1e9
+
+			for t := 0; t < targetCount; t++ {
+				if targetAssigned[t] {
+					continue
+				}
+
+				dx := entityPositions[i].X - targets[t].X
+				dy := entityPositions[i].Y - targets[t].Y
+				dist := dx*dx + dy*dy // squared distance (avoids sqrt)
+
+				if dist < bestDist {
+					bestDist = dist
+					bestTarget = t
+				}
+			}
+
+			if bestTarget >= 0 {
+				mapping.EntityTargets[i] = bestTarget
+				targetAssigned[bestTarget] = true
+			} else {
+				// All targets assigned, wrap to first target
+				mapping.EntityTargets[i] = 0
+			}
+		}
+
+		// If more targets than entities, spawn from nearest entity to each unassigned target
+		if targetCount > entityCount {
+			mapping.SpawnFrom = make([]int, targetCount-entityCount)
+			spawnIdx := 0
+
+			for t := 0; t < targetCount; t++ {
+				if targetAssigned[t] {
+					continue
+				}
+
+				// Find nearest entity to this target
+				bestEntity := 0
+				bestDist := 1e9
+
+				for e := 0; e < entityCount; e++ {
+					dx := entityPositions[e].X - targets[t].X
+					dy := entityPositions[e].Y - targets[t].Y
+					dist := dx*dx + dy*dy
+
+					if dist < bestDist {
+						bestDist = dist
+						bestEntity = e
+					}
+				}
+
+				mapping.SpawnFrom[spawnIdx] = bestEntity
+				spawnIdx++
+			}
+		}
+
+		return mapping
+	}
+}
+
 // DistributeTargets assigns target positions from cloud to entities using a distribution strategy.
 // If cloud has more points than entities, spawns additional particles to fill the gaps.
 // Returns all entities (original + newly spawned).

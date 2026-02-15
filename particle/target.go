@@ -1,9 +1,54 @@
 package particle
 
 import (
+	"math"
+
 	"flicker/core"
 	"flicker/fmath"
 )
+
+// CalculateSpeedForDuration computes the speed needed for all entities to reach
+// their targets within the given duration. Returns speed based on the maximum distance
+// any entity needs to travel.
+func CalculateSpeedForDuration(
+	entities []core.Entity,
+	targets []fmath.Vec2,
+	duration float64,
+	world *core.World,
+) float64 {
+	if len(entities) == 0 || len(targets) == 0 || duration <= 0 {
+		return 1.0 // safe default
+	}
+
+	maxDistance := 0.0
+
+	// Find maximum distance any entity needs to travel
+	for i, e := range entities {
+		tr := world.Transform(e)
+		if tr == nil {
+			continue
+		}
+
+		targetIdx := i % len(targets)
+		target := targets[targetIdx]
+
+		dx := target.X - tr.Position.X
+		dy := target.Y - tr.Position.Y
+		dist := math.Sqrt(dx*dx + dy*dy)
+
+		if dist > maxDistance {
+			maxDistance = dist
+		}
+	}
+
+	// Speed = distance / time (with small buffer for safety)
+	speed := maxDistance / (duration * 0.9) // 90% of duration to ensure completion
+	if speed < 1.0 {
+		speed = 1.0 // minimum speed
+	}
+
+	return speed
+}
 
 // InterpolateToTarget returns a behavior that moves an entity towards a target position at a given speed.
 // Moves at speed units/second. Stops when within epsilon distance.

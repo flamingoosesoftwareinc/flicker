@@ -34,110 +34,127 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Make text MUCH larger to see particles traveling in different directions.
-	textSize := float64(sh) * 1
+	// Text rendering setup
+	textSize := float64(sh) * 0.8
 	textOpts := asset.TextOptions{
 		Font:  textFont,
 		Size:  textSize,
 		Color: core.Color{R: 255, G: 255, B: 255},
 	}
 
-	// Rasterize two text layouts: "GO" and "FLYING" (wider for more directional variety)
-	layoutA := asset.RasterizeText("GO", textOpts)
-	layoutB := asset.RasterizeText("FLYING", textOpts)
-
-	if layoutA == nil || layoutB == nil {
-		fmt.Fprintf(os.Stderr, "error: failed to rasterize text\n")
-		os.Exit(1)
+	// Create 10 different text morphs to stress-test the system
+	words := []string{
+		"GO",
+		"WAVE",
+		"SPIN",
+		"MORPH",
+		"BURST",
+		"FLOW",
+		"DANCE",
+		"ZOOM",
+		"TWIST",
+		"FLY",
 	}
 
-	// Convert bitmaps to point clouds.
-	cloudA := particle.BitmapToCloud(layoutA.Bitmap)
-	cloudB := particle.BitmapToCloud(layoutB.Bitmap)
+	// Rasterize all text layouts
+	layouts := make([]*asset.TextLayout, len(words))
+	clouds := make([][]fmath.Vec2, len(words))
 
-	if len(cloudA) == 0 || len(cloudB) == 0 {
-		fmt.Fprintf(os.Stderr, "error: empty point clouds\n")
-		os.Exit(1)
+	for i, word := range words {
+		layout := asset.RasterizeText(word, textOpts)
+		if layout == nil {
+			fmt.Fprintf(os.Stderr, "error: failed to rasterize text: %s\n", word)
+			os.Exit(1)
+		}
+		layouts[i] = layout
+		clouds[i] = particle.BitmapToCloud(layout.Bitmap)
 	}
 
 	// Single pixel bitmap for particles.
 	pixel := bitmap.New(1, 1)
 	pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
 
-	// Calculate center offset to center the text.
-	offsetX := float64(sw/2) - float64(layoutA.Bitmap.Width)/2
-	offsetY := float64(sh/2) - float64(layoutA.Bitmap.Height)/2
+	// Calculate center offset for initial cloud.
+	offsetX := float64(sw/2) - float64(layouts[0].Bitmap.Width)/2
+	offsetY := float64(sh/2) - float64(layouts[0].Bitmap.Height)/2
 
-	// Spawn particles at cloud A positions.
-	particles := make([]core.Entity, len(cloudA))
-	turbulenceBehaviors := make([]*core.FuncBehavior, len(cloudA))
-	for i, pos := range cloudA {
-		p := world.Spawn()
-		particles[i] = p
-		world.AddTransform(p, &core.Transform{
-			Position: fmath.Vec3{X: pos.X + offsetX, Y: pos.Y + offsetY},
-			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-		})
-		world.AddBody(p, &core.Body{})
-		world.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
-
-		// Add dynamic particle materials: directional appearance + time-based rainbow
-		world.AddMaterial(p, core.ComposeMaterials(
-			particle.BrailleDirectional(),
-			particle.RainbowTime(2.0), // cycle through rainbow 2x per second
-		))
-
-		// Add turbulence behavior for wild motion (will be disabled after transition)
-		turbulence := world.AddBehavior(p, core.NewBehavior(physics.Turbulence(0.05, 30.0))).(*core.FuncBehavior)
-		turbulenceBehaviors[i] = turbulence
-
-		world.AddRoot(p)
+	// Offset initial cloud
+	initialCloud := make([]fmath.Vec2, len(clouds[0]))
+	for i, pos := range clouds[0] {
+		initialCloud[i] = fmath.Vec2{
+			X: pos.X + offsetX,
+			Y: pos.Y + offsetY,
+		}
 	}
 
-	// After 2 seconds, distribute targets from cloud B.
-	targetDistributed := false
-	startTime := 0.0
-
-	// Add a behavior to the world to handle the morph trigger.
-	morphTrigger := world.Spawn()
-	world.AddBehavior(
-		morphTrigger,
-		core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
-			if startTime == 0 {
-				startTime = t.Total
-			}
-
-			// At 2 seconds, distribute targets (may spawn additional particles).
-			if !targetDistributed && t.Total-startTime >= 2.0 {
-				targetDistributed = true
-
-				// Disable turbulence on all particles so they converge smoothly
-				for _, turbulence := range turbulenceBehaviors {
-					turbulence.SetEnabled(false)
-				}
-
-				// Position FLYING centered on screen.
-				offsetXFly := float64(sw/2) - float64(layoutB.Bitmap.Width)/2
-				offsetCloudB := make([]fmath.Vec2, len(cloudB))
-				for i, pos := range cloudB {
-					offsetCloudB[i] = fmath.Vec2{
-						X: pos.X + offsetXFly,
-						Y: pos.Y + offsetY,
-					}
-				}
-
-				// Distribute targets using linear distribution strategy.
-				// This creates 1:1 mapping and spawns extra particles from sequential sources.
-				particles = particle.DistributeTargets(
-					particles,
-					offsetCloudB,
-					40.0, // Fast movement speed
-					particle.LinearDistribution(),
-					w,
-				)
-			}
-		}),
+	// Create particle material: directional appearance + time-based rainbow
+	material := core.ComposeMaterials(
+		particle.BrailleDirectional(),
+		particle.RainbowTime(2.0),
 	)
+
+	// Create point cloud sequence
+	seq := particle.NewPointCloudSequence(
+		world,
+		initialCloud,
+		&bitmap.Braille{Bitmap: pixel},
+		material,
+		0, // layer
+	)
+
+	// Add turbulence to initial particles
+	turbConfig := &particle.TurbulenceConfig{Scale: 0.05, Strength: 30.0}
+	for _, p := range seq.Particles() {
+		tb := world.AddBehavior(p, core.NewBehavior(physics.Turbulence(turbConfig.Scale, turbConfig.Strength))).(*core.FuncBehavior)
+		tb.SetEnabled(true)
+	}
+
+	// Distribution strategies to cycle through
+	strategies := []particle.DistributionStrategy{
+		particle.LinearDistribution(),
+		particle.RoundRobinDistribution(),
+		nil, // placeholder for ClosestPoint (needs runtime state)
+	}
+
+	// Add morph targets with varying settings
+	for i := 1; i < len(words); i++ {
+		targetCloud := clouds[i]
+		targetLayout := layouts[i]
+
+		// Center target cloud
+		targetOffsetX := float64(sw/2) - float64(targetLayout.Bitmap.Width)/2
+		offsetTargetCloud := make([]fmath.Vec2, len(targetCloud))
+		for j, pos := range targetCloud {
+			offsetTargetCloud[j] = fmath.Vec2{
+				X: pos.X + targetOffsetX,
+				Y: pos.Y + offsetY,
+			}
+		}
+
+		// Cycle through strategies
+		strategyIdx := i % 3
+		var strategy particle.DistributionStrategy
+		if strategyIdx == 2 {
+			// ClosestPoint needs current particle state - will be computed at morph time
+			// For now, use a closure that captures seq
+			strategy = particle.LinearDistribution() // Fallback
+		} else {
+			strategy = strategies[strategyIdx]
+		}
+
+		// Toggle turbulence every other morph
+		var turb *particle.TurbulenceConfig
+		if i%2 == 0 {
+			turb = turbConfig
+		}
+
+		seq.AddTarget(particle.MorphTarget{
+			Cloud:      offsetTargetCloud,
+			Duration:   6.0,
+			Strategy:   strategy,
+			Turbulence: turb,
+		})
+	}
 
 	// Camera.
 	cam := world.Spawn()
