@@ -28,7 +28,8 @@ func BitmapToCloud(bm *bitmap.Bitmap) []fmath.Vec2 {
 // TargetMapping defines how entities map to targets and where to spawn new particles.
 type TargetMapping struct {
 	EntityTargets []int // EntityTargets[i] = target index for entity i
-	SpawnFrom     []int // For extra targets, spawn from entity SpawnFrom[i]
+	SpawnFrom     []int // SpawnFrom[i] = entity to clone from for spawn i
+	SpawnTargets  []int // SpawnTargets[i] = target index for spawn i
 }
 
 // DistributionStrategy computes target assignments for entities and spawn sources.
@@ -49,9 +50,12 @@ func LinearDistribution() DistributionStrategy {
 
 		// If more targets than entities, spawn from sequential entities
 		if targetCount > entityCount {
-			mapping.SpawnFrom = make([]int, targetCount-entityCount)
-			for i := 0; i < len(mapping.SpawnFrom); i++ {
+			extraCount := targetCount - entityCount
+			mapping.SpawnFrom = make([]int, extraCount)
+			mapping.SpawnTargets = make([]int, extraCount)
+			for i := 0; i < extraCount; i++ {
 				mapping.SpawnFrom[i] = i % entityCount
+				mapping.SpawnTargets[i] = entityCount + i // Targets sequentially after assigned ones
 			}
 		}
 
@@ -74,9 +78,12 @@ func RoundRobinDistribution() DistributionStrategy {
 
 		// If more targets than entities, spawn from random entities
 		if targetCount > entityCount {
-			mapping.SpawnFrom = make([]int, targetCount-entityCount)
-			for i := 0; i < len(mapping.SpawnFrom); i++ {
+			extraCount := targetCount - entityCount
+			mapping.SpawnFrom = make([]int, extraCount)
+			mapping.SpawnTargets = make([]int, extraCount)
+			for i := 0; i < extraCount; i++ {
 				mapping.SpawnFrom[i] = rand.Intn(entityCount)
+				mapping.SpawnTargets[i] = entityCount + i // Targets sequentially after assigned ones
 			}
 		}
 
@@ -96,9 +103,16 @@ func ClosestPointDistribution(
 			EntityTargets: make([]int, entityCount),
 		}
 
-		// Build position list for entities
-		entityPositions := make([]fmath.Vec2, entityCount)
-		for i := 0; i < entityCount; i++ {
+		// Use min of entityCount and captured entities length
+		// (particle count may have grown since strategy was created)
+		availableEntities := entityCount
+		if availableEntities > len(entities) {
+			availableEntities = len(entities)
+		}
+
+		// Build position list for entities we have
+		entityPositions := make([]fmath.Vec2, availableEntities)
+		for i := 0; i < availableEntities; i++ {
 			tr := world.Transform(entities[i])
 			if tr != nil {
 				entityPositions[i] = fmath.Vec2{X: tr.Position.X, Y: tr.Position.Y}
@@ -108,8 +122,8 @@ func ClosestPointDistribution(
 		// Track which targets are already assigned
 		targetAssigned := make([]bool, targetCount)
 
-		// Greedy assignment: for each entity, assign to nearest unassigned target
-		for i := 0; i < entityCount; i++ {
+		// Greedy assignment: for each entity we have positions for, assign to nearest unassigned target
+		for i := 0; i < availableEntities; i++ {
 			bestTarget := -1
 			bestDist := 1e9
 
@@ -137,9 +151,25 @@ func ClosestPointDistribution(
 			}
 		}
 
+		// For entities beyond what we captured, use round-robin
+		for i := availableEntities; i < entityCount; i++ {
+			targetIdx := i % targetCount
+			mapping.EntityTargets[i] = targetIdx
+			targetAssigned[targetIdx] = true // Mark these targets as assigned
+		}
+
 		// If more targets than entities, spawn from nearest entity to each unassigned target
 		if targetCount > entityCount {
-			mapping.SpawnFrom = make([]int, targetCount-entityCount)
+			// Count actual unassigned targets first
+			unassignedCount := 0
+			for t := 0; t < targetCount; t++ {
+				if !targetAssigned[t] {
+					unassignedCount++
+				}
+			}
+
+			mapping.SpawnFrom = make([]int, unassignedCount)
+			mapping.SpawnTargets = make([]int, unassignedCount)
 			spawnIdx := 0
 
 			for t := 0; t < targetCount; t++ {
@@ -147,11 +177,11 @@ func ClosestPointDistribution(
 					continue
 				}
 
-				// Find nearest entity to this target
+				// Find nearest entity to this target (from entities we have positions for)
 				bestEntity := 0
 				bestDist := 1e9
 
-				for e := 0; e < entityCount; e++ {
+				for e := 0; e < availableEntities; e++ {
 					dx := entityPositions[e].X - targets[t].X
 					dy := entityPositions[e].Y - targets[t].Y
 					dist := dx*dx + dy*dy
@@ -163,6 +193,7 @@ func ClosestPointDistribution(
 				}
 
 				mapping.SpawnFrom[spawnIdx] = bestEntity
+				mapping.SpawnTargets[spawnIdx] = t // Use the actual unassigned target index
 				spawnIdx++
 			}
 		}
@@ -174,7 +205,8 @@ func ClosestPointDistribution(
 // DistributeTargets assigns target positions from cloud to entities using a distribution strategy.
 // If cloud has more points than entities, spawns additional particles to fill the gaps.
 // Returns all entities (original + newly spawned).
-// Adds InterpolateToTarget behavior to each entity.
+// Adds InterpolateToTarget behavior to each entity if speed > 0.
+// Use speed <= 0 to skip behavior creation (e.g., when phase system handles movement).
 func DistributeTargets(
 	entities []core.Entity,
 	cloud []fmath.Vec2,
@@ -190,14 +222,16 @@ func DistributeTargets(
 	mapping := strategy(len(entities), len(cloud))
 
 	// Assign targets to existing entities using strategy mapping.
-	for i, e := range entities {
-		targetIdx := mapping.EntityTargets[i]
-		world.AddBehavior(e, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
+	// Only add behaviors if speed > 0 (phase system uses speed <= 0 to skip behavior creation)
+	if speed > 0 {
+		for i, e := range entities {
+			targetIdx := mapping.EntityTargets[i]
+			world.AddBehavior(e, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
+		}
 	}
 
 	// If cloud has more points than entities, spawn new particles for the extra points.
 	if len(cloud) > len(entities) {
-		initialEntityCount := len(entities) // Capture before appending
 		for i := 0; i < len(mapping.SpawnFrom); i++ {
 			// Get template from entity specified by strategy.
 			sourceIdx := mapping.SpawnFrom[i]
@@ -244,9 +278,12 @@ func DistributeTargets(
 			// Add to roots.
 			world.AddRoot(p)
 
-			// Assign target from remaining cloud points.
-			targetIdx := initialEntityCount + i
-			world.AddBehavior(p, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
+			// Assign target using strategy mapping.
+			// Only add behavior if speed > 0 (phase system handles movement)
+			if speed > 0 {
+				targetIdx := mapping.SpawnTargets[i]
+				world.AddBehavior(p, core.NewBehavior(InterpolateToTarget(cloud[targetIdx], speed)))
+			}
 
 			// Add to entities list.
 			entities = append(entities, p)

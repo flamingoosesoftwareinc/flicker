@@ -10,7 +10,6 @@ import (
 	"flicker/core/bitmap"
 	"flicker/fmath"
 	"flicker/particle"
-	"flicker/physics"
 	"flicker/terminal"
 	"github.com/gdamore/tcell/v2"
 )
@@ -42,18 +41,18 @@ func main() {
 		Color: core.Color{R: 255, G: 255, B: 255},
 	}
 
-	// Create 10 different text morphs to stress-test the system
+	// Create different words to demonstrate various transition types
 	words := []string{
-		"GO",
-		"WAVE",
-		"SPIN",
-		"MORPH",
-		"BURST",
-		"FLOW",
-		"DANCE",
-		"ZOOM",
-		"TWIST",
-		"FLY",
+		"GO",      // Start
+		"BURST",   // Burst transition
+		"CURVE",   // Curved arc transition
+		"EASE",    // Keyframe with easing
+		"SEEK",    // Direct seek (behavior)
+		"SWIRL",   // Multi-phase: turbulence + seek
+		"ARC",     // Another curve
+		"SMOOTH",  // Smooth easing
+		"EXPLODE", // Burst again
+		"END",     // Final
 	}
 
 	// Rasterize all text layouts
@@ -70,11 +69,11 @@ func main() {
 		clouds[i] = particle.BitmapToCloud(layout.Bitmap)
 	}
 
-	// Single pixel bitmap for particles.
+	// Single pixel bitmap for particles
 	pixel := bitmap.New(1, 1)
 	pixel.SetDot(0, 0, core.Color{R: 255, G: 255, B: 255})
 
-	// Calculate center offset for initial cloud.
+	// Calculate center offset for initial cloud
 	offsetX := float64(sw/2) - float64(layouts[0].Bitmap.Width)/2
 	offsetY := float64(sh/2) - float64(layouts[0].Bitmap.Height)/2
 
@@ -102,21 +101,7 @@ func main() {
 		0, // layer
 	)
 
-	// Add turbulence to initial particles
-	turbConfig := &particle.TurbulenceConfig{Scale: 0.05, Strength: 30.0}
-	for _, p := range seq.Particles() {
-		tb := world.AddBehavior(p, core.NewBehavior(physics.Turbulence(turbConfig.Scale, turbConfig.Strength))).(*core.FuncBehavior)
-		tb.SetEnabled(true)
-	}
-
-	// Distribution strategies to cycle through
-	strategies := []particle.DistributionStrategy{
-		particle.LinearDistribution(),
-		particle.RoundRobinDistribution(),
-		nil, // placeholder for ClosestPoint (needs runtime state)
-	}
-
-	// Add morph targets with varying settings
+	// Add targets with different phase combinations
 	for i := 1; i < len(words); i++ {
 		targetCloud := clouds[i]
 		targetLayout := layouts[i]
@@ -131,44 +116,67 @@ func main() {
 			}
 		}
 
-		// Cycle through strategies
-		strategyIdx := i % 3
+		// Create strategy dynamically (ClosestPoint needs current particle state)
 		var strategy particle.DistributionStrategy
-		if strategyIdx == 2 {
-			// ClosestPoint needs current particle state - will be computed at morph time
-			// For now, use a closure that captures seq
-			strategy = particle.LinearDistribution() // Fallback
-		} else {
-			strategy = strategies[strategyIdx]
+		switch i % 3 {
+		case 0:
+			strategy = particle.LinearDistribution()
+		case 1:
+			strategy = particle.RoundRobinDistribution()
+		case 2:
+			// Create ClosestPoint with current particles each time
+			strategy = particle.ClosestPointDistribution(seq.Particles(), offsetTargetCloud, world)
 		}
 
-		// Toggle turbulence every other morph
-		var turb *particle.TurbulenceConfig
-		if i%2 == 0 {
-			turb = turbConfig
-		}
+		// Create different phase combinations for each transition
+		var phases []particle.TransitionPhase
+		duration := 6.0
 
-		// Use burst transition for every third morph
-		transitionType := particle.TransitionDirect
-		var burstDist, burstDur float64
-		if i%3 == 0 {
-			transitionType = particle.TransitionBurst
-			burstDist = float64(sh) * 0.3 // Burst 30% of screen height
-			burstDur = 0.4                // 40% of duration for burst phase
+		switch i % 5 {
+		case 0:
+			// Direct seek (single behavior phase)
+			phases = []particle.TransitionPhase{
+				particle.SeekPhase(),
+			}
+
+		case 1:
+			// Burst + seek (two behavior phases)
+			burstDist := float64(sh) * 0.4
+			phases = []particle.TransitionPhase{
+				particle.BurstPhase(burstDist), // 50% of duration
+				particle.SeekPhase(),           // 50% of duration
+			}
+
+		case 2:
+			// Keyframe with smooth easing
+			phases = []particle.TransitionPhase{
+				&particle.KeyframePhase{Easing: particle.EaseInOutQuad},
+			}
+
+		case 3:
+			// Curved arc motion
+			arcHeight := float64(sh) * 0.3
+			phases = []particle.TransitionPhase{
+				&particle.CurvePhase{ArcHeight: arcHeight},
+			}
+
+		case 4:
+			// Multi-phase: turbulence, then smooth keyframe seek
+			phases = []particle.TransitionPhase{
+				particle.TurbulencePhase(0.05, 30.0),                   // 33% turbulence
+				&particle.KeyframePhase{Easing: particle.EaseOutCubic}, // 67% smooth ease
+			}
 		}
 
 		seq.AddTarget(particle.MorphTarget{
-			Cloud:          offsetTargetCloud,
-			Duration:       6.0,
-			Strategy:       strategy,
-			Turbulence:     turb,
-			TransitionType: transitionType,
-			BurstDistance:  burstDist,
-			BurstDuration:  burstDur,
+			Cloud:    offsetTargetCloud,
+			Duration: duration,
+			Strategy: strategy,
+			Phases:   phases,
 		})
 	}
 
-	// Camera.
+	// Camera
 	cam := world.Spawn()
 	world.AddTransform(cam, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw) / 2.0, Y: float64(sh) / 2.0},
@@ -177,7 +185,7 @@ func main() {
 	world.AddCamera(cam, &core.Camera{Zoom: 1})
 	world.SetActiveCamera(cam)
 
-	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
+	// Pump PollEvent in a goroutine so the tick loop never blocks on input
 	events := make(chan tcell.Event, 1)
 	go func() {
 		for {
@@ -192,7 +200,7 @@ func main() {
 	last := time.Now()
 
 	for {
-		// Drain events (non-blocking).
+		// Drain events (non-blocking)
 		step := false
 		quit := false
 		for draining := true; draining; {
