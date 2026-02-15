@@ -177,9 +177,19 @@ func TestBrailleDirectional(t *testing.T) {
 			wantRune: '⠤',
 		},
 		{
+			name:     "southeast",
+			velocity: fmath.Vec2{X: 1, Y: 1},
+			wantRune: '⠡',
+		},
+		{
 			name:     "south",
 			velocity: fmath.Vec2{X: 0, Y: 1},
 			wantRune: '⡇',
+		},
+		{
+			name:     "southwest",
+			velocity: fmath.Vec2{X: -1, Y: 1},
+			wantRune: '⢇',
 		},
 		{
 			name:     "west",
@@ -187,9 +197,19 @@ func TestBrailleDirectional(t *testing.T) {
 			wantRune: '⠒',
 		},
 		{
+			name:     "northwest",
+			velocity: fmath.Vec2{X: -1, Y: -1},
+			wantRune: '⠊',
+		},
+		{
 			name:     "north",
 			velocity: fmath.Vec2{X: 0, Y: -1},
 			wantRune: '⡀',
+		},
+		{
+			name:     "northeast",
+			velocity: fmath.Vec2{X: 1, Y: -1},
+			wantRune: '⠈',
 		},
 	}
 
@@ -205,7 +225,13 @@ func TestBrailleDirectional(t *testing.T) {
 
 			got := mat(f)
 			if got.Rune != tt.wantRune {
-				t.Errorf("BrailleDirectional() = %c, want %c", got.Rune, tt.wantRune)
+				t.Errorf(
+					"BrailleDirectional() = %c (U+%04X), want %c (U+%04X)",
+					got.Rune,
+					got.Rune,
+					tt.wantRune,
+					tt.wantRune,
+				)
 			}
 		})
 	}
