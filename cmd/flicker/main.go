@@ -47,6 +47,16 @@ func main() {
 	scene3 := createThanksScene(sw, sh, textFont)
 	sm.Add(scene3)
 
+	// Transition shaders to cycle through
+	transitions := []core.TransitionShader{
+		core.CrossFade,
+		core.RadialWipe,
+		core.Pixelate,
+		core.WipeLeft,
+		core.PushRight,
+	}
+	transitionIndex := 0
+
 	// Start with first scene
 	sm.Start()
 
@@ -86,7 +96,10 @@ func main() {
 			return
 		}
 		if nextSlide && !sm.IsTransitioning() {
-			sm.Next(core.CrossFade, 1.0)
+			// Use next transition shader and cycle
+			shader := transitions[transitionIndex]
+			transitionIndex = (transitionIndex + 1) % len(transitions)
+			sm.Next(shader, 1.5)
 		}
 
 		now := time.Now()
