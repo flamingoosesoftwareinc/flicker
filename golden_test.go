@@ -651,12 +651,12 @@ func TestTextRendering(t *testing.T) {
 		t.Fatalf("LoadFont: %v", err)
 	}
 
-	textBm := asset.RasterizeText("Hi", asset.TextOptions{
+	textLayout := asset.RasterizeText("Hi", asset.TextOptions{
 		Font:  f,
 		Size:  16,
 		Color: core.Color{R: 255, G: 255, B: 255},
 	})
-	if textBm == nil {
+	if textLayout == nil {
 		t.Fatal("RasterizeText returned nil")
 	}
 
@@ -669,7 +669,7 @@ func TestTextRendering(t *testing.T) {
 		Position: fmath.Vec3{X: 2, Y: 2},
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
-	world.AddDrawable(textEnt, &bitmap.HalfBlock{Bitmap: textBm})
+	world.AddDrawable(textEnt, &bitmap.HalfBlock{Bitmap: textLayout.Bitmap})
 	world.AddRoot(textEnt)
 
 	canvas.Clear()

@@ -14,16 +14,17 @@ func TestRasterizeTextI(t *testing.T) {
 		t.Fatalf("LoadFont: %v", err)
 	}
 
-	bm := RasterizeText("I", TextOptions{
+	layout := RasterizeText("I", TextOptions{
 		Font:  f,
 		Size:  48,
 		Color: core.Color{R: 255, G: 255, B: 255},
 	})
 
-	if bm == nil {
+	if layout == nil {
 		t.Fatal("RasterizeText returned nil")
 	}
 
+	bm := layout.Bitmap
 	m := f.Metrics(48)
 	expectedH := int(math.Ceil(m.Height))
 	if bm.Height != expectedH {
@@ -52,6 +53,14 @@ func TestRasterizeTextI(t *testing.T) {
 	if math.Abs(float64(bm.Width)-advPx) > 2 {
 		t.Errorf("width: got %d, want ~%f", bm.Width, advPx)
 	}
+
+	// Verify glyph layout.
+	if len(layout.Glyphs) != 1 {
+		t.Errorf("expected 1 glyph, got %d", len(layout.Glyphs))
+	}
+	if len(layout.Glyphs) > 0 && layout.Glyphs[0].Rune != 'I' {
+		t.Errorf("expected glyph 'I', got %q", layout.Glyphs[0].Rune)
+	}
 }
 
 func TestRasterizeTextMultiChar(t *testing.T) {
@@ -60,15 +69,27 @@ func TestRasterizeTextMultiChar(t *testing.T) {
 		t.Fatalf("LoadFont: %v", err)
 	}
 
-	bmA := RasterizeText("A", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
-	bmAB := RasterizeText("AB", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
+	layoutA := RasterizeText("A", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
+	layoutAB := RasterizeText("AB", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
 
-	if bmA == nil || bmAB == nil {
+	if layoutA == nil || layoutAB == nil {
 		t.Fatal("RasterizeText returned nil")
 	}
 
-	if bmAB.Width <= bmA.Width {
-		t.Errorf("AB width (%d) should be greater than A width (%d)", bmAB.Width, bmA.Width)
+	if layoutAB.Bitmap.Width <= layoutA.Bitmap.Width {
+		t.Errorf(
+			"AB width (%d) should be greater than A width (%d)",
+			layoutAB.Bitmap.Width,
+			layoutA.Bitmap.Width,
+		)
+	}
+
+	// Verify glyph counts.
+	if len(layoutA.Glyphs) != 1 {
+		t.Errorf("expected 1 glyph for 'A', got %d", len(layoutA.Glyphs))
+	}
+	if len(layoutAB.Glyphs) != 2 {
+		t.Errorf("expected 2 glyphs for 'AB', got %d", len(layoutAB.Glyphs))
 	}
 }
 
@@ -78,8 +99,12 @@ func TestRasterizeTextEmpty(t *testing.T) {
 		t.Fatalf("LoadFont: %v", err)
 	}
 
-	bm := RasterizeText("", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
-	if bm != nil {
-		t.Errorf("expected nil for empty string, got bitmap %dx%d", bm.Width, bm.Height)
+	layout := RasterizeText("", TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}})
+	if layout != nil {
+		t.Errorf(
+			"expected nil for empty string, got layout with bitmap %dx%d",
+			layout.Bitmap.Width,
+			layout.Bitmap.Height,
+		)
 	}
 }

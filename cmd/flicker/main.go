@@ -379,14 +379,14 @@ func main() {
 		textSize := float64(sh) * 0.8
 
 		// AA text — top third of screen.
-		aaBm := asset.RasterizeText("FLICKER", asset.TextOptions{
+		aaLayout := asset.RasterizeText("FLICKER", asset.TextOptions{
 			Font:      textFont,
 			Size:      textSize,
 			Color:     core.Color{R: 220, G: 240, B: 255},
 			AntiAlias: true,
 		})
-		if aaBm != nil {
-			aaDraw := &bitmap.Braille{Bitmap: aaBm}
+		if aaLayout != nil {
+			aaDraw := &bitmap.Braille{Bitmap: aaLayout.Bitmap}
 			aaW, aaH := aaDraw.Bounds()
 			aaEnt := world.Spawn()
 			world.AddTransform(aaEnt, &core.Transform{
@@ -402,13 +402,13 @@ func main() {
 		}
 
 		// Sharp text (default) — bottom third of screen.
-		sharpBm := asset.RasterizeText("FLICKER", asset.TextOptions{
+		sharpLayout := asset.RasterizeText("FLICKER", asset.TextOptions{
 			Font:  textFont,
 			Size:  textSize,
 			Color: core.Color{R: 220, G: 240, B: 255},
 		})
-		if sharpBm != nil {
-			sharpDraw := &bitmap.Braille{Bitmap: sharpBm}
+		if sharpLayout != nil {
+			sharpDraw := &bitmap.Braille{Bitmap: sharpLayout.Bitmap}
 			shW, shH := sharpDraw.Bounds()
 			sharpEnt := world.Spawn()
 			world.AddTransform(sharpEnt, &core.Transform{

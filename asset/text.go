@@ -19,9 +19,24 @@ type TextOptions struct {
 	AntiAlias bool       // enable anti-aliasing (default: sharp edges)
 }
 
-// RasterizeText rasterizes a single line of text into a bitmap.
+// Glyph holds layout information for a single character in rendered text.
+type Glyph struct {
+	Rune   rune
+	Index  int // position in the original string
+	X, Y   int // top-left corner in bitmap pixels
+	Width  int // advance width in pixels
+	Height int // bounding box height in pixels
+}
+
+// TextLayout holds a rasterized text bitmap and per-glyph layout information.
+type TextLayout struct {
+	Bitmap *bitmap.Bitmap
+	Glyphs []Glyph
+}
+
+// RasterizeText rasterizes a single line of text into a bitmap with glyph layout.
 // Returns nil if text is empty or the font has no glyphs for any character.
-func RasterizeText(text string, opts TextOptions) *bitmap.Bitmap {
+func RasterizeText(text string, opts TextOptions) *TextLayout {
 	if len(text) == 0 || opts.Font == nil {
 		return nil
 	}
@@ -52,22 +67,38 @@ func RasterizeText(text string, opts TextOptions) *bitmap.Bitmap {
 		return nil
 	}
 
-	// Pass 2: rasterize glyphs into vector rasterizer.
+	// Pass 2: rasterize glyphs into vector rasterizer and track layout.
 	r := vector.NewRasterizer(bmW, bmH)
 	var xOffset float64
 	ascent := m.Ascent
+	var glyphs []Glyph
 
-	for _, ch := range runes {
+	for idx, ch := range runes {
 		gi, err := sf.GlyphIndex(buf, ch)
 		if err != nil || gi == 0 {
 			continue
 		}
 
+		adv, err := sf.GlyphAdvance(buf, gi, ppem, font.HintingNone)
+		if err != nil {
+			continue
+		}
+		glyphWidth := float64(adv) / 64.0
+
+		// Record glyph layout.
+		glyphs = append(glyphs, Glyph{
+			Rune:   ch,
+			Index:  idx,
+			X:      int(math.Floor(xOffset)),
+			Y:      0,
+			Width:  int(math.Ceil(glyphWidth)),
+			Height: bmH,
+		})
+
 		segs, err := sf.LoadGlyph(buf, gi, ppem, nil)
 		if err != nil {
-			// Fall back: skip this glyph, just advance.
-			adv, _ := sf.GlyphAdvance(buf, gi, ppem, font.HintingNone)
-			xOffset += float64(adv) / 64.0
+			// Skip rasterization but still advance.
+			xOffset += glyphWidth
 			continue
 		}
 
@@ -105,8 +136,7 @@ func RasterizeText(text string, opts TextOptions) *bitmap.Bitmap {
 			}
 		}
 
-		adv, _ := sf.GlyphAdvance(buf, gi, ppem, font.HintingNone)
-		xOffset += float64(adv) / 64.0
+		xOffset += glyphWidth
 	}
 
 	// Draw the rasterizer into an alpha mask.
@@ -128,5 +158,41 @@ func RasterizeText(text string, opts TextOptions) *bitmap.Bitmap {
 		}
 	}
 
-	return bm
+	return &TextLayout{
+		Bitmap: bm,
+		Glyphs: glyphs,
+	}
+}
+
+// GlyphAt returns the index of the glyph at pixel coordinates (x, y).
+// Returns -1 if (x, y) is not within any glyph's bounding box.
+func (tl *TextLayout) GlyphAt(x, y int) int {
+	for i, g := range tl.Glyphs {
+		if x >= g.X && x < g.X+g.Width && y >= g.Y && y < g.Y+g.Height {
+			return i
+		}
+	}
+	return -1
+}
+
+// SplitGlyphs crops the text bitmap into individual per-glyph bitmaps.
+// Returns a slice where each element corresponds to tl.Glyphs[i].
+// Useful for creating per-character entities with independent transforms.
+func (tl *TextLayout) SplitGlyphs() []*bitmap.Bitmap {
+	result := make([]*bitmap.Bitmap, len(tl.Glyphs))
+	for i, g := range tl.Glyphs {
+		glyph := bitmap.New(g.Width, g.Height)
+		for dy := range g.Height {
+			for dx := range g.Width {
+				srcX := g.X + dx
+				srcY := g.Y + dy
+				if srcX < tl.Bitmap.Width && srcY < tl.Bitmap.Height {
+					c, a := tl.Bitmap.Get(srcX, srcY)
+					glyph.Set(dx, dy, c, a)
+				}
+			}
+		}
+		result[i] = glyph
+	}
+	return result
 }
