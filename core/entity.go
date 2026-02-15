@@ -103,6 +103,46 @@ func (w *World) Roots() []Entity {
 	return w.roots
 }
 
+// Entities returns all entity IDs that exist in the world.
+// Collects entities from all component maps.
+func (w *World) Entities() []Entity {
+	seen := make(map[Entity]bool)
+
+	// Collect from all component maps
+	for e := range w.transforms {
+		seen[e] = true
+	}
+	for e := range w.drawables {
+		seen[e] = true
+	}
+	for e := range w.behaviors {
+		seen[e] = true
+	}
+	for e := range w.materials {
+		seen[e] = true
+	}
+	for e := range w.layers {
+		seen[e] = true
+	}
+	for e := range w.cameras {
+		seen[e] = true
+	}
+	for e := range w.bodies {
+		seen[e] = true
+	}
+	for e := range w.ages {
+		seen[e] = true
+	}
+
+	// Convert to slice
+	entities := make([]Entity, 0, len(seen))
+	for e := range seen {
+		entities = append(entities, e)
+	}
+
+	return entities
+}
+
 func (w *World) Children(e Entity) []Entity {
 	return w.children[e]
 }

@@ -84,11 +84,12 @@ func (s *BasicScene) OnExit() {
 		s.exitFn(s.world)
 	}
 
-	// Clean up all entities when exiting scene
-	// This ensures the scene starts fresh when re-entered
-	roots := s.world.Roots()
-	for _, root := range roots {
-		s.world.Despawn(root)
+	// Clean up ALL entities when exiting scene (not just roots)
+	// This ensures the scene starts completely fresh when re-entered,
+	// including non-root entities like behavior containers
+	entities := s.world.Entities()
+	for _, e := range entities {
+		s.world.Despawn(e)
 	}
 }
 
