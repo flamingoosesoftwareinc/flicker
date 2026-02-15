@@ -110,7 +110,7 @@ These are the target features, built on top of the foundations above. Dependenci
 - **Text rendering (complete)** — Load Google Fonts TTFs, rasterize glyphs into bitmap buffer, render as braille/block cells. Text effects: typewriter, scramble-reveal, count up/down.
 - **Text: multi-line & kerning** — Line wrapping, multi-line layout with line height control. Kerning pair adjustments for professional typography. Variable font axis interpolation (weight animation).
 - **Analytical SDF primitives (complete)** — `sdf/` package with 2D signed distance functions from [iquilezles.org/articles/distfunctions2d](https://iquilezles.org/articles/distfunctions2d/). Primitives: Circle, Box, RoundedBox, Segment, Triangle, EquilateralTriangle, Rhombus, Pentagon, Hexagon, Ellipse, Arc, Pie. Operations: Union, Subtract, Intersect, SmoothUnion, SmoothSubtract, SmoothIntersect. Pure functions taking `fmath.Vec2`, returning distance. Separate from bitmap-based SDF in `core/bitmap/sdf.go`.
-- **Particle systems** — Point emitters, velocity/acceleration integration, attractor/repulsor effectors, particle pooling. Bitmap sampling: treat any bitmap as a point cloud (spawn particles at pixel positions). Point cloud interpolation: animate particles from one bitmap's positions to another's. Sub-cell rendering for pixel-precise particles.
+- **Particle systems (complete)** — `physics/` package: generic physics behaviors (EulerIntegration, VerletIntegration, Attractor, Repulsor, Drag, Gravity, Turbulence, Spring) that work on any entity with Body + Transform. `particle/` package: particle-specific helpers (BitmapToCloud, DistributeTargets, InterpolateToTarget, Emit, AgeAndDespawn). `Body` component (velocity, acceleration) and `Age` component (age, lifetime) in `core/`. Point cloud morphing: bitmap → point cloud → particle interpolation. Demo: "GO" → "FLY" text morph.
 - **Trails** — Post-process fade (`cell.Alpha *= decay`) instead of full clear. Per-layer trail intensity.
 - **Physics: springs and effectors** — Spring force `F = -kx - bv`, point effectors (attract/repel), drag. Verlet integration. No collision detection needed initially.
 - **SVG rendering** — Parse SVG paths, rasterize bezier curves and fills into bitmap buffer.
@@ -123,7 +123,7 @@ These are the target features, built on top of the foundations above. Dependenci
 ```
 flicker/
   core/
-    entity.go      // Entity, World, parent/child relationships, ComposeMaterials
+    entity.go      // Entity, World, parent/child relationships, ComposeMaterials, Body/Age components, Despawn
     camera.go      // Camera component, ViewMatrix (orthographic view transform)
     transform.go   // Transform component (position, rotation, scale) with LocalMatrix()
     drawable.go    // Drawable interface, RenderFunc
@@ -169,6 +169,22 @@ flicker/
     sdf.go         // 2D signed distance functions: primitives (Circle, Box, Triangle, polygons, Ellipse, Arc, Pie), operations (Union, Subtract, Intersect, smooth variants)
     sdf_test.go
     example_test.go
+  physics/
+    integrate.go   // EulerIntegration, VerletIntegration (Verlet maintains state in closure)
+    forces.go      // Attractor, Repulsor, Drag, Gravity, Turbulence
+    spring.go      // Spring (Hooke's law with damping)
+    integrate_test.go
+    forces_test.go
+    spring_test.go
+  particle/
+    target.go      // InterpolateToTarget (deterministic motion)
+    lifecycle.go   // AgeAndDespawn
+    emit.go        // Emit (particle spawning)
+    cloud.go       // BitmapToCloud, DistributeTargets (point cloud helpers)
+    target_test.go
+    lifecycle_test.go
+    emit_test.go
+    cloud_test.go
   terminal/
     screen.go      // Screen interface, TcellScreen (tcell backend)
     simscreen.go   // SimScreen (in-memory backend for testing)
@@ -179,4 +195,4 @@ flicker/
   testdata/        // Golden files
 ```
 
-`fmath` depends on nothing. `sdf` depends on `fmath`. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `textfx` depends on `core`, `core/bitmap`, `asset`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
+`fmath` depends on nothing. `sdf` depends on `fmath`. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `textfx` depends on `core`, `core/bitmap`, `asset`, and `fmath`. `physics` depends on `core` and `fmath`. `particle` depends on `core`, `core/bitmap`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.

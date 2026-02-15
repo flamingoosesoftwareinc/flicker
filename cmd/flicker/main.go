@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"time"
 
@@ -10,8 +9,8 @@ import (
 	"flicker/core"
 	"flicker/core/bitmap"
 	"flicker/fmath"
+	"flicker/particle"
 	"flicker/terminal"
-	"flicker/textfx"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -25,434 +24,89 @@ func main() {
 
 	sw, sh := screen.Size()
 	canvas := core.NewCanvas(sw, sh)
-	canvas.Background = core.Cell{
-		BG:      core.Color{R: 155, G: 155, B: 155},
-		FGAlpha: 1,
-		BGAlpha: 1,
-	} // Opaque grey — blend modes need a real destination color.
 	world := core.NewWorld()
 
-	// Layer 0: Red box — Normal blend (base layer), slow seesaw left→right.
-	boxA := world.Spawn()
-	world.AddTransform(boxA, &core.Transform{
-		Position: fmath.Vec3{X: 2, Y: 5},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(boxA, &bitmap.Rect{
-		Width:   12,
-		Height:  6,
-		FG:      core.Color{R: 200, G: 60, B: 60},
-		BG:      core.Color{R: 200, G: 60, B: 60},
-		FGAlpha: 0.7,
-		BGAlpha: 0.7,
-	})
-	world.AddLayer(boxA, 0)
-	world.AddRoot(boxA)
-
-	// Tween-based ping-pong with easing.
-	tweenA := &fmath.Tween{
-		From:     2,
-		To:       float64(sw - 14),
-		Duration: 8.0,
-		Easing:   fmath.EaseInOutCubic,
-	}
-	forwardA := true
-	world.AddBehavior(boxA, func(t core.Time, e core.Entity, w *core.World) {
-		w.Transform(e).Position.X = tweenA.Update(t.Delta)
-		if tweenA.Done() {
-			tweenA.Reset()
-			if forwardA {
-				tweenA.From, tweenA.To = float64(sw-14), 2
-			} else {
-				tweenA.From, tweenA.To = 2, float64(sw-14)
-			}
-			forwardA = !forwardA
-		}
-	})
-
-	world.AddMaterial(boxA, func(f core.Fragment) core.Cell {
-		gradient := float64(f.Y) / 5.0
-		pulse := (math.Sin(2*math.Pi*f.Time.Total) + 1) / 2
-		brightness := gradient*0.5 + pulse*0.5
-		f.Cell.FG = core.Color{
-			R: uint8(float64(f.Cell.FG.R) * brightness),
-			G: uint8(float64(f.Cell.FG.G) * brightness),
-			B: uint8(float64(f.Cell.FG.B) * brightness),
-		}
-		return f.Cell
-	})
-
-	// Layer 1: Green box — Multiply blend, seesaw right→left (faster).
-	boxB := world.Spawn()
-	world.AddTransform(boxB, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw - 14), Y: 5},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(boxB, &bitmap.Rect{
-		Width:   12,
-		Height:  6,
-		FG:      core.Color{R: 60, G: 200, B: 60},
-		BG:      core.Color{R: 60, G: 200, B: 60},
-		FGAlpha: 0.7,
-		BGAlpha: 0.7,
-	})
-	world.AddLayer(boxB, 1)
-	world.AddRoot(boxB)
-
-	world.AddBehavior(boxB, func(t core.Time, e core.Entity, w *core.World) {
-		v := fmath.Triangle(t.Total / 8.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
-	})
-
-	// Layer 2: Blue box — Screen blend, vertical bounce.
-	boxC := world.Spawn()
-	world.AddTransform(boxC, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: 2},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(boxC, &bitmap.Rect{
-		Width:   12,
-		Height:  6,
-		FG:      core.Color{R: 60, G: 60, B: 200},
-		BG:      core.Color{R: 60, G: 60, B: 200},
-		FGAlpha: 0.7,
-		BGAlpha: 0.7,
-	})
-	world.AddLayer(boxC, 2)
-	world.AddRoot(boxC)
-
-	world.AddBehavior(boxC, func(t core.Time, e core.Entity, w *core.World) {
-		v := fmath.Triangle(t.Total / 6.0)
-		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-8), v)
-	})
-
-	// Layer 3: Yellow box — Overlay blend, diagonal drift.
-	boxD := world.Spawn()
-	world.AddTransform(boxD, &core.Transform{
-		Position: fmath.Vec3{X: 2, Y: 2},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(boxD, &bitmap.Rect{
-		Width:   12,
-		Height:  6,
-		FG:      core.Color{R: 200, G: 200, B: 60},
-		BG:      core.Color{R: 200, G: 200, B: 60},
-		FGAlpha: 0.7,
-		BGAlpha: 0.7,
-	})
-	world.AddLayer(boxD, 3)
-	world.AddRoot(boxD)
-
-	// TweenVec3-based diagonal ping-pong with easing.
-	tweenD := &fmath.TweenVec3{
-		From:     fmath.Vec3{X: 2, Y: 1},
-		To:       fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)},
-		Duration: 5.0,
-		Easing:   fmath.EaseInOutQuad,
-	}
-	forwardD := true
-	world.AddBehavior(boxD, func(t core.Time, e core.Entity, w *core.World) {
-		pos := tweenD.Update(t.Delta)
-		w.Transform(e).Position.X = pos.X
-		w.Transform(e).Position.Y = pos.Y
-		if tweenD.Done() {
-			tweenD.Reset()
-			if forwardD {
-				tweenD.From = fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)}
-				tweenD.To = fmath.Vec3{X: 2, Y: 1}
-			} else {
-				tweenD.From = fmath.Vec3{X: 2, Y: 1}
-				tweenD.To = fmath.Vec3{X: float64(sw - 14), Y: float64(sh - 8)}
-			}
-			forwardD = !forwardD
-		}
-	})
-
-	// Layer 4: Cyan box — Difference blend, opposite horizontal.
-	boxE := world.Spawn()
-	world.AddTransform(boxE, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw/2 - 6), Y: float64(sh/2 - 3)},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(boxE, &bitmap.Rect{
-		Width:   12,
-		Height:  6,
-		FG:      core.Color{R: 60, G: 200, B: 200},
-		BG:      core.Color{R: 60, G: 200, B: 200},
-		FGAlpha: 0.7,
-		BGAlpha: 0.7,
-	})
-	world.AddLayer(boxE, 4)
-	world.AddRoot(boxE)
-
-	world.AddBehavior(boxE, func(t core.Time, e core.Entity, w *core.World) {
-		v := fmath.Triangle(t.Total / 7.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, float64(sw-14), 2, v)
-	})
-
-	// Layer 5: Braille sine wave — sub-cell resolution wireframe.
-	brailleBm := bitmap.New(30, 20)
-	brailleEnt := world.Spawn()
-	world.AddTransform(brailleEnt, &core.Transform{
-		Position: fmath.Vec3{X: 2, Y: float64(sh - 7)},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	brailleDraw := &bitmap.Braille{Bitmap: brailleBm}
-	world.AddDrawable(brailleEnt, brailleDraw)
-	world.AddLayer(brailleEnt, 5)
-	world.AddRoot(brailleEnt)
-
-	world.AddBehavior(brailleEnt, func(t core.Time, e core.Entity, w *core.World) {
-		brailleBm.Clear()
-		phase := t.Total * 3.0
-		for px := range 30 {
-			// Sine wave mapped to bitmap Y range.
-			fy := (math.Sin(float64(px)*0.4+phase) + 1) / 2 * 19
-			py := int(fy)
-			c := core.Color{R: 0, G: 220, B: uint8(120 + int(math.Sin(phase)*80))}
-			brailleBm.SetDot(px, py, c)
-			// Thicken: also plot the pixel above/below if in range.
-			if py > 0 {
-				brailleBm.SetDot(px, py-1, c)
-			}
-			if py < 19 {
-				brailleBm.SetDot(px, py+1, c)
-			}
-		}
-		v := fmath.Triangle(t.Total / 10.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-17), v)
-	})
-
-	// Layer 6: Half-block color gradient — two colors per cell.
-	hbBm := bitmap.New(16, 10)
-	hbEnt := world.Spawn()
-	world.AddTransform(hbEnt, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw - 20), Y: 2},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	hbDraw := &bitmap.HalfBlock{Bitmap: hbBm}
-	world.AddDrawable(hbEnt, hbDraw)
-	world.AddLayer(hbEnt, 6)
-	world.AddRoot(hbEnt)
-
-	world.AddBehavior(hbEnt, func(t core.Time, e core.Entity, w *core.World) {
-		for py := range 10 {
-			for px := range 16 {
-				g := uint8(fmath.Clamp(float64(py)*28, 0, 255))
-				rv := fmath.Triangle(float64(px)*0.06 + t.Total*0.3)
-				bv := fmath.Triangle(float64(py)*0.1 + t.Total*0.2)
-				r := uint8(rv * 255)
-				b := uint8(bv * 255)
-				hbBm.Set(px, py, core.Color{R: r, G: g, B: b}, 1.0)
-			}
-		}
-		v := fmath.Triangle(t.Total / 9.0)
-		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-7), v)
-	})
-
-	// Layer 7: Orbiting pair — parent rotates, child orbits around it.
-	// Braille bitmaps give sub-cell rotation resolution.
-	pivotBm := bitmap.New(8, 8)
-	for py := range 8 {
-		for px := range 8 {
-			pivotBm.SetDot(px, py, core.Color{R: 255, G: 180, B: 0})
-		}
-	}
-	rotPivot := world.Spawn()
-	world.AddTransform(rotPivot, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw/2 - 3), Y: float64(sh/2 - 2)},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(rotPivot, &bitmap.Braille{Bitmap: pivotBm})
-	world.AddLayer(rotPivot, 7)
-	world.AddRoot(rotPivot)
-
-	// Child: offset from parent, orbits as parent rotates.
-	orbiterBm := bitmap.New(6, 4)
-	for py := range 4 {
-		for px := range 6 {
-			orbiterBm.SetDot(px, py, core.Color{R: 255, G: 100, B: 200})
-		}
-	}
-	orbiter := world.Spawn()
-	world.AddTransform(orbiter, &core.Transform{
-		Position: fmath.Vec3{X: 10, Y: 0},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(orbiter, &bitmap.Braille{Bitmap: orbiterBm})
-	world.Attach(orbiter, rotPivot)
-
-	world.AddBehavior(rotPivot, func(t core.Time, e core.Entity, w *core.World) {
-		tr := w.Transform(e)
-		tr.Rotation = t.Total * fmath.DegToRad(60)
-	})
-
-	// Layer 8: Suzanne OBJ wireframe — spinning 3D model via braille.
-	suzanneMesh, err := asset.LoadOBJ("suzanne.obj")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: %v (skipping OBJ layer)\n", err)
-	} else {
-		objBm := bitmap.New(60, 60)
-		objEnt := world.Spawn()
-		world.AddTransform(objEnt, &core.Transform{
-			Position: fmath.Vec3{X: float64(sw/2 - 15), Y: 1},
-			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-		})
-		objDraw := &bitmap.Braille{Bitmap: objBm}
-		world.AddDrawable(objEnt, objDraw)
-		world.AddLayer(objEnt, 8)
-		world.AddRoot(objEnt)
-
-		proj := fmath.Mat4Perspective(math.Pi/3, 1.0, 0.1, 100)
-		view := fmath.Mat4Translate(0, 0, -3)
-
-		world.AddBehavior(objEnt, func(t core.Time, e core.Entity, w *core.World) {
-			objBm.Clear()
-			model := fmath.Mat4RotateY(t.Total * 0.8).Multiply(fmath.Mat4RotateX(0.3))
-			mvp := proj.Multiply(view).Multiply(model)
-			c := core.Color{R: 180, G: 255, B: 200}
-			asset.RasterizeWireframe(suzanneMesh, mvp, objBm, c)
-		})
-	}
-
-	// Layer 9: Full-block plasma — 1:1 pixel-to-cell animated color field.
-	fbBm := bitmap.New(14, 8)
-	fbEnt := world.Spawn()
-	world.AddTransform(fbEnt, &core.Transform{
-		Position: fmath.Vec3{X: 2, Y: 1},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(fbEnt, &bitmap.FullBlock{Bitmap: fbBm})
-	world.AddLayer(fbEnt, 9)
-	world.AddRoot(fbEnt)
-
-	world.AddBehavior(fbEnt, func(t core.Time, e core.Entity, w *core.World) {
-		for py := range 8 {
-			for px := range 14 {
-				fx := float64(px)
-				fy := float64(py)
-				v1 := math.Sin(fx*0.3 + t.Total*1.5)
-				v2 := math.Sin(fy*0.4 + t.Total*1.2)
-				v3 := math.Sin((fx+fy)*0.2 + t.Total*0.8)
-				v := (v1 + v2 + v3 + 3) / 6 // normalize to [0,1]
-				r := uint8(v * 255)
-				g := uint8((1 - v) * 180)
-				b := uint8(math.Abs(v-0.5) * 2 * 255)
-				fbBm.Set(px, py, core.Color{R: r, G: g, B: b}, 1.0)
-			}
-		}
-		v := fmath.Triangle(t.Total / 12.0)
-		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, float64(sw-16), v)
-	})
-
-	// Layer 10: BG-only color wash — transparent FG lets underlying content bleed through.
-	bgBm := bitmap.New(16, 10)
-	bgEnt := world.Spawn()
-	world.AddTransform(bgEnt, &core.Transform{
-		Position: fmath.Vec3{X: float64(sw/2 - 8), Y: float64(sh/2 - 5)},
-		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
-	})
-	world.AddDrawable(bgEnt, &bitmap.BGBlock{Bitmap: bgBm})
-	world.AddLayer(bgEnt, 10)
-	world.AddRoot(bgEnt)
-
-	world.AddBehavior(bgEnt, func(t core.Time, e core.Entity, w *core.World) {
-		for py := range 10 {
-			for px := range 16 {
-				fx := float64(px)
-				fy := float64(py)
-				// Slow rolling color bands.
-				r := uint8((math.Sin(fy*0.5+t.Total*0.6) + 1) / 2 * 200)
-				g := uint8((math.Sin(fx*0.4+t.Total*0.4) + 1) / 2 * 160)
-				b := uint8((math.Cos((fx+fy)*0.3+t.Total*0.5) + 1) / 2 * 220)
-				bgBm.Set(px, py, core.Color{R: r, G: g, B: b}, 0.6)
-			}
-		}
-		v := fmath.Triangle(t.Total / 11.0)
-		w.Transform(e).Position.Y = fmath.Remap(0, 1, 1, float64(sh-12), v)
-	})
-
-	// Layer 11-13: Text effects showcase using textfx package.
+	// Load font for text rendering.
 	textFont, fontErr := asset.LoadFont("Oxanium/static/Oxanium-Bold.ttf")
 	if fontErr != nil {
-		fmt.Fprintf(os.Stderr, "warning: %v (skipping text layer)\n", fontErr)
-	} else {
-		textSize := float64(sh) * 0.6
-		textOpts := asset.TextOptions{
-			Font:  textFont,
-			Size:  textSize,
-			Color: core.Color{R: 220, G: 240, B: 255},
-		}
-
-		// Effect 1: Typewriter reveal (top third).
-		typeLayout := asset.RasterizeText("FLICKER", textOpts)
-		if typeLayout != nil {
-			typeDraw := &bitmap.HalfBlock{Bitmap: typeLayout.Bitmap}
-			typeW, typeH := typeDraw.Bounds()
-			typeEnt := world.Spawn()
-			world.AddTransform(typeEnt, &core.Transform{
-				Position: fmath.Vec3{
-					X: float64(sw/2) - float64(typeW)/2,
-					Y: float64(sh)/6 - float64(typeH)/2,
-				},
-				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
-			})
-			world.AddDrawable(typeEnt, typeDraw)
-			world.AddLayer(typeEnt, 11)
-			world.AddRoot(typeEnt)
-
-			charsRevealed := 0.0
-			world.AddMaterial(
-				typeEnt,
-				textfx.TypewriterMaterial(typeLayout, textfx.HalfBlock, &charsRevealed),
-			)
-			world.AddBehavior(
-				typeEnt,
-				textfx.TypewriterBehavior(&charsRevealed, 3.0, len(typeLayout.Glyphs)),
-			)
-		}
-
-		// Effect 2: Per-character wave (middle).
-		waveLayout := asset.RasterizeText("FLICKER", textOpts)
-		if waveLayout != nil {
-			textfx.Wave(world, waveLayout, textfx.WaveOptions{
-				BasePosition: fmath.Vec3{
-					X: float64(sw/2) - float64(waveLayout.Bitmap.Width)/2,
-					Y: float64(sh) / 2,
-				},
-				Encoding:     textfx.HalfBlock,
-				Layer:        12,
-				Amplitude:    3.0,
-				Frequency:    1.0,
-				PhasePerChar: 0.5,
-			})
-		}
-
-		// Effect 3: Staggered fade-in (bottom third).
-		fadeLayout := asset.RasterizeText("FLICKER", textOpts)
-		if fadeLayout != nil {
-			fadeDraw := &bitmap.HalfBlock{Bitmap: fadeLayout.Bitmap}
-			fadeW, fadeH := fadeDraw.Bounds()
-			fadeEnt := world.Spawn()
-			world.AddTransform(fadeEnt, &core.Transform{
-				Position: fmath.Vec3{
-					X: float64(sw/2) - float64(fadeW)/2,
-					Y: float64(sh)*5/6 - float64(fadeH)/2,
-				},
-				Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
-			})
-			world.AddDrawable(fadeEnt, fadeDraw)
-			world.AddLayer(fadeEnt, 13)
-			world.AddRoot(fadeEnt)
-
-			world.AddMaterial(
-				fadeEnt,
-				textfx.StaggeredFadeMaterial(fadeLayout, textfx.HalfBlock, 0.15, 0.5),
-			)
-		}
+		fmt.Fprintf(os.Stderr, "error loading font: %v\n", fontErr)
+		os.Exit(1)
 	}
 
-	// Camera: gentle circular pan + zoom pulse.
+	textSize := float64(sh) * 0.7
+	textOpts := asset.TextOptions{
+		Font:  textFont,
+		Size:  textSize,
+		Color: core.Color{R: 255, G: 255, B: 255},
+	}
+
+	// Rasterize two text layouts: "GO" and "FLY"
+	layoutA := asset.RasterizeText("GO", textOpts)
+	layoutB := asset.RasterizeText("FLY", textOpts)
+
+	if layoutA == nil || layoutB == nil {
+		fmt.Fprintf(os.Stderr, "error: failed to rasterize text\n")
+		os.Exit(1)
+	}
+
+	// Convert bitmaps to point clouds.
+	cloudA := particle.BitmapToCloud(layoutA.Bitmap)
+	cloudB := particle.BitmapToCloud(layoutB.Bitmap)
+
+	if len(cloudA) == 0 || len(cloudB) == 0 {
+		fmt.Fprintf(os.Stderr, "error: empty point clouds\n")
+		os.Exit(1)
+	}
+
+	// Single pixel bitmap for particles.
+	pixel := bitmap.New(1, 1)
+	pixel.SetDot(0, 0, core.Color{R: 100, G: 200, B: 255})
+
+	// Calculate center offset to center the text.
+	offsetX := float64(sw/2) - float64(layoutA.Bitmap.Width)/2
+	offsetY := float64(sh/2) - float64(layoutA.Bitmap.Height)/2
+
+	// Spawn particles at cloud A positions.
+	particles := make([]core.Entity, len(cloudA))
+	for i, pos := range cloudA {
+		p := world.Spawn()
+		particles[i] = p
+		world.AddTransform(p, &core.Transform{
+			Position: fmath.Vec3{X: pos.X + offsetX, Y: pos.Y + offsetY},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		world.AddBody(p, &core.Body{})
+		world.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
+		world.AddRoot(p)
+	}
+
+	// After 2 seconds, distribute targets from cloud B.
+	targetDistributed := false
+	startTime := 0.0
+
+	// Add a behavior to the world to handle the morph trigger.
+	morphTrigger := world.Spawn()
+	world.AddBehavior(morphTrigger, func(t core.Time, e core.Entity, w *core.World) {
+		if startTime == 0 {
+			startTime = t.Total
+		}
+
+		// At 2 seconds, distribute targets.
+		if !targetDistributed && t.Total-startTime >= 2.0 {
+			targetDistributed = true
+			// Offset cloud B to center it as well.
+			offsetCloudB := make([]fmath.Vec2, len(cloudB))
+			for i, pos := range cloudB {
+				offsetCloudB[i] = fmath.Vec2{
+					X: pos.X + offsetX,
+					Y: pos.Y + offsetY,
+				}
+			}
+			particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
+		}
+	})
+
+	// Camera.
 	cam := world.Spawn()
 	world.AddTransform(cam, &core.Transform{
 		Position: fmath.Vec3{X: float64(sw) / 2.0, Y: float64(sh) / 2.0},
@@ -461,17 +115,6 @@ func main() {
 	world.AddCamera(cam, &core.Camera{Zoom: 1})
 	world.SetActiveCamera(cam)
 
-	// Camera rests at screen center so world (0,0) maps to screen (0,0).
-	cx, cy := float64(sw)/2.0, float64(sh)/2.0
-	world.AddBehavior(cam, func(t core.Time, e core.Entity, w *core.World) {
-		tr := w.Transform(e)
-		// Gentle circular pan: radius 3, period ~20s, centered on neutral position.
-		tr.Position.X = cx + 3*math.Cos(t.Total*0.3)
-		tr.Position.Y = cy + 3*math.Sin(t.Total*0.3)
-		// Zoom pulse: oscillates between 0.7 and 1.3 (~10s period).
-		w.Camera(e).Zoom = 1.0 + 0.3*math.Sin(t.Total*0.6)
-	})
-
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input.
 	events := make(chan tcell.Event, 1)
 	go func() {
@@ -479,12 +122,6 @@ func main() {
 			events <- screen.PollEvent()
 		}
 	}()
-
-	comp := core.NewCompositor(sw, sh)
-	comp.SetBlend(1, core.MultiplyColorBlend)
-	comp.SetBlend(2, core.ScreenColorBlend)
-	comp.SetBlend(3, core.OverlayColorBlend)
-	comp.SetBlend(4, core.DifferenceColorBlend)
 
 	const stepSize = 1.0 / 60.0
 
@@ -544,7 +181,7 @@ func main() {
 
 		canvas.Clear()
 		canvas.DrawBorder()
-		comp.Composite(world, canvas, t)
+		core.Render(world, canvas, t)
 		screen.Flush(canvas)
 	}
 }

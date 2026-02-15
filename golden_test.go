@@ -10,6 +10,7 @@ import (
 	"flicker/core"
 	"flicker/core/bitmap"
 	"flicker/fmath"
+	"flicker/physics"
 	"flicker/terminal"
 	"github.com/sebdah/goldie/v2"
 )
@@ -748,4 +749,80 @@ func TestOBJWireframe(t *testing.T) {
 
 	g := goldie.New(t)
 	g.Assert(t, "obj_wireframe", []byte(b.String()))
+}
+
+func TestParticleAttractor(t *testing.T) {
+	const (
+		w      = 40
+		h      = 20
+		frames = 10
+		dt     = 0.1
+	)
+
+	screen := terminal.NewSimScreen(w, h)
+	canvas := core.NewCanvas(w, h)
+
+	world := core.NewWorld()
+
+	// Import physics package for this test.
+	// (The import is at the top of the file, but we'll reference it here.)
+	// Create a circular attractor pattern: 5 particles in a circle around center,
+	// with an attractor force at center. They should converge over time.
+
+	center := fmath.Vec2{X: 20, Y: 10}
+	radius := 8.0
+	particleCount := 5
+
+	// Single pixel bitmap for particles.
+	pixel := bitmap.New(1, 1)
+	pixel.SetDot(0, 0, core.Color{R: 100, G: 200, B: 255})
+
+	for i := range particleCount {
+		angle := float64(i) * 2.0 * math.Pi / float64(particleCount)
+		x := center.X + radius*math.Cos(angle)
+		y := center.Y + radius*math.Sin(angle)
+
+		p := world.Spawn()
+		world.AddTransform(p, &core.Transform{
+			Position: fmath.Vec3{X: x, Y: y},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		world.AddBody(p, &core.Body{})
+		world.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
+		world.AddRoot(p)
+
+		// Add combined physics behavior: integration, attractor, and drag.
+		euler := physics.EulerIntegration()
+		attractor := physics.Attractor(center, 200.0)
+		drag := physics.Drag(0.5)
+
+		world.AddBehavior(p, func(t core.Time, e core.Entity, w *core.World) {
+			attractor(t, e, w)
+			drag(t, e, w)
+			euler(t, e, w)
+		})
+	}
+
+	for i := range frames {
+		ti := core.Time{
+			Total: float64(i+1) * dt,
+			Delta: dt,
+		}
+		core.UpdateBehaviors(world, ti)
+
+		canvas.Clear()
+		canvas.DrawBorder()
+		core.Render(world, canvas, ti)
+		screen.Flush(canvas)
+	}
+
+	var b strings.Builder
+	for i, frame := range screen.Frames() {
+		fmt.Fprintf(&b, "--- frame %d ---\n", i)
+		b.WriteString(frame)
+		b.WriteByte('\n')
+	}
+
+	g := goldie.New(t)
+	g.Assert(t, "particle_attractor", []byte(b.String()))
 }
