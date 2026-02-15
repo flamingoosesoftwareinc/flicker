@@ -25,7 +25,7 @@ func TypewriterMaterial(
 
 // TypewriterBehavior returns a behavior that animates charsRevealed at charsPerSec.
 func TypewriterBehavior(charsRevealed *float64, charsPerSec float64, maxChars int) core.Behavior {
-	return func(t core.Time, _ core.Entity, _ *core.World) {
+	return core.NewBehavior(func(t core.Time, _ core.Entity, _ *core.World) {
 		*charsRevealed = math.Min(float64(maxChars), t.Total*charsPerSec)
-	}
+	})
 }

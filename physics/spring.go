@@ -8,7 +8,7 @@ import (
 // Spring returns a behavior that applies spring force towards an anchor point.
 // F = -k*(pos - anchor) - damping*vel
 // Classic Hooke's law with damping. Works well with Verlet integration.
-func Spring(anchor fmath.Vec2, k, damping float64) core.Behavior {
+func Spring(anchor fmath.Vec2, k, damping float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		transform := w.Transform(e)

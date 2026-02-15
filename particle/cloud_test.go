@@ -81,8 +81,7 @@ func TestDistributeTargets(t *testing.T) {
 
 	// Verify all entities have behaviors.
 	for i, e := range result {
-		behavior := w.Behavior(e)
-		if behavior == nil {
+		if len(w.Behaviors(e)) == 0 {
 			t.Errorf("Entity %d should have behavior", i)
 		}
 	}
@@ -92,8 +91,8 @@ func TestDistributeTargets(t *testing.T) {
 	// Entity 3 should wrap to cloud[0], entity 4 to cloud[1], etc.
 	for i := 0; i < 10; i++ {
 		e := result[i]
-		behavior := w.Behavior(e)
-		behavior(core.Time{Delta: 1.0}, e, w)
+		behavior := w.Behaviors(e)[0]
+		behavior.Update(core.Time{Delta: 1.0}, e, w)
 
 		transform := w.Transform(e)
 
@@ -170,7 +169,7 @@ func TestDistributeTargetsSpawnsNewParticles(t *testing.T) {
 
 	// Verify all entities have behaviors and components.
 	for i, e := range result {
-		if w.Behavior(e) == nil {
+		if len(w.Behaviors(e)) == 0 {
 			t.Errorf("Entity %d should have behavior", i)
 		}
 		if w.Transform(e) == nil {

@@ -6,7 +6,7 @@ import "flicker/core"
 // spawnFunc defines what to spawn (particles, text, shapes, etc.).
 // Attached to an emitter entity (doesn't need physics itself).
 // Maintains accumulated time in closure.
-func Emit(rate float64, spawnFunc func(*core.World) core.Entity) core.Behavior {
+func Emit(rate float64, spawnFunc func(*core.World) core.Entity) core.BehaviorFunc {
 	accumulated := 0.0
 	interval := 1.0 / rate
 

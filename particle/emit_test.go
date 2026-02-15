@@ -17,11 +17,11 @@ func TestEmit(t *testing.T) {
 	}
 
 	rate := 10.0 // 10 entities per second
-	behavior := Emit(rate, spawnFunc)
+	behaviorFn := Emit(rate, spawnFunc)
 
 	// Run for 1 second with 10 steps of 0.1 seconds each.
 	for i := 0; i < 10; i++ {
-		behavior(core.Time{Delta: 0.1}, emitter, w)
+		behaviorFn(core.Time{Delta: 0.1}, emitter, w)
 	}
 
 	// Should spawn ~10 entities.
@@ -41,11 +41,11 @@ func TestEmitFractional(t *testing.T) {
 	}
 
 	rate := 5.0 // 5 entities per second
-	behavior := Emit(rate, spawnFunc)
+	behaviorFn := Emit(rate, spawnFunc)
 
 	// Run for 0.5 seconds with 5 steps of 0.1 seconds each.
 	for i := 0; i < 5; i++ {
-		behavior(core.Time{Delta: 0.1}, emitter, w)
+		behaviorFn(core.Time{Delta: 0.1}, emitter, w)
 	}
 
 	// interval = 1/5 = 0.2
@@ -66,10 +66,10 @@ func TestEmitBurst(t *testing.T) {
 	}
 
 	rate := 10.0 // 10 entities per second
-	behavior := Emit(rate, spawnFunc)
+	behaviorFn := Emit(rate, spawnFunc)
 
 	// Large time step (2 seconds) should spawn multiple entities in one frame.
-	behavior(core.Time{Delta: 2.0}, emitter, w)
+	behaviorFn(core.Time{Delta: 2.0}, emitter, w)
 
 	// Should spawn 20 entities (or 19 due to floating-point precision).
 	if spawnCount < 19 || spawnCount > 20 {

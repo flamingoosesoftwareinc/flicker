@@ -11,7 +11,7 @@ import (
 //	pos += vel * dt
 //	vel += acc * dt
 //	acc = 0  // reset for next frame
-func EulerIntegration() core.Behavior {
+func EulerIntegration() core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		transform := w.Transform(e)
@@ -43,7 +43,7 @@ func EulerIntegration() core.Behavior {
 //	pos = newPos
 //	vel = (pos - prevPos) / dt  // compute velocity for other behaviors
 //	acc = 0
-func VerletIntegration() core.Behavior {
+func VerletIntegration() core.BehaviorFunc {
 	prevPositions := make(map[core.Entity]fmath.Vec2)
 
 	return func(t core.Time, e core.Entity, w *core.World) {

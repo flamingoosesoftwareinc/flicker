@@ -78,11 +78,11 @@ func TestAnimatedBehavior(t *testing.T) {
 	world.AddRoot(box)
 
 	elapsed := 0.0
-	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(box, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		elapsed += t.Delta
 		v := fmath.Triangle(elapsed / 2.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 5, 50, v)
-	})
+	}))
 
 	for i := range frames {
 		t := core.Time{
@@ -136,11 +136,11 @@ func TestOverlappingObjects(t *testing.T) {
 	world.AddRoot(boxA)
 
 	elapsedA := 0.0
-	world.AddBehavior(boxA, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(boxA, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		elapsedA += t.Delta
 		v := fmath.Triangle(elapsedA / 2.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 2, 45, v)
-	})
+	}))
 
 	// Box B: blue-ish, renders on top (added second).
 	boxB := world.Spawn()
@@ -157,11 +157,11 @@ func TestOverlappingObjects(t *testing.T) {
 	world.AddRoot(boxB)
 
 	elapsedB := 0.0
-	world.AddBehavior(boxB, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(boxB, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		elapsedB += t.Delta
 		v := fmath.Triangle(elapsedB / 2.0)
 		w.Transform(e).Position.X = fmath.Remap(0, 1, 45, 2, v)
-	})
+	}))
 
 	for i := range frames {
 		t := core.Time{
@@ -277,7 +277,7 @@ func TestTween(t *testing.T) {
 	// Ping-pong tween: move X from 2 to 30, then back, using EaseInOutQuad.
 	forward := true
 	tw := &fmath.Tween{From: 2, To: 30, Duration: 2.0, Easing: fmath.EaseInOutQuad}
-	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(box, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		pos := tw.Update(t.Delta)
 		w.Transform(e).Position.X = pos
 		if tw.Done() {
@@ -289,7 +289,7 @@ func TestTween(t *testing.T) {
 			}
 			forward = !forward
 		}
-	})
+	}))
 
 	for i := range frames {
 		t := core.Time{
@@ -501,9 +501,9 @@ func TestTransformRotation(t *testing.T) {
 	})
 	world.Attach(child, box)
 
-	world.AddBehavior(box, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(box, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		w.Transform(e).Rotation = t.Total * fmath.DegToRad(90)
-	})
+	}))
 
 	for i := range frames {
 		ti := core.Time{
@@ -613,10 +613,10 @@ func TestCameraAnimatedZoom(t *testing.T) {
 	world.AddCamera(cam, camComp)
 	world.SetActiveCamera(cam)
 
-	world.AddBehavior(cam, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(cam, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		// Zoom: 1 → 2 → 3 over frames.
 		w.Camera(e).Zoom = t.Total + 1.0
-	})
+	}))
 
 	for i := range frames {
 		ti := core.Time{
@@ -721,12 +721,12 @@ func TestOBJWireframe(t *testing.T) {
 	proj := fmath.Mat4Perspective(math.Pi/3, 1.0, 0.1, 100)
 	view := fmath.Mat4Translate(0, 0, -3)
 
-	world.AddBehavior(objEnt, func(t core.Time, e core.Entity, w *core.World) {
+	world.AddBehavior(objEnt, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 		objBm.Clear()
 		model := fmath.Mat4RotateY(t.Total * 0.8).Multiply(fmath.Mat4RotateX(0.3))
 		mvp := proj.Multiply(view).Multiply(model)
 		asset.RasterizeWireframe(mesh, mvp, objBm, core.Color{R: 180, G: 255, B: 200})
-	})
+	}))
 
 	for i := range frames {
 		ti := core.Time{
@@ -797,11 +797,11 @@ func TestParticleAttractor(t *testing.T) {
 		attractor := physics.Attractor(center, 200.0)
 		drag := physics.Drag(0.5)
 
-		world.AddBehavior(p, func(t core.Time, e core.Entity, w *core.World) {
+		world.AddBehavior(p, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
 			attractor(t, e, w)
 			drag(t, e, w)
 			euler(t, e, w)
-		})
+		}))
 	}
 
 	for i := range frames {

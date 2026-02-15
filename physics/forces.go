@@ -7,7 +7,7 @@ import (
 
 // Attractor returns a behavior that applies a force towards a center point with inverse-square falloff.
 // F = strength / dist²
-func Attractor(center fmath.Vec2, strength float64) core.Behavior {
+func Attractor(center fmath.Vec2, strength float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		transform := w.Transform(e)
@@ -35,7 +35,7 @@ func Attractor(center fmath.Vec2, strength float64) core.Behavior {
 
 // Repulsor returns a behavior that applies a force away from a center point with inverse-square falloff.
 // F = -strength / dist²
-func Repulsor(center fmath.Vec2, strength float64) core.Behavior {
+func Repulsor(center fmath.Vec2, strength float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		transform := w.Transform(e)
@@ -63,7 +63,7 @@ func Repulsor(center fmath.Vec2, strength float64) core.Behavior {
 
 // Drag returns a behavior that applies a drag force opposing velocity.
 // vel *= (1 - coefficient * dt)
-func Drag(coefficient float64) core.Behavior {
+func Drag(coefficient float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		if body == nil {
@@ -83,7 +83,7 @@ func Drag(coefficient float64) core.Behavior {
 
 // Gravity returns a behavior that applies constant acceleration.
 // acc += force
-func Gravity(force fmath.Vec2) core.Behavior {
+func Gravity(force fmath.Vec2) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		if body == nil {
@@ -97,7 +97,7 @@ func Gravity(force fmath.Vec2) core.Behavior {
 
 // Turbulence returns a behavior that applies Perlin noise-based force at entity position.
 // scale controls noise frequency, strength controls force magnitude.
-func Turbulence(scale, strength float64) core.Behavior {
+func Turbulence(scale, strength float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		body := w.Body(e)
 		transform := w.Transform(e)

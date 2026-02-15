@@ -53,7 +53,7 @@ type World struct {
 	next         Entity
 	transforms   map[Entity]*Transform
 	drawables    map[Entity]Drawable
-	behaviors    map[Entity]Behavior
+	behaviors    map[Entity][]Behavior // Multiple behaviors per entity
 	materials    map[Entity]Material
 	layers       map[Entity]int
 	cameras      map[Entity]*Camera
@@ -68,7 +68,7 @@ func NewWorld() *World {
 	return &World{
 		transforms: make(map[Entity]*Transform),
 		drawables:  make(map[Entity]Drawable),
-		behaviors:  make(map[Entity]Behavior),
+		behaviors:  make(map[Entity][]Behavior),
 		materials:  make(map[Entity]Material),
 		layers:     make(map[Entity]int),
 		cameras:    make(map[Entity]*Camera),
@@ -115,11 +115,15 @@ func (w *World) Drawable(e Entity) Drawable {
 	return w.drawables[e]
 }
 
-func (w *World) AddBehavior(e Entity, b Behavior) {
-	w.behaviors[e] = b
+// AddBehavior adds a behavior to the entity and returns it for easy access.
+// Multiple behaviors can be added to the same entity.
+func (w *World) AddBehavior(e Entity, b Behavior) Behavior {
+	w.behaviors[e] = append(w.behaviors[e], b)
+	return b
 }
 
-func (w *World) Behavior(e Entity) Behavior {
+// Behaviors returns all behaviors for the entity.
+func (w *World) Behaviors(e Entity) []Behavior {
 	return w.behaviors[e]
 }
 

@@ -9,7 +9,7 @@ import (
 // Moves at speed units/second. Stops when within epsilon distance.
 // Updates Body.Velocity to reflect direction of motion (for directional materials).
 // No physics - directly modifies Transform.Position. Use for deterministic motion (point cloud morphing).
-func InterpolateToTarget(target fmath.Vec2, speed float64) core.Behavior {
+func InterpolateToTarget(target fmath.Vec2, speed float64) core.BehaviorFunc {
 	return func(t core.Time, e core.Entity, w *core.World) {
 		transform := w.Transform(e)
 		body := w.Body(e)

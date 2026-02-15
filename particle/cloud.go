@@ -40,10 +40,10 @@ func DistributeTargets(
 	// Assign targets to existing entities.
 	for i, e := range entities {
 		if i < len(cloud) {
-			world.AddBehavior(e, InterpolateToTarget(cloud[i], speed))
+			world.AddBehavior(e, core.NewBehavior(InterpolateToTarget(cloud[i], speed)))
 		} else {
 			// More entities than targets - round-robin wrap.
-			world.AddBehavior(e, InterpolateToTarget(cloud[i%len(cloud)], speed))
+			world.AddBehavior(e, core.NewBehavior(InterpolateToTarget(cloud[i%len(cloud)], speed)))
 		}
 	}
 
@@ -95,7 +95,7 @@ func DistributeTargets(
 			world.AddRoot(p)
 
 			// Assign target.
-			world.AddBehavior(p, InterpolateToTarget(cloud[i], speed))
+			world.AddBehavior(p, core.NewBehavior(InterpolateToTarget(cloud[i], speed)))
 
 			// Add to entities list.
 			entities = append(entities, p)

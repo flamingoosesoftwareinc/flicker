@@ -19,9 +19,9 @@ func TestSpring(t *testing.T) {
 	anchor := fmath.Vec2{X: 0, Y: 0}
 	k := 1.0
 	damping := 0.0
-	behavior := Spring(anchor, k, damping)
+	behaviorFn := Spring(anchor, k, damping)
 
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behaviorFn(core.Time{Delta: 0.1}, e, w)
 
 	body := w.Body(e)
 
@@ -46,9 +46,9 @@ func TestSpringDamping(t *testing.T) {
 	anchor := fmath.Vec2{X: 0, Y: 0}
 	k := 1.0
 	damping := 0.5
-	behavior := Spring(anchor, k, damping)
+	behaviorFn := Spring(anchor, k, damping)
 
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behaviorFn(core.Time{Delta: 0.1}, e, w)
 
 	body := w.Body(e)
 
@@ -65,8 +65,8 @@ func TestSpringWithoutComponents(t *testing.T) {
 	e := w.Spawn()
 
 	// Entity without Body or Transform should not crash.
-	behavior := Spring(fmath.Vec2{X: 0, Y: 0}, 1.0, 0.5)
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behaviorFn := Spring(fmath.Vec2{X: 0, Y: 0}, 1.0, 0.5)
+	behaviorFn(core.Time{Delta: 0.1}, e, w)
 
 	// No panic = success.
 }

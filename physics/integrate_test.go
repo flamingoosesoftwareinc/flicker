@@ -18,13 +18,13 @@ func TestEulerIntegration(t *testing.T) {
 		Velocity:     fmath.Vec2{X: 0, Y: 0},
 		Acceleration: fmath.Vec2{X: 10, Y: 0}, // constant acceleration
 	})
-	w.AddBehavior(e, EulerIntegration())
+	w.AddBehavior(e, core.NewBehavior(EulerIntegration()))
 
 	// Step 1: dt=0.1
 	// vel = 0 + 10*0.1 = 1
 	// pos = 0 + 0*0.1 = 0
-	behavior := w.Behavior(e)
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behavior := w.Behaviors(e)[0]
+	behavior.Update(core.Time{Delta: 0.1}, e, w)
 
 	body := w.Body(e)
 	transform := w.Transform(e)
@@ -41,7 +41,7 @@ func TestEulerIntegration(t *testing.T) {
 
 	// Step 2: Apply acceleration again and step.
 	body.Acceleration = fmath.Vec2{X: 10, Y: 0}
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behavior.Update(core.Time{Delta: 0.1}, e, w)
 
 	// vel = 1 + 10*0.1 = 2
 	// pos = 0 + 1*0.1 = 0.1
@@ -63,12 +63,12 @@ func TestVerletIntegration(t *testing.T) {
 		Velocity:     fmath.Vec2{X: 0, Y: 0},
 		Acceleration: fmath.Vec2{X: 10, Y: 0}, // constant acceleration
 	})
-	w.AddBehavior(e, VerletIntegration())
+	w.AddBehavior(e, core.NewBehavior(VerletIntegration()))
 
-	behavior := w.Behavior(e)
+	behavior := w.Behaviors(e)[0]
 
 	// Step 1: dt=0.1
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behavior.Update(core.Time{Delta: 0.1}, e, w)
 
 	transform := w.Transform(e)
 	body := w.Body(e)
@@ -81,7 +81,7 @@ func TestVerletIntegration(t *testing.T) {
 
 	// Step 2: Apply acceleration again and step.
 	body.Acceleration = fmath.Vec2{X: 10, Y: 0}
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behavior.Update(core.Time{Delta: 0.1}, e, w)
 
 	// prevPos = 0, pos = 0.1
 	// newPos = 2*0.1 - 0 + 10*0.1² = 0.2 + 0.1 = 0.3
@@ -93,8 +93,8 @@ func TestVerletIntegration(t *testing.T) {
 func TestVerletStateSeparation(t *testing.T) {
 	w := core.NewWorld()
 
-	// Create two entities with the same Verlet behavior.
-	behavior := VerletIntegration()
+	// Create two entities with the same Verlet behavior function.
+	behaviorFn := VerletIntegration()
 
 	e1 := w.Spawn()
 	w.AddTransform(e1, &core.Transform{Position: fmath.Vec3{X: 0, Y: 0}})
@@ -104,9 +104,9 @@ func TestVerletStateSeparation(t *testing.T) {
 	w.AddTransform(e2, &core.Transform{Position: fmath.Vec3{X: 100, Y: 0}})
 	w.AddBody(e2, &core.Body{Acceleration: fmath.Vec2{X: 20, Y: 0}})
 
-	// Step both entities.
-	behavior(core.Time{Delta: 0.1}, e1, w)
-	behavior(core.Time{Delta: 0.1}, e2, w)
+	// Step both entities using the raw function (testing closure state separation).
+	behaviorFn(core.Time{Delta: 0.1}, e1, w)
+	behaviorFn(core.Time{Delta: 0.1}, e2, w)
 
 	// Each entity should maintain separate state.
 	t1 := w.Transform(e1)
@@ -125,8 +125,8 @@ func TestIntegrationWithoutComponents(t *testing.T) {
 	e := w.Spawn()
 
 	// Entity without Body or Transform should not crash.
-	behavior := EulerIntegration()
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behavior := core.NewBehavior(EulerIntegration())
+	behavior.Update(core.Time{Delta: 0.1}, e, w)
 
 	// No panic = success.
 }

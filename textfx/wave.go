@@ -52,10 +52,13 @@ func Wave(world *core.World, layout *asset.TextLayout, opts WaveOptions) []core.
 
 		// Wave behavior with phase offset.
 		phase := float64(i) * opts.PhasePerChar
-		world.AddBehavior(charEnt, func(t core.Time, e core.Entity, w *core.World) {
-			offset := opts.Amplitude * math.Sin(t.Total*opts.Frequency*2*math.Pi+phase)
-			w.Transform(e).Position.Y = baseY + offset
-		})
+		world.AddBehavior(
+			charEnt,
+			core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
+				offset := opts.Amplitude * math.Sin(t.Total*opts.Frequency*2*math.Pi+phase)
+				w.Transform(e).Position.Y = baseY + offset
+			}),
+		)
 
 		entities[i] = charEnt
 	}

@@ -99,26 +99,30 @@ func main() {
 
 	// Add a behavior to the world to handle the morph trigger.
 	morphTrigger := world.Spawn()
-	world.AddBehavior(morphTrigger, func(t core.Time, e core.Entity, w *core.World) {
-		if startTime == 0 {
-			startTime = t.Total
-		}
-
-		// At 2 seconds, distribute targets (may spawn additional particles).
-		if !targetDistributed && t.Total-startTime >= 2.0 {
-			targetDistributed = true
-			// Offset cloud B to center it as well.
-			offsetCloudB := make([]fmath.Vec2, len(cloudB))
-			for i, pos := range cloudB {
-				offsetCloudB[i] = fmath.Vec2{
-					X: pos.X + offsetX,
-					Y: pos.Y + offsetY,
-				}
+	world.AddBehavior(
+		morphTrigger,
+		core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
+			if startTime == 0 {
+				startTime = t.Total
 			}
-			// DistributeTargets returns all entities (including newly spawned ones).
-			particles = particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
-		}
-	})
+
+			// At 2 seconds, distribute targets (may spawn additional particles).
+			if !targetDistributed && t.Total-startTime >= 2.0 {
+				targetDistributed = true
+				// Position FLYING more to the left of the screen.
+				offsetXFly := float64(sw/4) - float64(layoutB.Bitmap.Width)/2
+				offsetCloudB := make([]fmath.Vec2, len(cloudB))
+				for i, pos := range cloudB {
+					offsetCloudB[i] = fmath.Vec2{
+						X: pos.X + offsetXFly,
+						Y: pos.Y + offsetY,
+					}
+				}
+				// DistributeTargets returns all entities (including newly spawned ones).
+				particles = particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
+			}
+		}),
+	)
 
 	// Camera.
 	cam := world.Spawn()

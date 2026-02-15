@@ -157,15 +157,15 @@ func TestForcesWithoutComponents(t *testing.T) {
 
 	// Entity without Body or Transform should not crash.
 	behaviors := []core.Behavior{
-		Attractor(fmath.Vec2{X: 10, Y: 10}, 100),
-		Repulsor(fmath.Vec2{X: 10, Y: 10}, 100),
-		Drag(0.5),
-		Gravity(fmath.Vec2{X: 0, Y: 9.8}),
-		Turbulence(0.1, 10),
+		core.NewBehavior(Attractor(fmath.Vec2{X: 10, Y: 10}, 100)),
+		core.NewBehavior(Repulsor(fmath.Vec2{X: 10, Y: 10}, 100)),
+		core.NewBehavior(Drag(0.5)),
+		core.NewBehavior(Gravity(fmath.Vec2{X: 0, Y: 9.8})),
+		core.NewBehavior(Turbulence(0.1, 10)),
 	}
 
 	for _, b := range behaviors {
-		b(core.Time{Delta: 0.1}, e, w)
+		b.Update(core.Time{Delta: 0.1}, e, w)
 	}
 
 	// No panic = success.

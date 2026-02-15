@@ -13,10 +13,10 @@ func TestAgeAndDespawnIncrementsAge(t *testing.T) {
 
 	w.AddAge(e, &core.Age{Age: 0.0, Lifetime: 0.0}) // Lifetime=0 means infinite.
 
-	behavior := AgeAndDespawn()
+	behaviorFn := AgeAndDespawn()
 
 	// Step 1: dt=0.1
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behaviorFn(core.Time{Delta: 0.1}, e, w)
 
 	age := w.Age(e)
 	if age == nil {
@@ -27,7 +27,7 @@ func TestAgeAndDespawnIncrementsAge(t *testing.T) {
 	}
 
 	// Step 2: dt=0.2
-	behavior(core.Time{Delta: 0.2}, e, w)
+	behaviorFn(core.Time{Delta: 0.2}, e, w)
 
 	age = w.Age(e)
 	if age == nil {
@@ -44,10 +44,10 @@ func TestAgeAndDespawnLifetime(t *testing.T) {
 
 	w.AddAge(e, &core.Age{Age: 0.0, Lifetime: 1.0})
 
-	behavior := AgeAndDespawn()
+	behaviorFn := AgeAndDespawn()
 
 	// Step 1: age to 0.5 (below lifetime).
-	behavior(core.Time{Delta: 0.5}, e, w)
+	behaviorFn(core.Time{Delta: 0.5}, e, w)
 
 	age := w.Age(e)
 	if age == nil {
@@ -55,7 +55,7 @@ func TestAgeAndDespawnLifetime(t *testing.T) {
 	}
 
 	// Step 2: age to 1.5 (exceeds lifetime).
-	behavior(core.Time{Delta: 1.0}, e, w)
+	behaviorFn(core.Time{Delta: 1.0}, e, w)
 
 	age = w.Age(e)
 	if age != nil {
@@ -68,8 +68,8 @@ func TestAgeAndDespawnWithoutAge(t *testing.T) {
 	e := w.Spawn()
 
 	// Entity without Age component should not crash.
-	behavior := AgeAndDespawn()
-	behavior(core.Time{Delta: 0.1}, e, w)
+	behaviorFn := AgeAndDespawn()
+	behaviorFn(core.Time{Delta: 0.1}, e, w)
 
 	// No panic = success.
 }
