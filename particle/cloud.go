@@ -1,6 +1,8 @@
 package particle
 
 import (
+	"math/rand"
+
 	"flicker/core"
 	"flicker/core/bitmap"
 	"flicker/fmath"
@@ -50,8 +52,10 @@ func DistributeTargets(
 	// If cloud has more points than entities, spawn new particles for the extra points.
 	if len(cloud) > len(entities) {
 		for i := len(entities); i < len(cloud); i++ {
-			// Get template from first entity (copy components).
-			template := entities[0]
+			// Get template from a random existing entity to distribute spawn positions
+			// across the source cloud instead of all spawning from the same position.
+			randomIdx := rand.Intn(len(entities))
+			template := entities[randomIdx]
 			templateTransform := world.Transform(template)
 			templateDrawable := world.Drawable(template)
 			templateMaterial := world.Material(template)

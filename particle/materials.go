@@ -133,12 +133,89 @@ func AgeBasedSize(ageThresholds []float64, runes []rune) core.Material {
 	}
 }
 
+// RainbowVelocity changes color through HSV spectrum based on speed.
+// Cycles hue from red → orange → yellow → green → cyan → blue → magenta → red
+// as speed increases from minSpeed to maxSpeed.
+func RainbowVelocity(minSpeed, maxSpeed float64) core.Material {
+	return func(f core.Fragment) core.Cell {
+		body := f.World.Body(f.Entity)
+		if body == nil {
+			return f.Cell
+		}
+
+		speed := math.Sqrt(body.Velocity.X*body.Velocity.X + body.Velocity.Y*body.Velocity.Y)
+		t := fmath.Clamp((speed-minSpeed)/(maxSpeed-minSpeed), 0, 1)
+
+		// Map t to hue: 0 = red, 1 = red (full spectrum)
+		hue := t * 360.0
+
+		cell := f.Cell
+		cell.FG = hsvToRGB(hue, 1.0, 1.0)
+		return cell
+	}
+}
+
+// RainbowTime cycles color through HSV spectrum based on time.
+// Each entity gets a different phase offset based on its ID for color variety.
+// frequency controls how fast colors cycle (in Hz).
+func RainbowTime(frequency float64) core.Material {
+	return func(f core.Fragment) core.Cell {
+		// Use entity ID as phase offset so each particle has different color
+		phase := float64(f.Entity) * 0.1
+
+		// Cycle hue based on time + phase
+		hue := math.Mod((f.Time.Total*frequency*360.0)+phase*360.0, 360.0)
+
+		cell := f.Cell
+		cell.FG = hsvToRGB(hue, 1.0, 1.0)
+		return cell
+	}
+}
+
 // lerpColor linearly interpolates between two colors.
 func lerpColor(a, b core.Color, t float64) core.Color {
 	return core.Color{
 		R: uint8(fmath.Lerp(float64(a.R), float64(b.R), t)),
 		G: uint8(fmath.Lerp(float64(a.G), float64(b.G), t)),
 		B: uint8(fmath.Lerp(float64(a.B), float64(b.B), t)),
+	}
+}
+
+// hsvToRGB converts HSV color space to RGB.
+// h: hue in degrees [0, 360], s: saturation [0, 1], v: value/brightness [0, 1]
+func hsvToRGB(h, s, v float64) core.Color {
+	// Normalize hue to [0, 360)
+	for h < 0 {
+		h += 360
+	}
+	for h >= 360 {
+		h -= 360
+	}
+
+	c := v * s
+	x := c * (1 - math.Abs(math.Mod(h/60.0, 2)-1))
+	m := v - c
+
+	var r, g, b float64
+	switch {
+	case h < 60:
+		r, g, b = c, x, 0
+	case h < 120:
+		r, g, b = x, c, 0
+	case h < 180:
+		r, g, b = 0, c, x
+	case h < 240:
+		r, g, b = 0, x, c
+	case h < 300:
+		r, g, b = x, 0, c
+	default:
+		r, g, b = c, 0, x
+	}
+
+	return core.Color{
+		R: uint8((r + m) * 255),
+		G: uint8((g + m) * 255),
+		B: uint8((b + m) * 255),
 	}
 }
 

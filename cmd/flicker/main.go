@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"flicker/core/bitmap"
 	"flicker/fmath"
 	"flicker/particle"
+	"flicker/physics"
 	"flicker/terminal"
 	"github.com/gdamore/tcell/v2"
 )
@@ -69,6 +71,7 @@ func main() {
 
 	// Spawn particles at cloud A positions.
 	particles := make([]core.Entity, len(cloudA))
+	turbulenceBehaviors := make([]*core.FuncBehavior, len(cloudA))
 	for i, pos := range cloudA {
 		p := world.Spawn()
 		particles[i] = p
@@ -79,16 +82,15 @@ func main() {
 		world.AddBody(p, &core.Body{})
 		world.AddDrawable(p, &bitmap.Braille{Bitmap: pixel})
 
-		// Add dynamic particle materials: directional appearance + velocity-based color
+		// Add dynamic particle materials: directional appearance + time-based rainbow
 		world.AddMaterial(p, core.ComposeMaterials(
 			particle.BrailleDirectional(),
-			particle.VelocityColor(particle.ColorGradient{
-				MinSpeed: 0.0,
-				MaxSpeed: 20.0,
-				MinColor: core.Color{R: 100, G: 150, B: 255}, // blue = slow
-				MaxColor: core.Color{R: 255, G: 100, B: 100}, // red = fast
-			}),
+			particle.RainbowTime(2.0), // cycle through rainbow 2x per second
 		))
+
+		// Add turbulence behavior for wild motion (will be disabled after transition)
+		turbulence := world.AddBehavior(p, core.NewBehavior(physics.Turbulence(0.05, 30.0))).(*core.FuncBehavior)
+		turbulenceBehaviors[i] = turbulence
 
 		world.AddRoot(p)
 	}
@@ -109,8 +111,14 @@ func main() {
 			// At 2 seconds, distribute targets (may spawn additional particles).
 			if !targetDistributed && t.Total-startTime >= 2.0 {
 				targetDistributed = true
-				// Position FLYING more to the left of the screen.
-				offsetXFly := float64(sw/4) - float64(layoutB.Bitmap.Width)/2
+
+				// Disable turbulence on all particles so they converge smoothly
+				for _, turbulence := range turbulenceBehaviors {
+					turbulence.SetEnabled(false)
+				}
+
+				// Position FLYING centered on screen.
+				offsetXFly := float64(sw/2) - float64(layoutB.Bitmap.Width)/2
 				offsetCloudB := make([]fmath.Vec2, len(cloudB))
 				for i, pos := range cloudB {
 					offsetCloudB[i] = fmath.Vec2{
@@ -118,8 +126,69 @@ func main() {
 						Y: pos.Y + offsetY,
 					}
 				}
-				// DistributeTargets returns all entities (including newly spawned ones).
-				particles = particle.DistributeTargets(particles, offsetCloudB, 10.0, w)
+
+				// Distribute targets with varied speeds (30-50) for more organic motion.
+				// We'll manually assign InterpolateToTarget with random speeds instead of
+				// using DistributeTargets which uses a fixed speed.
+				for i, p := range particles {
+					targetIdx := i % len(offsetCloudB)
+					randomSpeed := 30.0 + rand.Float64()*20.0 // random speed between 30-50
+					w.AddBehavior(
+						p,
+						core.NewBehavior(
+							particle.InterpolateToTarget(offsetCloudB[targetIdx], randomSpeed),
+						),
+					)
+				}
+
+				// Handle extra targets if cloud B has more points than particles
+				if len(offsetCloudB) > len(particles) {
+					for i := len(particles); i < len(offsetCloudB); i++ {
+						// Spawn new particle
+						p := w.Spawn()
+
+						// Pick a random existing particle as template to distribute spawns
+						// across the "GO" cloud instead of all spawning from the same position.
+						randomIdx := rand.Intn(len(particles))
+						template := particles[randomIdx]
+
+						if tr := w.Transform(template); tr != nil {
+							w.AddTransform(p, &core.Transform{
+								Position: tr.Position, // Start at a random cloud A position
+								Rotation: tr.Rotation,
+								Scale:    tr.Scale,
+							})
+						}
+						if body := w.Body(template); body != nil {
+							w.AddBody(p, &core.Body{
+								Velocity:     body.Velocity,
+								Acceleration: body.Acceleration,
+							})
+						}
+						if drawable := w.Drawable(template); drawable != nil {
+							w.AddDrawable(p, drawable)
+						}
+						if material := w.Material(template); material != nil {
+							w.AddMaterial(p, material)
+						}
+						w.AddLayer(p, w.Layer(template))
+
+						// Also add turbulence to newly spawned particles
+						turbulence := w.AddBehavior(p, core.NewBehavior(physics.Turbulence(0.05, 30.0))).(*core.FuncBehavior)
+						turbulence.SetEnabled(false) // Disabled since we're past transition time
+
+						randomSpeed := 30.0 + rand.Float64()*20.0
+						w.AddBehavior(
+							p,
+							core.NewBehavior(
+								particle.InterpolateToTarget(offsetCloudB[i], randomSpeed),
+							),
+						)
+						w.AddRoot(p)
+
+						particles = append(particles, p)
+					}
+				}
 			}
 		}),
 	)
