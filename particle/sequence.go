@@ -13,12 +13,23 @@ type TurbulenceConfig struct {
 	Strength float64 // Force magnitude
 }
 
+// TransitionType defines how particles move to their targets.
+type TransitionType int
+
+const (
+	TransitionDirect TransitionType = iota // Go straight to target
+	TransitionBurst                        // Burst outward from center, then to target
+)
+
 // MorphTarget defines a single morph destination with timing and behavior settings.
 type MorphTarget struct {
-	Cloud      []fmath.Vec2         // Target positions
-	Duration   float64              // Time to complete this morph (seconds)
-	Strategy   DistributionStrategy // How to assign particles to targets
-	Turbulence *TurbulenceConfig    // nil = no turbulence for this morph
+	Cloud          []fmath.Vec2         // Target positions
+	Duration       float64              // Time to complete this morph (seconds)
+	Strategy       DistributionStrategy // How to assign particles to targets
+	Turbulence     *TurbulenceConfig    // nil = no turbulence for this morph
+	TransitionType TransitionType       // How particles transition to targets
+	BurstDistance  float64              // How far to burst outward (for TransitionBurst)
+	BurstDuration  float64              // What fraction of duration to burst (0.0-1.0, default 0.3)
 }
 
 // PointCloudSequence manages a particle system that morphs through multiple targets.
@@ -31,6 +42,7 @@ type PointCloudSequence struct {
 	particles           []core.Entity
 	movementBehaviors   []core.Behavior      // Track movement behaviors to disable on morph
 	turbulenceBehaviors []*core.FuncBehavior // Track turbulence behaviors
+	burstBehaviors      []*core.FuncBehavior // Track burst behaviors (for TransitionBurst)
 
 	// Morph sequence
 	targets            []MorphTarget
@@ -39,7 +51,9 @@ type PointCloudSequence struct {
 
 	// Timing
 	transitionStartTime float64
+	burstEndTime        float64 // When burst phase ends (for TransitionBurst)
 	isTransitioning     bool
+	isBursting          bool // Whether currently in burst phase
 
 	// Template for spawning new particles
 	templateDrawable core.Drawable
@@ -61,6 +75,7 @@ func NewPointCloudSequence(
 		particles:           make([]core.Entity, len(initialCloud)),
 		movementBehaviors:   make([]core.Behavior, 0),
 		turbulenceBehaviors: make([]*core.FuncBehavior, 0),
+		burstBehaviors:      make([]*core.FuncBehavior, 0),
 		targets:             make([]MorphTarget, 0),
 		currentTargetIndex:  -1,
 		loop:                true,
@@ -92,6 +107,37 @@ func NewPointCloudSequence(
 	return seq
 }
 
+// burstOutward creates a behavior that moves particles radially outward from a center point.
+func burstOutward(center fmath.Vec2, speed float64) core.BehaviorFunc {
+	return func(t core.Time, e core.Entity, w *core.World) {
+		transform := w.Transform(e)
+		body := w.Body(e)
+		if transform == nil {
+			return
+		}
+
+		pos := fmath.Vec2{X: transform.Position.X, Y: transform.Position.Y}
+		delta := pos.Sub(center) // Direction away from center
+
+		// Handle particles at exact center
+		if delta.X == 0 && delta.Y == 0 {
+			delta = fmath.Vec2{X: 1, Y: 0} // Default direction
+		}
+
+		dir := delta.Normalize()
+		dt := t.Delta
+
+		// Move outward
+		transform.Position.X += dir.X * speed * dt
+		transform.Position.Y += dir.Y * speed * dt
+
+		// Update velocity for directional materials
+		if body != nil {
+			body.Velocity = fmath.Vec2{X: dir.X * speed, Y: dir.Y * speed}
+		}
+	}
+}
+
 // AddTarget adds a morph target to the sequence.
 func (s *PointCloudSequence) AddTarget(target MorphTarget) {
 	s.targets = append(s.targets, target)
@@ -119,8 +165,30 @@ func (s *PointCloudSequence) update(t core.Time, e core.Entity, w *core.World) {
 		s.startNextTransition(t.Total)
 	}
 
-	// Check if current transition is complete
 	currentTarget := s.targets[s.currentTargetIndex]
+
+	// Check if we're in burst phase and it's time to transition to seek phase
+	if s.isBursting && t.Total >= s.burstEndTime {
+		s.isBursting = false
+
+		// Disable burst behaviors
+		for _, bb := range s.burstBehaviors {
+			if bb != nil {
+				bb.SetEnabled(false)
+			}
+		}
+
+		// Enable movement behaviors to start seeking targets
+		for _, mb := range s.movementBehaviors {
+			if mb != nil {
+				if fb, ok := mb.(*core.FuncBehavior); ok {
+					fb.SetEnabled(true)
+				}
+			}
+		}
+	}
+
+	// Check if current transition is complete
 	elapsed := t.Total - s.transitionStartTime
 
 	if elapsed >= currentTarget.Duration {
@@ -227,6 +295,74 @@ func (s *PointCloudSequence) startNextTransition(currentTime float64) {
 					}
 					s.movementBehaviors = append(s.movementBehaviors, b)
 					break
+				}
+			}
+		}
+	}
+
+	// Handle burst transition
+	if target.TransitionType == TransitionBurst {
+		s.isBursting = true
+
+		// Calculate burst parameters
+		burstFraction := target.BurstDuration
+		if burstFraction <= 0 {
+			burstFraction = 0.3 // Default: 30% of duration for burst
+		}
+		burstTime := target.Duration * burstFraction
+		s.burstEndTime = currentTime + burstTime
+
+		// Calculate center point (centroid of current particle positions)
+		center := fmath.Vec2{X: 0, Y: 0}
+		for _, p := range s.particles {
+			if tr := s.world.Transform(p); tr != nil {
+				center.X += tr.Position.X
+				center.Y += tr.Position.Y
+			}
+		}
+		if len(s.particles) > 0 {
+			center.X /= float64(len(s.particles))
+			center.Y /= float64(len(s.particles))
+		}
+
+		// Determine burst speed
+		burstSpeed := target.BurstDistance / burstTime
+		if burstSpeed < 10 {
+			burstSpeed = 50.0 // Default burst speed
+		}
+
+		// Disable movement behaviors initially (will be enabled after burst)
+		for _, mb := range s.movementBehaviors {
+			if mb != nil {
+				if fb, ok := mb.(*core.FuncBehavior); ok {
+					fb.SetEnabled(false)
+				}
+			}
+		}
+
+		// Clear old burst behaviors
+		for _, bb := range s.burstBehaviors {
+			if bb != nil {
+				bb.SetEnabled(false)
+			}
+		}
+		s.burstBehaviors = s.burstBehaviors[:0]
+
+		// Add burst behaviors to all particles
+		for _, p := range s.particles {
+			bb := s.world.AddBehavior(
+				p,
+				core.NewBehavior(burstOutward(center, burstSpeed)),
+			).(*core.FuncBehavior)
+			s.burstBehaviors = append(s.burstBehaviors, bb)
+		}
+	} else {
+		// Direct transition - ensure movement behaviors are enabled
+		s.isBursting = false
+		for _, mb := range s.movementBehaviors {
+			if mb != nil {
+				if fb, ok := mb.(*core.FuncBehavior); ok {
+					fb.SetEnabled(true)
 				}
 			}
 		}

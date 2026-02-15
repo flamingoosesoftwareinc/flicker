@@ -148,11 +148,23 @@ func main() {
 			turb = turbConfig
 		}
 
+		// Use burst transition for every third morph
+		transitionType := particle.TransitionDirect
+		var burstDist, burstDur float64
+		if i%3 == 0 {
+			transitionType = particle.TransitionBurst
+			burstDist = float64(sh) * 0.3 // Burst 30% of screen height
+			burstDur = 0.4                // 40% of duration for burst phase
+		}
+
 		seq.AddTarget(particle.MorphTarget{
-			Cloud:      offsetTargetCloud,
-			Duration:   6.0,
-			Strategy:   strategy,
-			Turbulence: turb,
+			Cloud:          offsetTargetCloud,
+			Duration:       6.0,
+			Strategy:       strategy,
+			Turbulence:     turb,
+			TransitionType: transitionType,
+			BurstDistance:  burstDist,
+			BurstDuration:  burstDur,
 		})
 	}
 
