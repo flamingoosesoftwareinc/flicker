@@ -93,13 +93,28 @@ func CrossFade(f TransitionFragment) Cell {
 	fromCell := f.FromCanvas.Get(f.X, f.Y)
 	toCell := f.ToCanvas.Get(f.X, f.Y)
 
-	// Fade from's alpha down, to's alpha up
+	// Determine which cell to use based on their original alphas
+	fromHasContent := fromCell.FGAlpha > 0 || fromCell.BGAlpha > 0
+	toHasContent := toCell.FGAlpha > 0 || toCell.BGAlpha > 0
+
+	// If only one has content, fade it in/out
+	if !toHasContent {
+		fromCell.FGAlpha *= (1.0 - f.Progress)
+		fromCell.BGAlpha *= (1.0 - f.Progress)
+		return fromCell
+	}
+	if !fromHasContent {
+		toCell.FGAlpha *= f.Progress
+		toCell.BGAlpha *= f.Progress
+		return toCell
+	}
+
+	// Both have content - blend them
 	fromCell.FGAlpha *= (1.0 - f.Progress)
 	fromCell.BGAlpha *= (1.0 - f.Progress)
 	toCell.FGAlpha *= f.Progress
 	toCell.BGAlpha *= f.Progress
 
-	// Composite to over from with normal blending
 	return BlendCell(fromCell, toCell, NormalColorBlend)
 }
 

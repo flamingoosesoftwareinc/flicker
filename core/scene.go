@@ -83,6 +83,13 @@ func (s *BasicScene) OnExit() {
 	if s.exitFn != nil {
 		s.exitFn(s.world)
 	}
+
+	// Clean up all entities when exiting scene
+	// This ensures the scene starts fresh when re-entered
+	roots := s.world.Roots()
+	for _, root := range roots {
+		s.world.Despawn(root)
+	}
 }
 
 // Render implements Scene.

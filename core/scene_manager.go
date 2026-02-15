@@ -49,11 +49,13 @@ func (sm *SceneManager) Start() {
 	sm.GoTo(0)
 }
 
-// Next transitions to the next scene. Does nothing if already at last scene.
+// Next transitions to the next scene. Wraps to first scene after last.
 func (sm *SceneManager) Next(shader TransitionShader, duration float64) {
-	if sm.current+1 < len(sm.scenes) {
-		sm.transitionTo(sm.current+1, shader, duration)
+	if len(sm.scenes) == 0 {
+		return
 	}
+	nextIndex := (sm.current + 1) % len(sm.scenes)
+	sm.transitionTo(nextIndex, shader, duration)
 }
 
 // Previous transitions to the previous scene. Does nothing if already at first scene.
