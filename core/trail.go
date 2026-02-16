@@ -108,9 +108,9 @@ func GravityTrail(decay, fallSpeed float64) func(Fragment) Cell {
 	}
 }
 
-// DustTrail creates a sparse dust particle effect where only occasional cells
-// become faint dust particles with subtle drift. Most of the trail disappears quickly.
-func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cell {
+// DissolveTrail creates a dissolving trail effect where cells randomly break into
+// sparse dust particles with subtle drift. Creates an organic dissolve appearance.
+func DissolveTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cell {
 	return func(f Fragment) Cell {
 		c := f.Cell
 
@@ -155,13 +155,13 @@ func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cel
 				return Cell{}
 			}
 		} else {
-			// Not dust - fade quickly and disappear
-			c.FGAlpha *= 0.5 // Very fast fade for non-dust
-			c.BGAlpha *= 0.5
+			// Not dust - apply normal decay (slower so trail is visible)
+			c.FGAlpha *= decay
+			c.BGAlpha *= decay
 		}
 
 		// Clear faint cells
-		if c.FGAlpha < 0.08 {
+		if c.FGAlpha < 0.05 {
 			return Cell{}
 		}
 

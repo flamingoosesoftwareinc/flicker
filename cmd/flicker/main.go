@@ -42,7 +42,7 @@ func main() {
 	sm.Add(createBlurTrailScene(sw, sh, textFont))
 	sm.Add(createFloatyTrailScene(sw, sh, textFont))
 	sm.Add(createGravityTrailScene(sw, sh, textFont))
-	sm.Add(createDustTrailScene(sw, sh, textFont))
+	sm.Add(createDissolveTrailScene(sw, sh, textFont))
 	sm.Add(createFireTrailScene(sw, sh, textFont))
 
 	// Original Timeline/Particle scenes
@@ -427,17 +427,17 @@ func createGravityTrailScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	return scene
 }
 
-// createDustTrailScene - Dissolving dust trail
-func createDustTrailScene(sw, sh int, font *asset.Font) *core.BasicScene {
+// createDissolveTrailScene - Dissolving dust trail
+func createDissolveTrailScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		// Set dust trail on layer 0
 		dustColor := core.Color{R: 120, G: 120, B: 120}
-		scene.Compositor().SetPreProcess(0, core.DustTrail(0.93, 0.6, dustColor))
+		scene.Compositor().SetPreProcess(0, core.DissolveTrail(0.93, 0.6, dustColor))
 
 		// Create title
-		titleLayout := asset.RasterizeText("DUST TRAIL", asset.TextOptions{
+		titleLayout := asset.RasterizeText("DISSOLVE TRAIL", asset.TextOptions{
 			Font:  font,
 			Size:  float64(sh) * 0.2,
 			Color: core.Color{R: 255, G: 255, B: 255},
@@ -454,7 +454,7 @@ func createDustTrailScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		w.AddRoot(titleEntity)
 
 		// Create moving text
-		textLayout := asset.RasterizeText("DUST", asset.TextOptions{
+		textLayout := asset.RasterizeText("DISSOLVE", asset.TextOptions{
 			Font:  font,
 			Size:  float64(sh) * 0.4,
 			Color: core.Color{R: 200, G: 150, B: 255},
