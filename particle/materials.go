@@ -172,6 +172,81 @@ func RainbowTime(frequency float64) core.Material {
 	}
 }
 
+// FireTime cycles color through a fire palette (black → red → orange → yellow → white)
+// based on time. Each entity gets a different phase offset for variety.
+// frequency controls how fast colors cycle (in Hz).
+func FireTime(frequency float64) core.Material {
+	// Fire gradient stops: dark red → red → orange → yellow → white
+	stops := []core.Color{
+		{R: 40, G: 0, B: 0},      // dark ember
+		{R: 200, G: 30, B: 0},    // deep red
+		{R: 255, G: 100, B: 0},   // orange
+		{R: 255, G: 200, B: 50},  // yellow-orange
+		{R: 255, G: 255, B: 200}, // hot white
+	}
+
+	return func(f core.Fragment) core.Cell {
+		phase := float64(f.Entity) * 0.1
+		t := math.Mod((f.Time.Total*frequency)+phase, 1.0)
+		if t < 0 {
+			t += 1.0
+		}
+
+		// Map t to gradient stops
+		pos := t * float64(len(stops)-1)
+		idx := int(pos)
+		frac := pos - float64(idx)
+		if idx >= len(stops)-1 {
+			idx = len(stops) - 2
+			frac = 1.0
+		}
+
+		cell := f.Cell
+		cell.FG = lerpColor(stops[idx], stops[idx+1], frac)
+		return cell
+	}
+}
+
+// CycleMaterials smoothly crossfades between multiple materials over time.
+// Each material is shown for `period` seconds, with crossfade during transitions.
+// fadeRatio controls what fraction of each period is spent fading (0.0–1.0).
+func CycleMaterials(period, fadeRatio float64, materials ...core.Material) core.Material {
+	n := len(materials)
+	if n == 0 {
+		return func(f core.Fragment) core.Cell { return f.Cell }
+	}
+	if n == 1 {
+		return materials[0]
+	}
+
+	return func(f core.Fragment) core.Cell {
+		totalCycle := period * float64(n)
+		pos := math.Mod(f.Time.Total, totalCycle)
+		if pos < 0 {
+			pos += totalCycle
+		}
+
+		// Which material are we in?
+		idx := int(pos / period)
+		localT := (pos - float64(idx)*period) / period // 0..1 within current slot
+
+		cellA := materials[idx%n](f)
+
+		// Check if we're in the fade region (end of slot)
+		fadeStart := 1.0 - fadeRatio
+		if localT > fadeStart && fadeRatio > 0 {
+			// Crossfade into next material
+			blend := (localT - fadeStart) / fadeRatio
+			cellB := materials[(idx+1)%n](f)
+
+			cellA.FG = lerpColor(cellA.FG, cellB.FG, blend)
+			cellA.BG = lerpColor(cellA.BG, cellB.BG, blend)
+		}
+
+		return cellA
+	}
+}
+
 // lerpColor linearly interpolates between two colors.
 func lerpColor(a, b core.Color, t float64) core.Color {
 	return core.Color{

@@ -60,6 +60,89 @@ local function make_oscillating_text(world, text, size_frac, color, start_x_frac
 end
 
 -- ============================================================================
+-- Custom materials (pure Lua, using fragment.entity_id and fragment.time)
+-- ============================================================================
+
+-- HSV to RGB conversion (hue in degrees, s/v in 0..1)
+local function hsv_to_rgb(h, s, v)
+    h = h % 360
+    local c = v * s
+    local x = c * (1 - math.abs((h / 60) % 2 - 1))
+    local m = v - c
+    local r, g, b
+    if h < 60 then      r, g, b = c, x, 0
+    elseif h < 120 then r, g, b = x, c, 0
+    elseif h < 180 then r, g, b = 0, c, x
+    elseif h < 240 then r, g, b = 0, x, c
+    elseif h < 300 then r, g, b = x, 0, c
+    else                r, g, b = c, 0, x
+    end
+    return (r + m) * 255, (g + m) * 255, (b + m) * 255
+end
+
+-- Fire gradient: dark ember → red → orange → yellow → hot white
+local fire_stops = {
+    { 40,   0,   0},   -- dark ember
+    {200,  30,   0},   -- deep red
+    {255, 100,   0},   -- orange
+    {255, 200,  50},   -- yellow-orange
+    {255, 255, 200},   -- hot white
+}
+
+local function sample_fire(t)
+    t = t % 1.0
+    local pos = t * (#fire_stops - 1)
+    local idx = math.floor(pos)
+    local frac = pos - idx
+    if idx >= #fire_stops - 1 then idx = #fire_stops - 2; frac = 1.0 end
+    local a = fire_stops[idx + 1]
+    local b = fire_stops[idx + 2]
+    return a[1] + (b[1] - a[1]) * frac,
+           a[2] + (b[2] - a[2]) * frac,
+           a[3] + (b[3] - a[3]) * frac
+end
+
+-- Cycling material: smoothly crossfades between rainbow and fire every 4 seconds.
+-- Uses entity_id for per-particle phase offset.
+function fire_rainbow_material()
+    return function(frag)
+        local phase = frag.entity_id * 0.1
+        local t = frag.time
+
+        -- Cycle: 4s rainbow, 4s fire, with 30% crossfade
+        local cycle_pos = (t % 8.0) / 8.0  -- 0..1 over 8 seconds
+        local rainbow_t = (t * 2.0 + phase) % 1.0
+        local fire_t = (t * 1.5 + phase) % 1.0
+
+        local rr, rg, rb = hsv_to_rgb(rainbow_t * 360, 1.0, 1.0)
+        local fr, fg, fb = sample_fire(fire_t)
+
+        -- Blend factor: 0 = full rainbow, 1 = full fire
+        -- First half (0..0.5) = rainbow, second half (0.5..1) = fire
+        -- With smooth transitions at the boundaries
+        local blend
+        if cycle_pos < 0.35 then
+            blend = 0  -- pure rainbow
+        elseif cycle_pos < 0.5 then
+            blend = (cycle_pos - 0.35) / 0.15  -- fade to fire
+        elseif cycle_pos < 0.85 then
+            blend = 1  -- pure fire
+        else
+            blend = 1 - (cycle_pos - 0.85) / 0.15  -- fade to rainbow
+        end
+
+        return {
+            rune = frag.rune,
+            fg_r = rr + (fr - rr) * blend,
+            fg_g = rg + (fg - rg) * blend,
+            fg_b = rb + (fb - rb) * blend,
+            fg_alpha = frag.fg_alpha,
+            bg_alpha = 0,
+        }
+    end
+end
+
+-- ============================================================================
 -- Scene definitions
 -- ============================================================================
 
@@ -374,10 +457,10 @@ local function create_particle_scene()
                 initial_cloud[i] = f.vec2(pos.x + offset_x, pos.y + offset_y)
             end
 
-            -- Compose materials
+            -- Material: braille directional runes + cycling rainbow/fire color
             local material = f.compose_materials(
                 f.particle.braille_directional(),
-                f.particle.rainbow_time(2.0)
+                fire_rainbow_material()
             )
 
             -- Create point cloud sequence

@@ -121,6 +121,7 @@ func materialFromLua(L *lua.LState, fn *lua.LFunction) core.Material {
 		L.SetField(fragTable, "screen_y", lua.LNumber(f.ScreenY))
 		L.SetField(fragTable, "time", lua.LNumber(f.Time.Total))
 		L.SetField(fragTable, "delta", lua.LNumber(f.Time.Delta))
+		L.SetField(fragTable, "entity_id", lua.LNumber(f.Entity))
 		L.SetField(fragTable, "rune", lua.LString(string(f.Cell.Rune)))
 		L.SetField(fragTable, "fg_r", lua.LNumber(f.Cell.FG.R))
 		L.SetField(fragTable, "fg_g", lua.LNumber(f.Cell.FG.G))
@@ -130,6 +131,15 @@ func materialFromLua(L *lua.LState, fn *lua.LFunction) core.Material {
 		L.SetField(fragTable, "bg_g", lua.LNumber(f.Cell.BG.G))
 		L.SetField(fragTable, "bg_b", lua.LNumber(f.Cell.BG.B))
 		L.SetField(fragTable, "bg_alpha", lua.LNumber(f.Cell.BGAlpha))
+
+		// Velocity from Body component (if present)
+		if body := f.World.Body(f.Entity); body != nil {
+			L.SetField(fragTable, "vel_x", lua.LNumber(body.Velocity.X))
+			L.SetField(fragTable, "vel_y", lua.LNumber(body.Velocity.Y))
+		} else {
+			L.SetField(fragTable, "vel_x", lua.LNumber(0))
+			L.SetField(fragTable, "vel_y", lua.LNumber(0))
+		}
 
 		if err := L.CallByParam(lua.P{
 			Fn:      fn,
