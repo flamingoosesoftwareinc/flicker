@@ -607,14 +607,15 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			}
 		}))
 
-		// Add trailing emitter at bottom-left corner of text
+		// Add trailing emitter across entire bottom edge of text
 		// Offset is relative to text position
 		emitter := particle.NewTrailingEmitter(fmath.Vec2{
 			X: 0,                                 // Left edge
 			Y: float64(textLayout.Bitmap.Height), // Bottom edge
 		})
-		emitter.EmitRate = 5.0     // Spawn more particles
-		emitter.ParticleLife = 3.0 // Longer lifetime for visibility
+		emitter.Width = float64(textLayout.Bitmap.Width) // Spread across full width
+		emitter.EmitRate = 5.0                           // Spawn more particles
+		emitter.ParticleLife = 3.0                       // Longer lifetime for visibility
 		w.AddBehavior(movingText, emitter)
 	})
 

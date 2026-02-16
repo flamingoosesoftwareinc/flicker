@@ -15,6 +15,7 @@ type TrailingEmitter struct {
 	EmitRate     float64    // particles per unit distance moved
 	ParticleLife float64    // particle lifetime in seconds
 	Offset       fmath.Vec2 // offset from entity position (e.g., bottom-left corner)
+	Width        float64    // width of emission area (0 = single point, >0 = spread across width)
 	Color        core.Color // particle color (typically bright white)
 }
 
@@ -68,10 +69,18 @@ func (te *TrailingEmitter) Update(t core.Time, e core.Entity, w *core.World) {
 				Y: te.lastPos.Y + delta.Y*t + te.Offset.Y,
 			}
 
-			// Add slight random offset for variety
+			// Hash-based random offset for variety
 			hash := (int(particlePos.X*73) ^ int(particlePos.Y*31) ^ int(t*100)) & 0xFF
+			hashNorm := float64(hash) / 255.0
+
+			// Spread particles across emission width (if specified)
+			if te.Width > 0 {
+				particlePos.X += hashNorm * te.Width
+			}
+
+			// Add slight vertical random offset
 			randomOffset := fmath.Vec2{
-				X: (float64(hash)/255.0 - 0.5) * 2.0,
+				X: (hashNorm - 0.5) * 2.0,
 				Y: (float64((hash*17)&0xFF)/255.0 - 0.5) * 1.5,
 			}
 			particlePos = particlePos.Add(randomOffset)
