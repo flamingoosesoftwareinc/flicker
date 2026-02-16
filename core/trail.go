@@ -108,75 +108,60 @@ func GravityTrail(decay, fallSpeed float64) func(Fragment) Cell {
 	}
 }
 
-// DustTrail creates a selective dissolving effect where trails selectively spawn
-// dust particles that drift and fade. Uses noise for spawning probability,
-// turbulence-like offset for active movement, and gradient bias.
+// DustTrail creates a sparse dust particle effect where only occasional cells
+// become faint dust particles with subtle drift. Most of the trail disappears quickly.
 func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cell {
 	return func(f Fragment) Cell {
 		c := f.Cell
 
-		// Skip empty cells immediately
+		// Skip empty cells
 		if c.Rune == 0 || c.Rune == ' ' {
 			return Cell{}
 		}
 
-		// Turbulence-like noise for dust position offset (creates active/wobbly movement)
-		turbX := fmath.Noise2D(float64(f.ScreenX)*0.05, f.Time.Total*0.4)
-		turbY := fmath.Noise2D(float64(f.ScreenY)*0.05+50.0, f.Time.Total*0.4)
+		// Hash-based randomness for sparse, non-clustered dust spawning
+		// Using prime numbers for good distribution
+		hash := (f.ScreenX*73856093 ^ f.ScreenY*19349663 ^ int(f.Time.Total*100)*83492791) & 0xFFFF
+		hashNorm := float64(hash) / 65535.0 // 0.0 to 1.0
 
-		// Sample from slightly offset position for turbulent appearance
-		offsetX := int(turbX * 2.0)
-		offsetY := int(turbY * 1.5)
-		sourceCell := f.Source.Get(f.ScreenX+offsetX, f.ScreenY+offsetY)
+		// Very sparse spawning - only ~10-15% of cells become dust
+		spawnThreshold := 0.88 + (float64(f.ScreenY)/100.0)*0.05 // Slightly more dust lower down
 
-		// If source cell is empty after turbulence offset, fade current cell fast
-		if sourceCell.Rune == 0 || sourceCell.Rune == ' ' {
-			c.FGAlpha *= 0.7
-			c.BGAlpha *= 0.7
-			if c.FGAlpha < 0.05 {
+		// Check if this cell should become dust
+		isDust := c.FGAlpha < dustThreshold && hashNorm > spawnThreshold
+
+		if isDust {
+			// Subtle turbulent drift (much smaller than before)
+			driftX := fmath.Noise2D(float64(f.ScreenX)*0.08, f.Time.Total*0.3) * 1.2
+			driftY := fmath.Noise2D(float64(f.ScreenY)*0.08+100.0, f.Time.Total*0.25) * 0.8
+
+			// Sample from slightly offset position for gentle drift
+			offsetX := int(driftX)
+			offsetY := int(driftY)
+			driftedCell := f.Source.Get(f.ScreenX+offsetX, f.ScreenY+offsetY)
+
+			// Only show dust if drifted position had content
+			if driftedCell.Rune != 0 && driftedCell.Rune != ' ' {
+				// Small dust particle
+				c.Rune = '·' // Use smallest dust character only
+				c.FG = dustColor
+				c.BGAlpha = 0.0
+
+				// Faint and fading fast
+				c.FGAlpha = 0.25 + hashNorm*0.15 // 0.25-0.4 range (fainter)
+				c.FGAlpha *= 0.7                 // Fast decay
+			} else {
+				// Drifted into empty space - disappear
 				return Cell{}
 			}
-			return c
-		}
-
-		// Use source cell with turbulence
-		c = sourceCell
-
-		// Spawn probability based on noise (selective dust spawning)
-		spawnNoise := fmath.Noise2D(float64(f.ScreenX)*0.1, float64(f.ScreenY)*0.1+f.Time.Total*0.2)
-
-		// Gradient bias - more dust toward bottom/trailing edge
-		verticalBias := float64(f.ScreenY) / 50.0 // Increases downward
-		spawnProbability := (spawnNoise + 1.0) / 2.0 * (0.6 + verticalBias*0.4)
-
-		// Only spawn dust if probability is high enough AND cell is fading
-		shouldSpawnDust := c.FGAlpha < dustThreshold && spawnProbability > 0.55
-
-		if shouldSpawnDust {
-			// Convert to dust particle
-			dustChars := []rune{'·', '∙', '⋅', '•', '⋆'}
-			idx := (f.ScreenX + f.ScreenY + int(f.Time.Total*10)) % len(dustChars)
-			c.Rune = dustChars[idx]
-			c.FG = dustColor
-			c.BGAlpha = 0.0
-
-			// Dust particles are visible but fade quickly
-			c.FGAlpha = 0.4 + spawnNoise*0.3 // 0.4-0.7 range
-
-			// Fast decay for dust
-			c.FGAlpha *= 0.75
-		} else if c.FGAlpha < dustThreshold {
-			// Fading but didn't spawn dust - just clear quickly
-			c.FGAlpha *= 0.6
-			c.BGAlpha *= 0.6
 		} else {
-			// Still solid - apply gentle decay
-			c.FGAlpha *= decay
-			c.BGAlpha *= decay
+			// Not dust - fade quickly and disappear
+			c.FGAlpha *= 0.5 // Very fast fade for non-dust
+			c.BGAlpha *= 0.5
 		}
 
-		// Clear very faint cells
-		if c.FGAlpha < 0.05 {
+		// Clear faint cells
+		if c.FGAlpha < 0.08 {
 			return Cell{}
 		}
 
