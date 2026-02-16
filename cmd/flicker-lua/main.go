@@ -39,14 +39,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check if the script created a scene manager (multi-scene mode)
+	// Check if the script created a scene manager during Load (top-level)
 	sm := engine.SceneManager()
 	multiScene := sm != nil
 
 	if !multiScene {
-		// Single scene mode
+		// Single scene mode - call OnEnter which may create a scene manager
 		scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
-		scene.OnReady()
+
+		// Re-check: on_enter may have created a scene manager
+		sm = engine.SceneManager()
+		multiScene = sm != nil
+
+		if !multiScene {
+			scene.OnReady()
+		}
 	}
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input
