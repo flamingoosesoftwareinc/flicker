@@ -33,40 +33,111 @@ func NewTrailingEmitter(offset fmath.Vec2) *TrailingEmitter {
 
 // EmissionParams holds parameters for particle emission derived from a bitmap's shape.
 type EmissionParams struct {
-	Offset fmath.Vec2 // Offset to bottom-left of shape
+	Offset fmath.Vec2 // Offset to emission position
 	Width  float64    // Width of emission area
 }
 
-// BoundsToEmissionParams converts SDF shape bounds to particle emission parameters.
-// This is a low-level function that works with any SDF source (bitmap, analytical, etc.).
-//
-// shapeBounds: The bounding box of the shape in source coordinate space
-// scaleX, scaleY: Scale factors to convert from source space to screen space
-func BoundsToEmissionParams(shapeBounds bitmap.Bounds, scaleX, scaleY float64) EmissionParams {
-	if shapeBounds.Empty {
-		return EmissionParams{}
-	}
+// EmissionGeometry describes where particles should emit from in source coordinate space.
+type EmissionGeometry struct {
+	Offset fmath.Vec2 // Starting position for emission
+	Width  float64    // Width of emission area (0 for point emission)
+}
 
+// EmissionStrategy determines where particles should emit from based on SDF shape analysis.
+// Strategies have full access to the SDF and can query distance at any point,
+// enabling complex emission patterns (boundaries, contours, inside/outside, etc.).
+type EmissionStrategy func(sdf *bitmap.SDF) EmissionGeometry
+
+// Predefined emission strategies
+
+// BottomEdge emits particles from the bottom edge of the shape.
+func BottomEdge(sdf *bitmap.SDF) EmissionGeometry {
+	bounds := sdf.Bounds()
+	if bounds.Empty {
+		return EmissionGeometry{}
+	}
+	return EmissionGeometry{
+		Offset: fmath.Vec2{
+			X: float64(bounds.MinX),
+			Y: float64(bounds.MaxY + 1), // +1 to emit just below bottom edge
+		},
+		Width: float64(bounds.MaxX - bounds.MinX),
+	}
+}
+
+// TopEdge emits particles from the top edge of the shape.
+func TopEdge(sdf *bitmap.SDF) EmissionGeometry {
+	bounds := sdf.Bounds()
+	if bounds.Empty {
+		return EmissionGeometry{}
+	}
+	return EmissionGeometry{
+		Offset: fmath.Vec2{
+			X: float64(bounds.MinX),
+			Y: float64(bounds.MinY),
+		},
+		Width: float64(bounds.MaxX - bounds.MinX),
+	}
+}
+
+// LeftEdge emits particles from the left edge of the shape.
+func LeftEdge(sdf *bitmap.SDF) EmissionGeometry {
+	bounds := sdf.Bounds()
+	if bounds.Empty {
+		return EmissionGeometry{}
+	}
+	return EmissionGeometry{
+		Offset: fmath.Vec2{
+			X: float64(bounds.MinX),
+			Y: float64(bounds.MinY),
+		},
+		Width: 0, // Vertical emission (no width)
+	}
+}
+
+// RightEdge emits particles from the right edge of the shape.
+func RightEdge(sdf *bitmap.SDF) EmissionGeometry {
+	bounds := sdf.Bounds()
+	if bounds.Empty {
+		return EmissionGeometry{}
+	}
+	return EmissionGeometry{
+		Offset: fmath.Vec2{
+			X: float64(bounds.MaxX),
+			Y: float64(bounds.MinY),
+		},
+		Width: 0, // Vertical emission (no width)
+	}
+}
+
+// ApplyEmissionStrategy applies an emission strategy to an SDF and converts
+// the resulting geometry to screen-space emission parameters.
+// This is the low-level function that works with any SDF source.
+func ApplyEmissionStrategy(
+	sdf *bitmap.SDF,
+	strategy EmissionStrategy,
+	scaleX, scaleY float64,
+) EmissionParams {
+	geom := strategy(sdf)
 	return EmissionParams{
 		Offset: fmath.Vec2{
-			X: float64(shapeBounds.MinX) * scaleX,
-			Y: float64(shapeBounds.MaxY+1) * scaleY, // +1 to emit just below bottom edge
+			X: geom.Offset.X * scaleX,
+			Y: geom.Offset.Y * scaleY,
 		},
-		Width: float64(shapeBounds.MaxX-shapeBounds.MinX) * scaleX,
+		Width: geom.Width * scaleX,
 	}
 }
 
 // ComputeBottomEdgeEmission is a convenience function for bitmap-based drawables.
-// It handles the common case of computing emission params from a bitmap and its drawable.
-// For custom SDF sources or more control, use BoundsToEmissionParams directly.
+// It handles the common case of computing bottom edge emission from a bitmap and its drawable.
+// For custom strategies or SDF sources, use ApplyEmissionStrategy directly.
 func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
 	}
 
-	// Compute SDF and query its geometric bounds (in bitmap pixel space)
+	// Compute SDF from bitmap
 	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
-	shapeBounds := sdf.Bounds()
 
 	// Get screen-space dimensions from drawable
 	screenWidth, screenHeight := drawable.Bounds()
@@ -75,8 +146,8 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) Emissi
 	scaleX := float64(screenWidth) / float64(bm.Width)
 	scaleY := float64(screenHeight) / float64(bm.Height)
 
-	// Delegate to low-level function
-	return BoundsToEmissionParams(shapeBounds, scaleX, scaleY)
+	// Apply bottom edge strategy
+	return ApplyEmissionStrategy(sdf, BottomEdge, scaleX, scaleY)
 }
 
 // Enabled returns true (always active).
