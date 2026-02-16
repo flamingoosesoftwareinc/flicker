@@ -139,14 +139,20 @@ func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cel
 			c.Rune = dustChars[idx]
 			c.FG = dustColor
 
+			// Boost alpha when converting to dust so it's visible and grayish
+			// Map from current low alpha to a visible range
+			c.FGAlpha = 0.3 + c.FGAlpha*0.5 // Range: 0.3 to 0.8
+			c.BGAlpha = 0.0                 // Dust has transparent background
+
 			// In deep pockets (low noise), fade dust faster
 			if pocketValue < -0.3 {
-				c.FGAlpha *= 0.8
+				c.FGAlpha *= 0.85
 			}
+		} else {
+			// Not yet dust - apply normal decay
+			c.FGAlpha *= localDecay
+			c.BGAlpha *= localDecay * 0.5 // BG fades faster
 		}
-
-		c.FGAlpha *= localDecay
-		c.BGAlpha *= localDecay * 0.5 // BG fades faster
 
 		// Clear cell when alpha drops too low
 		if c.FGAlpha < 0.01 && c.BGAlpha < 0.01 {
