@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/charmbracelet/x/vt v0.0.0-20260209194814-eeb2896ac759
 	github.com/epikur-io/gopher-lua v1.3.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/sebdah/goldie/v2 v2.8.0
 	golang.org/x/image v0.36.0

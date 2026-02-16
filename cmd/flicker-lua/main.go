@@ -39,6 +39,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start hot reload file watcher
+	if watchErr := engine.WatchForChanges(); watchErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: hot reload disabled: %v\n", watchErr)
+	}
+
 	// Check if the script created a scene manager during Load (top-level)
 	sm := engine.SceneManager()
 	multiScene := sm != nil
@@ -63,6 +68,32 @@ func main() {
 			events <- screen.PollEvent()
 		}
 	}()
+
+	// doReload performs a full teardown and reload of the script.
+	doReload := func() {
+		if !multiScene {
+			scene.OnExit()
+		}
+		newScene, reloadErr := engine.Reload(sw, sh)
+		if reloadErr != nil {
+			fmt.Fprintf(os.Stderr, "reload error: %v\n", reloadErr)
+			return
+		}
+
+		sm = engine.SceneManager()
+		multiScene = sm != nil
+		if !multiScene {
+			scene = newScene
+			scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
+
+			sm = engine.SceneManager()
+			multiScene = sm != nil
+
+			if !multiScene {
+				scene.OnReady()
+			}
+		}
+	}
 
 	var simTime float64
 	last := time.Now()
@@ -91,6 +122,14 @@ func main() {
 				draining = false
 			}
 		}
+
+		// Check for file-watcher-triggered reload (non-blocking)
+		select {
+		case <-engine.NeedsReload():
+			reload = true
+		default:
+		}
+
 		if quit {
 			if multiScene {
 				// SceneManager handles cleanup
@@ -100,21 +139,7 @@ func main() {
 			return
 		}
 		if reload {
-			if !multiScene {
-				scene.OnExit()
-			}
-			newScene, err := engine.Reload(sw, sh)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "reload error: %v\n", err)
-			} else {
-				sm = engine.SceneManager()
-				multiScene = sm != nil
-				if !multiScene {
-					scene = newScene
-					scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
-					scene.OnReady()
-				}
-			}
+			doReload()
 		}
 		if nextSlide && multiScene && !sm.IsTransitioning() {
 			sm.Next(core.CrossFade, 1.5)

@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"flicker/core"
 	lua "github.com/epikur-io/gopher-lua"
+	"github.com/fsnotify/fsnotify"
 )
 
 // Engine manages the Lua VM and bridges it to the flicker rendering engine.
@@ -23,13 +25,21 @@ type Engine struct {
 	// Multi-scene support
 	sceneManager *core.SceneManager
 
+	// Hot reload
+	watcher    *fsnotify.Watcher
+	reloadChan chan struct{} // signals that a reload is needed
+	stopWatch  chan struct{} // signals the watcher goroutine to stop
+
 	// Error log (prints to stderr)
 	errors []string
 }
 
 // NewEngine creates a new Lua scripting engine.
 func NewEngine() *Engine {
-	return &Engine{}
+	return &Engine{
+		reloadChan: make(chan struct{}, 1),
+		stopWatch:  make(chan struct{}),
+	}
 }
 
 // Load initializes the Lua VM, registers all modules, and executes the script.
@@ -40,6 +50,7 @@ func (e *Engine) Load(scriptPath string, width, height int) (*core.BasicScene, e
 
 	e.scriptPath = scriptPath
 	e.defaultCallbacks = SceneCallbacks{}
+	e.sceneManager = nil
 	e.errors = nil
 
 	// Create new Lua state
@@ -88,10 +99,84 @@ func (e *Engine) Reload(width, height int) (*core.BasicScene, error) {
 	return e.Load(e.scriptPath, width, height)
 }
 
-// Close shuts down the Lua VM.
+// WatchForChanges starts watching the script file and its directory for changes.
+// When a change is detected (debounced by 100ms), a signal is sent on the
+// channel returned by NeedsReload().
+func (e *Engine) WatchForChanges() error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("fsnotify: %w", err)
+	}
+	e.watcher = watcher
+
+	// Watch the script file's directory (covers new/renamed files too)
+	dir := filepath.Dir(e.scriptPath)
+	if err := watcher.Add(dir); err != nil {
+		_ = watcher.Close()
+		return fmt.Errorf("watch %s: %w", dir, err)
+	}
+
+	go e.watchLoop()
+	return nil
+}
+
+// NeedsReload returns a channel that receives a signal when the script
+// file has changed and a reload is needed.
+func (e *Engine) NeedsReload() <-chan struct{} {
+	return e.reloadChan
+}
+
+func (e *Engine) watchLoop() {
+	var debounce *time.Timer
+
+	for {
+		select {
+		case event, ok := <-e.watcher.Events:
+			if !ok {
+				return
+			}
+			// Only care about .lua files being written or created
+			if filepath.Ext(event.Name) != ".lua" {
+				continue
+			}
+			if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+				continue
+			}
+
+			// Debounce: reset timer on each event
+			if debounce != nil {
+				debounce.Stop()
+			}
+			debounce = time.AfterFunc(100*time.Millisecond, func() {
+				// Non-blocking send
+				select {
+				case e.reloadChan <- struct{}{}:
+				default:
+				}
+			})
+
+		case err, ok := <-e.watcher.Errors:
+			if !ok {
+				return
+			}
+			fmt.Fprintf(os.Stderr, "[flicker-lua] watch error: %v\n", err)
+
+		case <-e.stopWatch:
+			return
+		}
+	}
+}
+
+// Close shuts down the Lua VM and file watcher.
 func (e *Engine) Close() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	if e.watcher != nil {
+		close(e.stopWatch)
+		_ = e.watcher.Close()
+		e.watcher = nil
+	}
 	if e.L != nil {
 		e.L.Close()
 		e.L = nil
