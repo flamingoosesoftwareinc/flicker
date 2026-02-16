@@ -137,15 +137,6 @@ func (br *Braille) Bounds() (int, int) {
 	return (br.Bitmap.Width + 1) / 2, (br.Bitmap.Height + 3) / 4
 }
 
-// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
-// Braille: 2:1 horizontal (2 pixels = 1 cell), 4:1 vertical (4 pixels = 1 cell).
-func (br *Braille) BitmapToScreen(coord fmath.Vec2) fmath.Vec2 {
-	return fmath.Vec2{
-		X: coord.X / 2.0, // 2:1 horizontal compression
-		Y: coord.Y / 4.0, // 4:1 vertical compression
-	}
-}
-
 // Renderer returns an inverse-mapping RenderFunc for braille mode.
 // For each screen cell in the rotated bounding box, it samples 2x4 dot positions
 // through the inverse world matrix to determine which source pixels are visible,

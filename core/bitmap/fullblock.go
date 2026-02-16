@@ -58,12 +58,6 @@ func (fb *FullBlock) Bounds() (int, int) {
 	return fb.Bitmap.Width, fb.Bitmap.Height
 }
 
-// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
-// FullBlock: 1:1 mapping (1 pixel = 1 cell both horizontally and vertically).
-func (fb *FullBlock) BitmapToScreen(coord fmath.Vec2) fmath.Vec2 {
-	return coord // 1:1 mapping, no conversion needed
-}
-
 // Renderer returns an inverse-mapping RenderFunc for full-block mode.
 func (fb *FullBlock) Renderer() core.RenderFunc {
 	if fb.Bitmap == nil {

@@ -38,8 +38,8 @@ type EmissionParams struct {
 }
 
 // ComputeBottomEdgeEmission analyzes a bitmap using SDF to find the bottom edge
-// emission parameters. Uses the drawable's coordinate conversion to map from
-// bitmap pixel space to screen character cell space.
+// emission parameters. Converts from bitmap pixel space to screen character cell
+// space using the drawable's rendered dimensions.
 func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
@@ -47,25 +47,26 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) Emissi
 
 	// Compute SDF and query its geometric bounds (in bitmap pixel space)
 	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
-	bounds := sdf.Bounds()
+	bitmapBounds := sdf.Bounds()
 
-	if bounds.Empty {
+	if bitmapBounds.Empty {
 		return EmissionParams{}
 	}
 
-	// Convert bitmap bounds to screen coordinates using drawable's mapping
-	bottomLeft := drawable.BitmapToScreen(fmath.Vec2{
-		X: float64(bounds.MinX),
-		Y: float64(bounds.MaxY + 1), // +1 to emit just below bottom edge
-	})
-	bottomRight := drawable.BitmapToScreen(fmath.Vec2{
-		X: float64(bounds.MaxX),
-		Y: float64(bounds.MaxY + 1),
-	})
+	// Get screen-space dimensions from drawable
+	screenWidth, screenHeight := drawable.Bounds()
 
+	// Compute coordinate scale factors
+	scaleX := float64(screenWidth) / float64(bm.Width)
+	scaleY := float64(screenHeight) / float64(bm.Height)
+
+	// Convert bitmap bounds to screen coordinates
 	return EmissionParams{
-		Offset: bottomLeft,
-		Width:  bottomRight.X - bottomLeft.X,
+		Offset: fmath.Vec2{
+			X: float64(bitmapBounds.MinX) * scaleX,
+			Y: float64(bitmapBounds.MaxY+1) * scaleY, // +1 to emit just below bottom edge
+		},
+		Width: float64(bitmapBounds.MaxX-bitmapBounds.MinX) * scaleX,
 	}
 }
 

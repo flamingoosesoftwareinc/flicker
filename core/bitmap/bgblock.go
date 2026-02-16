@@ -58,12 +58,6 @@ func (bg *BGBlock) Bounds() (int, int) {
 	return bg.Bitmap.Width, bg.Bitmap.Height
 }
 
-// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
-// BGBlock: 1:1 mapping (1 pixel = 1 cell both horizontally and vertically).
-func (bg *BGBlock) BitmapToScreen(coord fmath.Vec2) fmath.Vec2 {
-	return coord // 1:1 mapping, no conversion needed
-}
-
 // Renderer returns an inverse-mapping RenderFunc for BG-block mode.
 func (bg *BGBlock) Renderer() core.RenderFunc {
 	if bg.Bitmap == nil {

@@ -10,7 +10,6 @@ type Drawable interface {
 	Draw(canvas *Canvas, x, y int)
 	CellAt(x, y int) Cell
 	Renderer() RenderFunc
-	// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
-	// Each drawable has its own compression ratio (e.g., HalfBlock is 1:1 horizontal, 2:1 vertical).
-	BitmapToScreen(bitmapCoord fmath.Vec2) fmath.Vec2
+	// Bounds returns the drawable's dimensions in screen character cell coordinates.
+	Bounds() (width, height int)
 }
