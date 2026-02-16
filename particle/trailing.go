@@ -38,7 +38,7 @@ type EmissionParams struct {
 }
 
 // ComputeBottomEdgeEmission analyzes a bitmap using SDF to find the bottom edge
-// emission parameters. This works for any bitmap regardless of rendering method.
+// emission parameters for HalfBlock rendering (2:1 vertical compression).
 func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
@@ -53,13 +53,14 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
 	}
 
 	// Convert geometric bounds to particle emission parameters
-	// Emit from the bottom edge (maxY + 1) across the width
+	// HalfBlock renders 2 vertical pixels per cell, so divide Y by 2
+	// Emit from the bottom edge across the width
 	return EmissionParams{
 		Offset: fmath.Vec2{
-			X: float64(bounds.MinX),
-			Y: float64(bounds.MaxY + 1), // +1 to emit just below bottom edge
+			X: float64(bounds.MinX),       // No horizontal compression
+			Y: float64(bounds.MaxY+1) / 2, // Divide by 2 for HalfBlock vertical compression
 		},
-		Width: float64(bounds.MaxX - bounds.MinX),
+		Width: float64(bounds.MaxX - bounds.MinX), // No horizontal compression
 	}
 }
 
