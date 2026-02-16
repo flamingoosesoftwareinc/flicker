@@ -110,21 +110,43 @@ func GravityTrail(decay, fallSpeed float64) func(Fragment) Cell {
 
 // DustTrail creates a dissolving effect where trails turn into dust particles.
 // Decay controls fade, dustThreshold controls when transformation occurs.
+// Uses Voronoi-like noise pockets to create organic fading clusters.
 func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cell {
 	return func(f Fragment) Cell {
 		c := f.Cell
 
-		// As cell fades, convert to dust
-		if c.FGAlpha < dustThreshold && c.Rune != ' ' {
+		// Create Voronoi-like pockets using layered Perlin noise
+		// Low frequency for large pockets
+		pocket1 := fmath.Noise2D(float64(f.ScreenX)*0.03, float64(f.ScreenY)*0.03+f.Time.Total*0.1)
+		// Higher frequency for detail
+		pocket2 := fmath.Noise2D(float64(f.ScreenX)*0.08, float64(f.ScreenY)*0.08+f.Time.Total*0.15)
+
+		// Combine noise layers (-1 to 1 range)
+		// Pockets determine local fade rate
+		pocketValue := (pocket1 + pocket2*0.5) / 1.5
+
+		// Modulate decay based on pocket - creates regions that fade faster/slower
+		localDecay := decay * (0.8 + pocketValue*0.3) // Range: 0.5*decay to 1.1*decay
+
+		// Modulate dust threshold based on pockets - some regions turn to dust sooner
+		localThreshold := dustThreshold * (0.7 + pocketValue*0.6) // Varies threshold
+
+		// As cell fades, convert to dust in pockets
+		if c.FGAlpha < localThreshold && c.Rune != ' ' {
 			// Use various dust characters based on position for variety
 			dustChars := []rune{'·', '∙', '⋅', '•'}
 			idx := (f.ScreenX + f.ScreenY) % len(dustChars)
 			c.Rune = dustChars[idx]
 			c.FG = dustColor
+
+			// In deep pockets (low noise), fade dust faster
+			if pocketValue < -0.3 {
+				c.FGAlpha *= 0.8
+			}
 		}
 
-		c.FGAlpha *= decay
-		c.BGAlpha *= decay * 0.5 // BG fades faster
+		c.FGAlpha *= localDecay
+		c.BGAlpha *= localDecay * 0.5 // BG fades faster
 
 		// Clear cell when alpha drops too low
 		if c.FGAlpha < 0.01 && c.BGAlpha < 0.01 {
