@@ -60,7 +60,7 @@ local function make_oscillating_text(world, text, size_frac, color, start_x_frac
 end
 
 -- ============================================================================
--- Custom materials (pure Lua, using fragment.entity_id and fragment.time)
+-- Custom materials (pure Lua, using fragment fields)
 -- ============================================================================
 
 -- HSV to RGB conversion (hue in degrees, s/v in 0..1)
@@ -78,6 +78,52 @@ local function hsv_to_rgb(h, s, v)
     else                r, g, b = c, 0, x
     end
     return (r + m) * 255, (g + m) * 255, (b + m) * 255
+end
+
+-- Braille directional: maps velocity angle to 8-direction braille rune
+local braille_dirs = {
+    "\xe2\xa0\x8f",  -- ⠏ up         (idx 1)
+    "\xe2\xa0\x9b",  -- ⠛ up-right   (idx 2)
+    "\xe2\xa0\xb8",  -- ⠸ right      (idx 3)
+    "\xe2\xa0\xa4",  -- ⠤ down-right (idx 4)
+    "\xe2\xa0\xa4",  -- ⠤ down       (idx 5)
+    "\xe2\xa0\xa4",  -- ⠤ down-left  (idx 6)
+    "\xe2\xa0\x87",  -- ⠇ left       (idx 7)
+    "\xe2\xa0\x8f",  -- ⠏ up-left    (idx 8)
+}
+
+local function braille_directional_material()
+    return function(frag)
+        local vx, vy = frag.vel_x, frag.vel_y
+        if vx == 0 and vy == 0 then
+            return {
+                rune = braille_dirs[1],
+                fg_r = frag.fg_r, fg_g = frag.fg_g, fg_b = frag.fg_b,
+                fg_alpha = frag.fg_alpha, bg_alpha = 0,
+            }
+        end
+        local angle = math.atan2(vy, vx)
+        -- Map angle (-pi..pi) to 8 directions (1..8)
+        local idx = math.floor((angle + math.pi) / (2 * math.pi) * 8 + 0.5) % 8 + 1
+        return {
+            rune = braille_dirs[idx],
+            fg_r = frag.fg_r, fg_g = frag.fg_g, fg_b = frag.fg_b,
+            fg_alpha = frag.fg_alpha, bg_alpha = 0,
+        }
+    end
+end
+
+-- Rainbow time material: HSV cycle based on time
+local function rainbow_time_material(freq)
+    return function(frag)
+        local hue = (frag.time * freq * 360) % 360
+        local r, g, b = hsv_to_rgb(hue, 1.0, 1.0)
+        return {
+            rune = frag.rune,
+            fg_r = r, fg_g = g, fg_b = b,
+            fg_alpha = frag.fg_alpha, bg_alpha = 0,
+        }
+    end
 end
 
 -- Fire gradient: dark ember → red → orange → yellow → hot white
@@ -302,7 +348,7 @@ local function create_trailing_scene()
             end)
 
             -- Trailing emitter
-            local params = f.particle.compute_emission(layout.bitmap, drawable, "bottom")
+            local params = f.particle.compute_emission(layout.bitmap, drawable, f.particle.bottom_edge)
             local emitter = f.particle.trailing_emitter(params.offset, {
                 width = params.width,
                 emit_rate = 5.0,
@@ -459,7 +505,7 @@ local function create_particle_scene()
 
             -- Material: braille directional runes + cycling rainbow/fire color
             local material = f.compose_materials(
-                f.particle.braille_directional(),
+                braille_directional_material(),
                 fire_rainbow_material()
             )
 
@@ -525,7 +571,7 @@ local function create_thanks_scene()
                 rotation = 0,
             })
             text_entity:set_drawable(f.bitmap.half_block(layout.bitmap))
-            text_entity:set_material(f.particle.rainbow_time(3.0))
+            text_entity:set_material(rainbow_time_material(3.0))
             world:add_root(text_entity)
 
             timeline = f.timeline.new(world)

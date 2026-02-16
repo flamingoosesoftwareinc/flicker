@@ -9,6 +9,12 @@ import (
 	"flicker/physics"
 )
 
+// VelocityRange defines min/max velocity ranges for spawned particles.
+type VelocityRange struct {
+	MinX, MaxX float64
+	MinY, MaxY float64
+}
+
 // TrailingEmitter spawns dust particles from a moving entity's specified position.
 // Particles are bright white, drift with physics, and fade over their lifetime.
 type TrailingEmitter struct {
@@ -19,6 +25,11 @@ type TrailingEmitter struct {
 	Offset       fmath.Vec2 // offset from entity position (e.g., bottom-left corner)
 	Width        float64    // width of emission area (0 = single point, >0 = spread across width)
 	Color        core.Color // particle color (typically bright white)
+
+	Drawable      core.Drawable       // nil = default 1x1 braille pixel
+	Material      core.Material       // nil = default age-based fade
+	Behaviors     []core.BehaviorFunc // nil = default physics set (gravity+turbulence+drag+euler)
+	VelocityRange *VelocityRange      // nil = default random range
 }
 
 // NewTrailingEmitter creates a trailing emitter with default settings.
@@ -227,10 +238,14 @@ func (te *TrailingEmitter) spawnDustParticle(w *core.World, pos fmath.Vec2) {
 		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 	})
 
-	// Render as small white dot
-	pixel := bitmap.New(1, 1)
-	pixel.SetDot(0, 0, te.Color)
-	w.AddDrawable(particle, &bitmap.Braille{Bitmap: pixel})
+	// Drawable
+	if te.Drawable != nil {
+		w.AddDrawable(particle, te.Drawable)
+	} else {
+		pixel := bitmap.New(1, 1)
+		pixel.SetDot(0, 0, te.Color)
+		w.AddDrawable(particle, &bitmap.Braille{Bitmap: pixel})
+	}
 
 	// Age and lifetime
 	w.AddAge(particle, &core.Age{
@@ -238,48 +253,65 @@ func (te *TrailingEmitter) spawnDustParticle(w *core.World, pos fmath.Vec2) {
 		Lifetime: te.ParticleLife,
 	})
 
-	// Physics - slight downward drift + random horizontal
-	hash := (int(pos.X*13) ^ int(pos.Y*7)) & 0xFF
-	randomVelX := (float64(hash)/255.0 - 0.5) * 3.0
-	randomVelY := (float64((hash*23)&0xFF) / 255.0) * 2.0
+	// Velocity
+	if te.VelocityRange != nil {
+		vr := te.VelocityRange
+		hash := (int(pos.X*13) ^ int(pos.Y*7)) & 0xFF
+		hx := float64(hash) / 255.0
+		hy := float64((hash*23)&0xFF) / 255.0
+		w.AddBody(particle, &core.Body{
+			Velocity: fmath.Vec2{
+				X: vr.MinX + hx*(vr.MaxX-vr.MinX),
+				Y: vr.MinY + hy*(vr.MaxY-vr.MinY),
+			},
+		})
+	} else {
+		hash := (int(pos.X*13) ^ int(pos.Y*7)) & 0xFF
+		randomVelX := (float64(hash)/255.0 - 0.5) * 3.0
+		randomVelY := (float64((hash*23)&0xFF) / 255.0) * 2.0
+		w.AddBody(particle, &core.Body{
+			Velocity: fmath.Vec2{
+				X: randomVelX,
+				Y: 2.0 + randomVelY,
+			},
+		})
+	}
 
-	w.AddBody(particle, &core.Body{
-		Velocity: fmath.Vec2{
-			X: randomVelX,
-			Y: 2.0 + randomVelY, // Drift downward
-		},
-	})
+	// Behaviors
+	if te.Behaviors != nil {
+		allFns := make([]core.BehaviorFunc, 0, len(te.Behaviors)+1)
+		allFns = append(allFns, te.Behaviors...)
+		allFns = append(allFns, AgeAndDespawn())
+		w.AddBehavior(particle, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
+			for _, fn := range allFns {
+				fn(t, e, w)
+			}
+		}))
+	} else {
+		w.AddBehavior(particle, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
+			physics.EulerIntegration()(t, e, w)
+			physics.Gravity(fmath.Vec2{X: 0, Y: 1.5})(t, e, w)
+			physics.Turbulence(0.3, 2.0)(t, e, w)
+			physics.Drag(0.98)(t, e, w)
+			AgeAndDespawn()(t, e, w)
+		}))
+	}
 
-	// Add physics behaviors
-	w.AddBehavior(particle, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
-		// Euler integration for movement
-		physics.EulerIntegration()(t, e, w)
-
-		// Gravity (gentle downward acceleration)
-		physics.Gravity(fmath.Vec2{X: 0, Y: 1.5})(t, e, w)
-
-		// Turbulence for wobbly movement
-		physics.Turbulence(0.3, 2.0)(t, e, w)
-
-		// Drag to slow down
-		physics.Drag(0.98)(t, e, w)
-
-		// Age and despawn when lifetime expires
-		AgeAndDespawn()(t, e, w)
-	}))
-
-	// Material: fade based on age
-	w.AddMaterial(particle, func(f core.Fragment) core.Cell {
-		c := f.Cell
-		age := f.World.Age(f.Entity)
-		if age != nil {
-			// Fade out over lifetime
-			progress := age.Age / age.Lifetime
-			c.FGAlpha = 1.0 - progress // Fade from 1.0 to 0.0
-			c.BGAlpha = 0.0            // Transparent background
-		}
-		return c
-	})
+	// Material
+	if te.Material != nil {
+		w.AddMaterial(particle, te.Material)
+	} else {
+		w.AddMaterial(particle, func(f core.Fragment) core.Cell {
+			c := f.Cell
+			age := f.World.Age(f.Entity)
+			if age != nil {
+				progress := age.Age / age.Lifetime
+				c.FGAlpha = 1.0 - progress
+				c.BGAlpha = 0.0
+			}
+			return c
+		})
+	}
 
 	w.AddRoot(particle)
 }

@@ -9,8 +9,11 @@ import (
 )
 
 const (
-	typePointCloudSeq   = "flicker.point_cloud_sequence"
-	typeTrailingEmitter = "flicker.trailing_emitter"
+	typePointCloudSeq    = "flicker.point_cloud_sequence"
+	typeTrailingEmitter  = "flicker.trailing_emitter"
+	typeDistribution     = "flicker.distribution"
+	typeTransitionPhase  = "flicker.transition_phase"
+	typeEmissionStrategy = "flicker.emission_strategy"
 )
 
 func registerParticleModule(L *lua.LState, mod *lua.LTable) {
@@ -25,6 +28,27 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 	// TrailingEmitter metatable
 	tmt := registerType(L, typeTrailingEmitter, map[string]lua.LGFunction{})
 	L.SetField(tmt, "__index", L.GetField(tmt, "methods"))
+
+	// Distribution metatable
+	dmt := L.NewTypeMetatable(typeDistribution)
+	L.SetField(dmt, "__tostring", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LString("distribution"))
+		return 1
+	}))
+
+	// TransitionPhase metatable
+	pmt := L.NewTypeMetatable(typeTransitionPhase)
+	L.SetField(pmt, "__tostring", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LString("transition_phase"))
+		return 1
+	}))
+
+	// EmissionStrategy metatable
+	emt := L.NewTypeMetatable(typeEmissionStrategy)
+	L.SetField(emt, "__tostring", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LString("emission_strategy"))
+		return 1
+	}))
 
 	// particle sub-table
 	pt := L.NewTable()
@@ -76,15 +100,11 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 
 	// Distribution strategies
 	L.SetField(pt, "linear", L.NewFunction(func(L *lua.LState) int {
-		ud := L.NewUserData()
-		ud.Value = particle.LinearDistribution()
-		L.Push(ud)
+		pushUserData(L, typeDistribution, particle.LinearDistribution())
 		return 1
 	}))
 	L.SetField(pt, "round_robin", L.NewFunction(func(L *lua.LState) int {
-		ud := L.NewUserData()
-		ud.Value = particle.RoundRobinDistribution()
-		L.Push(ud)
+		pushUserData(L, typeDistribution, particle.RoundRobinDistribution())
 		return 1
 	}))
 	L.SetField(pt, "closest_point", L.NewFunction(func(L *lua.LState) int {
@@ -95,99 +115,67 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 		entities := tableToEntities(L, entitiesTable)
 		targets := tableToCloud(L, targetsTable)
 
-		ud := L.NewUserData()
-		ud.Value = particle.ClosestPointDistribution(entities, targets, w)
-		L.Push(ud)
+		pushUserData(L, typeDistribution, particle.ClosestPointDistribution(entities, targets, w))
 		return 1
 	}))
 
 	// Phase constructors
 	L.SetField(pt, "burst_phase", L.NewFunction(func(L *lua.LState) int {
 		distance := float64(L.CheckNumber(1))
-		ud := L.NewUserData()
-		ud.Value = particle.TransitionPhase(particle.BurstPhase(distance))
-		L.Push(ud)
+		pushUserData(
+			L,
+			typeTransitionPhase,
+			particle.TransitionPhase(particle.BurstPhase(distance)),
+		)
 		return 1
 	}))
 	L.SetField(pt, "seek_phase", L.NewFunction(func(L *lua.LState) int {
-		ud := L.NewUserData()
-		ud.Value = particle.TransitionPhase(particle.SeekPhase())
-		L.Push(ud)
+		pushUserData(L, typeTransitionPhase, particle.TransitionPhase(particle.SeekPhase()))
 		return 1
 	}))
 	L.SetField(pt, "keyframe_phase", L.NewFunction(func(L *lua.LState) int {
 		easingName := L.OptString(1, "in_out_quad")
 		easing := resolveParticleEasing(easingName)
-		ud := L.NewUserData()
-		ud.Value = particle.TransitionPhase(&particle.KeyframePhase{Easing: easing})
-		L.Push(ud)
+		pushUserData(
+			L,
+			typeTransitionPhase,
+			particle.TransitionPhase(&particle.KeyframePhase{Easing: easing}),
+		)
 		return 1
 	}))
 	L.SetField(pt, "curve_phase", L.NewFunction(func(L *lua.LState) int {
 		arcHeight := float64(L.OptNumber(1, 10))
-		ud := L.NewUserData()
-		ud.Value = particle.TransitionPhase(&particle.CurvePhase{ArcHeight: arcHeight})
-		L.Push(ud)
+		pushUserData(
+			L,
+			typeTransitionPhase,
+			particle.TransitionPhase(&particle.CurvePhase{ArcHeight: arcHeight}),
+		)
 		return 1
 	}))
 	L.SetField(pt, "turbulence_phase", L.NewFunction(func(L *lua.LState) int {
 		scale := float64(L.CheckNumber(1))
 		strength := float64(L.CheckNumber(2))
-		ud := L.NewUserData()
-		ud.Value = particle.TransitionPhase(particle.TurbulencePhase(scale, strength))
-		L.Push(ud)
+		pushUserData(
+			L,
+			typeTransitionPhase,
+			particle.TransitionPhase(particle.TurbulencePhase(scale, strength)),
+		)
 		return 1
 	}))
 
-	// Particle materials
-	L.SetField(pt, "braille_directional", L.NewFunction(func(L *lua.LState) int {
-		ud := L.NewUserData()
-		ud.Value = core.Material(particle.BrailleDirectional())
-		L.Push(ud)
-		return 1
-	}))
-	L.SetField(pt, "rainbow_time", L.NewFunction(func(L *lua.LState) int {
-		freq := float64(L.CheckNumber(1))
-		ud := L.NewUserData()
-		ud.Value = core.Material(particle.RainbowTime(freq))
-		L.Push(ud)
-		return 1
-	}))
-	L.SetField(pt, "rainbow_velocity", L.NewFunction(func(L *lua.LState) int {
-		minSpeed := float64(L.CheckNumber(1))
-		maxSpeed := float64(L.CheckNumber(2))
-		ud := L.NewUserData()
-		ud.Value = core.Material(particle.RainbowVelocity(minSpeed, maxSpeed))
-		L.Push(ud)
-		return 1
-	}))
-	L.SetField(pt, "velocity_color", L.NewFunction(func(L *lua.LState) int {
-		opts := L.CheckTable(1)
-		gradient := particle.ColorGradient{
-			MinSpeed: getNumberField(L, opts, "min_speed", 0),
-			MaxSpeed: getNumberField(L, opts, "max_speed", 100),
-		}
-
-		if minC := L.GetField(opts, "min_color"); minC != lua.LNil {
-			if ud, ok := minC.(*lua.LUserData); ok {
-				if c, ok := ud.Value.(core.Color); ok {
-					gradient.MinColor = c
-				}
-			}
-		}
-		if maxC := L.GetField(opts, "max_color"); maxC != lua.LNil {
-			if ud, ok := maxC.(*lua.LUserData); ok {
-				if c, ok := ud.Value.(core.Color); ok {
-					gradient.MaxColor = c
-				}
-			}
-		}
-
-		ud := L.NewUserData()
-		ud.Value = core.Material(particle.VelocityColor(gradient))
-		L.Push(ud)
-		return 1
-	}))
+	// Emission strategy constants
+	pushUserData(L, typeEmissionStrategy, particle.EmissionStrategy(particle.BottomEdge))
+	L.SetField(pt, "bottom_edge", L.Get(-1))
+	L.Pop(1)
+	pushUserData(L, typeEmissionStrategy, particle.EmissionStrategy(particle.TopEdge))
+	L.SetField(pt, "top_edge", L.Get(-1))
+	L.Pop(1)
+	pushUserData(L, typeEmissionStrategy, particle.EmissionStrategy(particle.LeftEdge))
+	L.SetField(pt, "left_edge", L.Get(-1))
+	L.Pop(1)
+	pushUserData(L, typeEmissionStrategy, particle.EmissionStrategy(particle.RightEdge))
+	L.SetField(pt, "right_edge", L.Get(-1))
+	L.Pop(1)
 
 	// Trailing emitter
 	L.SetField(pt, "trailing_emitter", L.NewFunction(func(L *lua.LState) int {
@@ -213,6 +201,52 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 					}
 				}
 			}
+			// Drawable userdata
+			if v := L.GetField(opts, "drawable"); v != lua.LNil {
+				if ud, ok := v.(*lua.LUserData); ok {
+					if d, ok := ud.Value.(core.Drawable); ok {
+						emitter.Drawable = d
+					}
+				}
+			}
+			// Material: userdata or Lua function
+			if v := L.GetField(opts, "material"); v != lua.LNil {
+				switch val := v.(type) {
+				case *lua.LUserData:
+					if m, ok := val.Value.(core.Material); ok {
+						emitter.Material = m
+					}
+				case *lua.LFunction:
+					emitter.Material = materialFromLua(L, val)
+				}
+			}
+			// Behaviors: table of BehaviorFunc userdata
+			if v := L.GetField(opts, "behaviors"); v != lua.LNil {
+				if bt, ok := v.(*lua.LTable); ok {
+					var behaviors []core.BehaviorFunc
+					bt.ForEach(func(_, val lua.LValue) {
+						if ud, ok := val.(*lua.LUserData); ok {
+							if fn, ok := ud.Value.(core.BehaviorFunc); ok {
+								behaviors = append(behaviors, fn)
+							}
+						}
+					})
+					if len(behaviors) > 0 {
+						emitter.Behaviors = behaviors
+					}
+				}
+			}
+			// Velocity range
+			if v := L.GetField(opts, "velocity"); v != lua.LNil {
+				if vt, ok := v.(*lua.LTable); ok {
+					emitter.VelocityRange = &particle.VelocityRange{
+						MinX: getNumberField(L, vt, "min_x", -1.5),
+						MaxX: getNumberField(L, vt, "max_x", 1.5),
+						MinY: getNumberField(L, vt, "min_y", 0),
+						MaxY: getNumberField(L, vt, "max_y", 4),
+					}
+				}
+			}
 		}
 
 		ud := L.NewUserData()
@@ -225,7 +259,6 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 	L.SetField(pt, "compute_emission", L.NewFunction(func(L *lua.LState) int {
 		bmUD := L.CheckUserData(1)
 		drawableUD := L.CheckUserData(2)
-		strategyName := L.OptString(3, "bottom")
 
 		bm, ok := bmUD.Value.(*bitmap.Bitmap)
 		if !ok {
@@ -238,19 +271,7 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 			return 0
 		}
 
-		var strategy particle.EmissionStrategy
-		switch strategyName {
-		case "bottom":
-			strategy = particle.BottomEdge
-		case "top":
-			strategy = particle.TopEdge
-		case "left":
-			strategy = particle.LeftEdge
-		case "right":
-			strategy = particle.RightEdge
-		default:
-			strategy = particle.BottomEdge
-		}
+		strategy := resolveEmissionStrategy(L, 3)
 
 		params := particle.ComputeEmissionParams(bm, drawable, strategy)
 		result := L.NewTable()
@@ -411,6 +432,29 @@ func tableToEntities(L *lua.LState, t *lua.LTable) []core.Entity {
 		}
 	})
 	return entities
+}
+
+// resolveEmissionStrategy accepts a string or EmissionStrategy userdata at stack position n.
+func resolveEmissionStrategy(L *lua.LState, n int) particle.EmissionStrategy {
+	v := L.Get(n)
+	switch val := v.(type) {
+	case *lua.LUserData:
+		if s, ok := val.Value.(particle.EmissionStrategy); ok {
+			return s
+		}
+	case lua.LString:
+		switch string(val) {
+		case "bottom":
+			return particle.BottomEdge
+		case "top":
+			return particle.TopEdge
+		case "left":
+			return particle.LeftEdge
+		case "right":
+			return particle.RightEdge
+		}
+	}
+	return particle.BottomEdge
 }
 
 // resolveParticleEasing maps easing names to particle package easing functions.

@@ -141,6 +141,15 @@ func materialFromLua(L *lua.LState, fn *lua.LFunction) core.Material {
 			L.SetField(fragTable, "vel_y", lua.LNumber(0))
 		}
 
+		// Age/lifetime from Age component (if present)
+		if age := f.World.Age(f.Entity); age != nil {
+			L.SetField(fragTable, "age", lua.LNumber(age.Age))
+			L.SetField(fragTable, "lifetime", lua.LNumber(age.Lifetime))
+		} else {
+			L.SetField(fragTable, "age", lua.LNumber(0))
+			L.SetField(fragTable, "lifetime", lua.LNumber(0))
+		}
+
 		if err := L.CallByParam(lua.P{
 			Fn:      fn,
 			NRet:    1,
