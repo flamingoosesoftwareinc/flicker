@@ -116,6 +116,15 @@ func (hb *HalfBlock) Bounds() (int, int) {
 	return hb.Bitmap.Width, (hb.Bitmap.Height + 1) / 2
 }
 
+// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
+// HalfBlock: 1:1 horizontal (1 pixel = 1 cell), 2:1 vertical (2 pixels = 1 cell).
+func (hb *HalfBlock) BitmapToScreen(coord fmath.Vec2) fmath.Vec2 {
+	return fmath.Vec2{
+		X: coord.X,       // 1:1 horizontal mapping
+		Y: coord.Y / 2.0, // 2:1 vertical compression
+	}
+}
+
 // Renderer returns an inverse-mapping RenderFunc for half-block mode.
 // Each screen cell samples two bitmap rows (top and bottom halves).
 func (hb *HalfBlock) Renderer() core.RenderFunc {

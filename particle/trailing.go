@@ -38,13 +38,14 @@ type EmissionParams struct {
 }
 
 // ComputeBottomEdgeEmission analyzes a bitmap using SDF to find the bottom edge
-// emission parameters for HalfBlock rendering (2:1 vertical compression).
-func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
+// emission parameters. Uses the drawable's coordinate conversion to map from
+// bitmap pixel space to screen character cell space.
+func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
 	}
 
-	// Compute SDF and query its geometric bounds
+	// Compute SDF and query its geometric bounds (in bitmap pixel space)
 	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
 	bounds := sdf.Bounds()
 
@@ -52,15 +53,19 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
 		return EmissionParams{}
 	}
 
-	// Convert geometric bounds to particle emission parameters
-	// HalfBlock renders 2 vertical pixels per cell, so divide Y by 2
-	// Emit from the bottom edge across the width
+	// Convert bitmap bounds to screen coordinates using drawable's mapping
+	bottomLeft := drawable.BitmapToScreen(fmath.Vec2{
+		X: float64(bounds.MinX),
+		Y: float64(bounds.MaxY + 1), // +1 to emit just below bottom edge
+	})
+	bottomRight := drawable.BitmapToScreen(fmath.Vec2{
+		X: float64(bounds.MaxX),
+		Y: float64(bounds.MaxY + 1),
+	})
+
 	return EmissionParams{
-		Offset: fmath.Vec2{
-			X: float64(bounds.MinX),       // No horizontal compression
-			Y: float64(bounds.MaxY+1) / 2, // Divide by 2 for HalfBlock vertical compression
-		},
-		Width: float64(bounds.MaxX - bounds.MinX), // No horizontal compression
+		Offset: bottomLeft,
+		Width:  bottomRight.X - bottomLeft.X,
 	}
 }
 

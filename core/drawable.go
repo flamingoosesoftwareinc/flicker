@@ -8,7 +8,9 @@ type RenderFunc func(world fmath.Mat3, emit func(dx, dy, sx, sy int, cell Cell))
 
 type Drawable interface {
 	Draw(canvas *Canvas, x, y int)
-	Bounds() (width, height int)
 	CellAt(x, y int) Cell
 	Renderer() RenderFunc
+	// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
+	// Each drawable has its own compression ratio (e.g., HalfBlock is 1:1 horizontal, 2:1 vertical).
+	BitmapToScreen(bitmapCoord fmath.Vec2) fmath.Vec2
 }

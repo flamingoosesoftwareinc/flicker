@@ -591,7 +591,8 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			Position: fmath.Vec3{X: centerX, Y: centerY},
 			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 		})
-		w.AddDrawable(movingText, &bitmap.HalfBlock{Bitmap: textLayout.Bitmap})
+		drawable := &bitmap.HalfBlock{Bitmap: textLayout.Bitmap}
+		w.AddDrawable(movingText, drawable)
 		w.AddRoot(movingText)
 
 		// Circular motion behavior (must run BEFORE trailing emitter)
@@ -607,8 +608,8 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			}
 		}))
 
-		// Add trailing emitter using SDF to automatically find bottom edge
-		params := particle.ComputeBottomEdgeEmission(textLayout.Bitmap)
+		// Add trailing emitter using SDF with drawable's coordinate conversion
+		params := particle.ComputeBottomEdgeEmission(textLayout.Bitmap, drawable)
 		emitter := particle.NewTrailingEmitter(params.Offset)
 		emitter.Width = params.Width
 		emitter.EmitRate = 5.0     // Spawn more particles

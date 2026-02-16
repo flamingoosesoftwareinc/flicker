@@ -1,6 +1,9 @@
 package bitmap
 
-import "flicker/core"
+import (
+	"flicker/core"
+	"flicker/fmath"
+)
 
 // Rect is a rectangular drawable that uses half-block encoding internally.
 type Rect struct {
@@ -46,6 +49,13 @@ func (r *Rect) Bounds() (int, int) {
 func (r *Rect) CellAt(x, y int) core.Cell {
 	r.ensureBitmap()
 	return r.hb.CellAt(x, y)
+}
+
+// BitmapToScreen converts bitmap pixel coordinates to screen character cell coordinates.
+// Rect delegates to its internal HalfBlock implementation.
+func (r *Rect) BitmapToScreen(coord fmath.Vec2) fmath.Vec2 {
+	r.ensureBitmap()
+	return r.hb.BitmapToScreen(coord)
 }
 
 func (r *Rect) Renderer() core.RenderFunc {
