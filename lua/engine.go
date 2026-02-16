@@ -20,6 +20,9 @@ type Engine struct {
 	activeScene      *core.BasicScene
 	defaultCallbacks SceneCallbacks
 
+	// Multi-scene support
+	sceneManager *core.SceneManager
+
 	// Error log (prints to stderr)
 	errors []string
 }
@@ -65,6 +68,11 @@ func (e *Engine) Load(scriptPath string, width, height int) (*core.BasicScene, e
 	// Build scene from collected callbacks
 	scene := buildScene(L, e, &e.defaultCallbacks, width, height)
 	return scene, nil
+}
+
+// SceneManager returns the scene manager if one was created by the script.
+func (e *Engine) SceneManager() *core.SceneManager {
+	return e.sceneManager
 }
 
 // Reload tears down the current VM and re-executes the script.

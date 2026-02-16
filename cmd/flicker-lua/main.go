@@ -39,9 +39,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start the scene
-	scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
-	scene.OnReady()
+	// Check if the script created a scene manager (multi-scene mode)
+	sm := engine.SceneManager()
+	multiScene := sm != nil
+
+	if !multiScene {
+		// Single scene mode
+		scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
+		scene.OnReady()
+	}
 
 	// Pump PollEvent in a goroutine so the tick loop never blocks on input
 	events := make(chan tcell.Event, 1)
@@ -58,6 +64,7 @@ func main() {
 		// Drain events (non-blocking)
 		quit := false
 		reload := false
+		nextSlide := false
 		for draining := true; draining; {
 			select {
 			case ev := <-events:
@@ -69,6 +76,8 @@ func main() {
 						quit = true
 					case kev.Rune() == 'r':
 						reload = true
+					case kev.Rune() == ' ':
+						nextSlide = true
 					}
 				}
 			default:
@@ -76,19 +85,32 @@ func main() {
 			}
 		}
 		if quit {
-			scene.OnExit()
+			if multiScene {
+				// SceneManager handles cleanup
+			} else {
+				scene.OnExit()
+			}
 			return
 		}
 		if reload {
-			scene.OnExit()
+			if !multiScene {
+				scene.OnExit()
+			}
 			newScene, err := engine.Reload(sw, sh)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "reload error: %v\n", err)
 			} else {
-				scene = newScene
-				scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
-				scene.OnReady()
+				sm = engine.SceneManager()
+				multiScene = sm != nil
+				if !multiScene {
+					scene = newScene
+					scene.OnEnter(core.SceneContext{Width: sw, Height: sh})
+					scene.OnReady()
+				}
 			}
+		}
+		if nextSlide && multiScene && !sm.IsTransitioning() {
+			sm.Next(core.CrossFade, 1.5)
 		}
 
 		now := time.Now()
@@ -101,11 +123,17 @@ func main() {
 			Delta: wallDelta,
 		}
 
-		scene.OnUpdate(t)
-
 		canvas.Clear()
 		canvas.DrawBorder()
-		scene.Render(canvas, t)
+
+		if multiScene {
+			sm.Update(t)
+			sm.Render(canvas, t)
+		} else {
+			scene.OnUpdate(t)
+			scene.Render(canvas, t)
+		}
+
 		screen.Flush(canvas)
 	}
 }

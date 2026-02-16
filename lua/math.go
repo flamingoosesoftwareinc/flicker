@@ -9,6 +9,7 @@ import (
 func registerMathTypes(L *lua.LState, mod *lua.LTable) {
 	registerVec2(L, mod)
 	registerVec3(L, mod)
+	registerTweenVec3(L, mod)
 	registerMathModule(L, mod)
 }
 
@@ -334,6 +335,78 @@ func vec3Cross(L *lua.LState) int {
 	b := checkVec3(L, 2)
 	pushVec3(L, a.Cross(b))
 	return 1
+}
+
+// --- TweenVec3 ---
+
+const typeTweenVec3 = "flicker.tween_vec3"
+
+func registerTweenVec3(L *lua.LState, mod *lua.LTable) {
+	mt := registerType(L, typeTweenVec3, map[string]lua.LGFunction{
+		"update": tweenVec3Update,
+		"done":   tweenVec3Done,
+		"reset":  tweenVec3Reset,
+	})
+	L.SetField(mt, "__index", L.GetField(mt, "methods"))
+
+	// Constructor: flicker.tween_vec3({from, to, duration, easing})
+	L.SetField(mod, "tween_vec3", L.NewFunction(func(L *lua.LState) int {
+		opts := L.CheckTable(1)
+
+		tw := &fmath.TweenVec3{
+			Duration: getNumberField(L, opts, "duration", 1.0),
+		}
+
+		if from := L.GetField(opts, "from"); from != lua.LNil {
+			if ud, ok := from.(*lua.LUserData); ok {
+				if v, ok := ud.Value.(fmath.Vec3); ok {
+					tw.From = v
+				}
+			}
+		}
+		if to := L.GetField(opts, "to"); to != lua.LNil {
+			if ud, ok := to.(*lua.LUserData); ok {
+				if v, ok := ud.Value.(fmath.Vec3); ok {
+					tw.To = v
+				}
+			}
+		}
+
+		easingName := getStringField(L, opts, "easing", "linear")
+		tw.Easing = resolveEasing(easingName)
+
+		pushUserData(L, typeTweenVec3, tw)
+		return 1
+	}))
+}
+
+func checkTweenVec3(L *lua.LState, n int) *fmath.TweenVec3 {
+	ud := L.CheckUserData(n)
+	if tw, ok := ud.Value.(*fmath.TweenVec3); ok {
+		return tw
+	}
+	L.ArgError(n, "tween_vec3 expected")
+	return nil
+}
+
+func tweenVec3Update(L *lua.LState) int {
+	tw := checkTweenVec3(L, 1)
+	dt := float64(L.CheckNumber(2))
+	result := tw.Update(dt)
+	pushVec3(L, result)
+	return 1
+}
+
+func tweenVec3Done(L *lua.LState) int {
+	tw := checkTweenVec3(L, 1)
+	L.Push(lua.LBool(tw.Done()))
+	return 1
+}
+
+func tweenVec3Reset(L *lua.LState) int {
+	tw := checkTweenVec3(L, 1)
+	tw.Reset()
+	return 0
 }
 
 // --- Math module ---

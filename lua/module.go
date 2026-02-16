@@ -16,11 +16,13 @@ func registerAll(L *lua.LState, engine *Engine) *lua.LTable {
 	registerBitmapModule(L, mod)
 	registerSDFModule(L, mod)
 	registerSceneAPI(L, mod, engine)
+	registerSceneManagerModule(L, mod, engine)
 	registerAssetModule(L, mod)
 	registerTimelineModule(L, mod, engine)
 	registerPhysicsModule(L, mod)
 	registerBodyMethod(L)
 	registerTextFXModule(L, mod)
+	registerParticleModule(L, mod)
 
 	// Clip metatable (used by timeline clip constructors)
 	L.NewTypeMetatable("flicker.clip")
