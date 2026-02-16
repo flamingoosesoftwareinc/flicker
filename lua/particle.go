@@ -263,15 +263,24 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 	}))
 
 	// compose_materials(mat1, mat2, ...)
+	// Accepts both Go material userdata and Lua functions.
 	L.SetField(mod, "compose_materials", L.NewFunction(func(L *lua.LState) int {
 		n := L.GetTop()
 		materials := make([]core.Material, 0, n)
 		for i := 1; i <= n; i++ {
-			ud := L.CheckUserData(i)
-			if m, ok := ud.Value.(core.Material); ok {
-				materials = append(materials, m)
-			} else {
-				L.ArgError(i, "material expected")
+			v := L.Get(i)
+			switch val := v.(type) {
+			case *lua.LUserData:
+				if m, ok := val.Value.(core.Material); ok {
+					materials = append(materials, m)
+				} else {
+					L.ArgError(i, "material expected")
+					return 0
+				}
+			case *lua.LFunction:
+				materials = append(materials, materialFromLua(L, val))
+			default:
+				L.ArgError(i, "material or function expected")
 				return 0
 			}
 		}
