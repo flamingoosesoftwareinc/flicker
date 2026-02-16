@@ -9,15 +9,20 @@ include makefiles/shared.mk
 include makefiles/go.mk
 include makefiles/git.mk
 
-.PHONY: build flicker pr-ready verify install
+.PHONY: build flicker flicker-lua pr-ready verify install
 
 # Add flicker to main build target
-build: flicker
+build: flicker flicker-lua
 
 flicker: ## Build the flicker CLI binary
 	$(info $(_bullet) Building <flicker>)
 	@cd $(GO_SRC_DIR) && \
 	go build -o ./bin/flicker ./cmd/flicker
+
+flicker-lua: ## Build the flicker-lua scripting binary
+	$(info $(_bullet) Building <flicker-lua>)
+	@cd $(GO_SRC_DIR) && \
+	go build -o ./bin/flicker-lua ./cmd/flicker-lua
 
 pr-ready: tidy-go generate format build lint test git-dirty ## Run comprehensive pre-commit checks
 
