@@ -594,17 +594,7 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		w.AddDrawable(movingText, &bitmap.HalfBlock{Bitmap: textLayout.Bitmap})
 		w.AddRoot(movingText)
 
-		// Add trailing emitter at bottom-left corner of text
-		// Offset is relative to text position
-		emitter := particle.NewTrailingEmitter(fmath.Vec2{
-			X: 0,                                 // Left edge
-			Y: float64(textLayout.Bitmap.Height), // Bottom edge
-		})
-		emitter.EmitRate = 2.0     // More particles
-		emitter.ParticleLife = 2.0 // Longer lifetime
-		w.AddBehavior(movingText, emitter)
-
-		// Circular motion behavior
+		// Circular motion behavior (must run BEFORE trailing emitter)
 		var angle float64
 		radius := float64(sh) * 0.25
 
@@ -616,6 +606,16 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 				Y: centerY + math.Sin(angle)*radius - float64(textLayout.Bitmap.Height)/2,
 			}
 		}))
+
+		// Add trailing emitter at bottom-left corner of text
+		// Offset is relative to text position
+		emitter := particle.NewTrailingEmitter(fmath.Vec2{
+			X: 0,                                 // Left edge
+			Y: float64(textLayout.Bitmap.Height), // Bottom edge
+		})
+		emitter.EmitRate = 2.0     // More particles
+		emitter.ParticleLife = 2.0 // Longer lifetime
+		w.AddBehavior(movingText, emitter)
 	})
 
 	return scene
