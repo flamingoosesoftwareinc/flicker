@@ -596,10 +596,10 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 
 		// Circular motion behavior (must run BEFORE trailing emitter)
 		var angle float64
-		radius := float64(sh) * 0.25
+		radius := float64(sh) * 0.3
 
 		w.AddBehavior(movingText, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
-			angle += t.Delta * 1.5 // Rotate speed
+			angle += t.Delta * 3.0 // Faster rotation for visible trail
 			trans := w.Transform(e)
 			trans.Position = fmath.Vec3{
 				X: centerX + math.Cos(angle)*radius - float64(textLayout.Bitmap.Width)/2,
@@ -613,8 +613,8 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			X: 0,                                 // Left edge
 			Y: float64(textLayout.Bitmap.Height), // Bottom edge
 		})
-		emitter.EmitRate = 2.0     // More particles
-		emitter.ParticleLife = 2.0 // Longer lifetime
+		emitter.EmitRate = 5.0     // Spawn more particles
+		emitter.ParticleLife = 3.0 // Longer lifetime for visibility
 		w.AddBehavior(movingText, emitter)
 	})
 

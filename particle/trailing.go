@@ -51,12 +51,12 @@ func (te *TrailingEmitter) Update(t core.Time, e core.Entity, w *core.World) {
 	delta := trans.Position.Sub(te.lastPos)
 	distance := fmath.Vec2{X: delta.X, Y: delta.Y}.Length()
 
-	// Only spawn if moving (threshold: 0.1 pixels)
-	if distance > 0.1 {
+	// Only spawn if moving (threshold: 0.01 pixels - reduced from 0.1)
+	if distance > 0.01 {
 		// Number of particles to spawn based on distance
 		count := int(distance * te.EmitRate)
-		if count < 1 && distance > 0.5 {
-			count = 1 // At least 1 particle if moving significantly
+		if count < 1 && distance > 0.01 {
+			count = 1 // At least 1 particle if moving at all
 		}
 
 		// Spawn dust particles along the path
