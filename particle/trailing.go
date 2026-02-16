@@ -128,10 +128,14 @@ func ApplyEmissionStrategy(
 	}
 }
 
-// ComputeBottomEdgeEmission is a convenience function for bitmap-based drawables.
+// ComputeEmissionParams is a convenience function for bitmap-based drawables.
 // It handles the common case of computing bottom edge emission from a bitmap and its drawable.
 // For custom strategies or SDF sources, use ApplyEmissionStrategy directly.
-func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) EmissionParams {
+func ComputeEmissionParams(
+	bm *bitmap.Bitmap,
+	drawable core.Drawable,
+	e EmissionStrategy,
+) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
 	}
@@ -147,7 +151,7 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) Emissi
 	scaleY := float64(screenHeight) / float64(bm.Height)
 
 	// Apply bottom edge strategy
-	return ApplyEmissionStrategy(sdf, BottomEdge, scaleX, scaleY)
+	return ApplyEmissionStrategy(sdf, e, scaleX, scaleY)
 }
 
 // Enabled returns true (always active).

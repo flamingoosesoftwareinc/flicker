@@ -609,7 +609,7 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		}))
 
 		// Add trailing emitter using SDF with drawable's coordinate conversion
-		params := particle.ComputeBottomEdgeEmission(textLayout.Bitmap, drawable)
+		params := particle.ComputeEmissionParams(textLayout.Bitmap, drawable, particle.BottomEdge)
 		emitter := particle.NewTrailingEmitter(params.Offset)
 		emitter.Width = params.Width
 		emitter.EmitRate = 5.0     // Spawn more particles
