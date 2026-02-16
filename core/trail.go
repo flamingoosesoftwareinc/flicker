@@ -132,7 +132,8 @@ func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cel
 		localThreshold := dustThreshold * (0.7 + pocketValue*0.6) // Varies threshold
 
 		// As cell fades, convert to dust in pockets
-		if c.FGAlpha < localThreshold && c.Rune != ' ' {
+		// Only convert non-empty cells (rune must be printable, not null/space)
+		if c.FGAlpha < localThreshold && c.Rune != 0 && c.Rune != ' ' {
 			// Use various dust characters based on position for variety
 			dustChars := []rune{'·', '∙', '⋅', '•'}
 			idx := (f.ScreenX + f.ScreenY) % len(dustChars)
