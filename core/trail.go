@@ -67,8 +67,10 @@ func BlurTrail(decay, blurAmount float64) func(Fragment) Cell {
 func FloatyTrail(decay, strength float64) func(Fragment) Cell {
 	return func(f Fragment) Cell {
 		// Use Perlin noise to create drifting offset
-		noiseX := fmath.Noise2D(float64(f.ScreenX)*0.05, f.Time.Total*0.3)
-		noiseY := fmath.Noise2D(float64(f.ScreenY)*0.05+100.0, f.Time.Total*0.3)
+		// Slower time evolution (0.1 vs 0.3) and lower spatial frequency (0.02 vs 0.05)
+		// for smoother, less steppy transitions
+		noiseX := fmath.Noise2D(float64(f.ScreenX)*0.02, f.Time.Total*0.1)
+		noiseY := fmath.Noise2D(float64(f.ScreenY)*0.02+100.0, f.Time.Total*0.1)
 
 		offsetX := int(noiseX * strength)
 		offsetY := int(noiseY * strength)
@@ -88,15 +90,12 @@ func FloatyTrail(decay, strength float64) func(Fragment) Cell {
 }
 
 // GravityTrail creates a downward-drifting trail effect.
-// Decay controls fade, fallSpeed controls how fast trails fall (pixels per second).
+// Decay controls fade, fallSpeed is no longer used (kept for API compatibility).
 func GravityTrail(decay, fallSpeed float64) func(Fragment) Cell {
 	return func(f Fragment) Cell {
-		// Calculate vertical offset based on time
-		// Use modulo to create repeating pattern
-		offset := int(f.Time.Total*fallSpeed) % 3
-
-		// Sample from above (creates downward drift)
-		c := f.Source.Get(f.ScreenX, f.ScreenY-offset)
+		// Sample from 1 pixel above to create smooth downward flow
+		// Each row shows what was in the row above it on the previous frame
+		c := f.Source.Get(f.ScreenX, f.ScreenY-1)
 		c.FGAlpha *= decay
 		c.BGAlpha *= decay
 
