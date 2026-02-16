@@ -1,6 +1,8 @@
 package particle
 
 import (
+	"math"
+
 	"flicker/core"
 	"flicker/core/bitmap"
 	"flicker/fmath"
@@ -26,6 +28,64 @@ func NewTrailingEmitter(offset fmath.Vec2) *TrailingEmitter {
 		ParticleLife: 1.5, // 1.5 seconds lifetime
 		Offset:       offset,
 		Color:        core.Color{R: 255, G: 255, B: 255}, // Bright white
+	}
+}
+
+// EmissionParams holds parameters for particle emission derived from a bitmap's shape.
+type EmissionParams struct {
+	Offset fmath.Vec2 // Offset to bottom-left of shape
+	Width  float64    // Width of emission area
+}
+
+// ComputeBottomEdgeEmission analyzes a bitmap using SDF to find the bottom edge
+// emission parameters. This works for any bitmap regardless of rendering method.
+func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
+	if bm.Width == 0 || bm.Height == 0 {
+		return EmissionParams{}
+	}
+
+	// Compute SDF from bitmap to find shape boundaries
+	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
+
+	// Find the bottom edge by scanning for the lowest Y position with content
+	var minX, maxX, maxY int
+	foundContent := false
+
+	for x := 0; x < bm.Width; x++ {
+		for y := bm.Height - 1; y >= 0; y-- {
+			// Check if this pixel is inside or on the boundary (distance <= 0)
+			if sdf.At(x, y) <= 0 {
+				if !foundContent {
+					minX = x
+					maxX = x
+					maxY = y
+					foundContent = true
+				} else {
+					if x < minX {
+						minX = x
+					}
+					if x > maxX {
+						maxX = x
+					}
+					if y > maxY {
+						maxY = y
+					}
+				}
+				break // Found bottom for this column
+			}
+		}
+	}
+
+	if !foundContent {
+		return EmissionParams{}
+	}
+
+	return EmissionParams{
+		Offset: fmath.Vec2{
+			X: float64(minX),
+			Y: float64(maxY + 1),
+		}, // +1 to emit just below bottom edge
+		Width: float64(maxX - minX),
 	}
 }
 
