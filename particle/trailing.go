@@ -37,9 +37,28 @@ type EmissionParams struct {
 	Width  float64    // Width of emission area
 }
 
-// ComputeBottomEdgeEmission analyzes a bitmap using SDF to find the bottom edge
-// emission parameters. Converts from bitmap pixel space to screen character cell
-// space using the drawable's rendered dimensions.
+// BoundsToEmissionParams converts SDF shape bounds to particle emission parameters.
+// This is a low-level function that works with any SDF source (bitmap, analytical, etc.).
+//
+// shapeBounds: The bounding box of the shape in source coordinate space
+// scaleX, scaleY: Scale factors to convert from source space to screen space
+func BoundsToEmissionParams(shapeBounds bitmap.Bounds, scaleX, scaleY float64) EmissionParams {
+	if shapeBounds.Empty {
+		return EmissionParams{}
+	}
+
+	return EmissionParams{
+		Offset: fmath.Vec2{
+			X: float64(shapeBounds.MinX) * scaleX,
+			Y: float64(shapeBounds.MaxY+1) * scaleY, // +1 to emit just below bottom edge
+		},
+		Width: float64(shapeBounds.MaxX-shapeBounds.MinX) * scaleX,
+	}
+}
+
+// ComputeBottomEdgeEmission is a convenience function for bitmap-based drawables.
+// It handles the common case of computing emission params from a bitmap and its drawable.
+// For custom SDF sources or more control, use BoundsToEmissionParams directly.
 func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) EmissionParams {
 	if bm.Width == 0 || bm.Height == 0 {
 		return EmissionParams{}
@@ -47,11 +66,7 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) Emissi
 
 	// Compute SDF and query its geometric bounds (in bitmap pixel space)
 	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
-	bitmapBounds := sdf.Bounds()
-
-	if bitmapBounds.Empty {
-		return EmissionParams{}
-	}
+	shapeBounds := sdf.Bounds()
 
 	// Get screen-space dimensions from drawable
 	screenWidth, screenHeight := drawable.Bounds()
@@ -60,14 +75,8 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap, drawable core.Drawable) Emissi
 	scaleX := float64(screenWidth) / float64(bm.Width)
 	scaleY := float64(screenHeight) / float64(bm.Height)
 
-	// Convert bitmap bounds to screen coordinates
-	return EmissionParams{
-		Offset: fmath.Vec2{
-			X: float64(bitmapBounds.MinX) * scaleX,
-			Y: float64(bitmapBounds.MaxY+1) * scaleY, // +1 to emit just below bottom edge
-		},
-		Width: float64(bitmapBounds.MaxX-bitmapBounds.MinX) * scaleX,
-	}
+	// Delegate to low-level function
+	return BoundsToEmissionParams(shapeBounds, scaleX, scaleY)
 }
 
 // Enabled returns true (always active).
