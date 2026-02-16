@@ -615,7 +615,7 @@ func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		})
 		emitter.Width = float64(
 			textLayout.Bitmap.Width,
-		) / 2 // Spread across full width (screen coords)
+		) // Full width (HalfBlock: 1 pixel = 1 cell horizontally)
 		emitter.EmitRate = 5.0     // Spawn more particles
 		emitter.ParticleLife = 3.0 // Longer lifetime for visibility
 		w.AddBehavior(movingText, emitter)
