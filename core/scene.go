@@ -9,6 +9,7 @@ type SceneContext struct {
 // Scene represents a discrete slide/screen with lifecycle management.
 type Scene interface {
 	OnEnter(ctx SceneContext) // Setup (called when scene becomes active)
+	OnReady()                 // Called when scene transition completes (or immediately if no transition)
 	OnUpdate(t Time)          // Per-frame update
 	OnExit()                  // Cleanup (called when scene becomes inactive)
 	Render(canvas *Canvas, t Time)
@@ -24,6 +25,7 @@ type BasicScene struct {
 
 	// Optional lifecycle hooks
 	enterFn  func(world *World, ctx SceneContext)
+	readyFn  func(world *World)
 	updateFn func(world *World, t Time)
 	exitFn   func(world *World)
 }
@@ -53,6 +55,12 @@ func (s *BasicScene) SetEnter(fn func(world *World, ctx SceneContext)) {
 	s.enterFn = fn
 }
 
+// SetReady registers a hook called when the scene transition completes.
+// If the scene has no transition (e.g., first scene or GoTo), this is called immediately after OnEnter.
+func (s *BasicScene) SetReady(fn func(world *World)) {
+	s.readyFn = fn
+}
+
 // SetUpdate registers a hook called every frame while the scene is active.
 func (s *BasicScene) SetUpdate(fn func(world *World, t Time)) {
 	s.updateFn = fn
@@ -67,6 +75,13 @@ func (s *BasicScene) SetExit(fn func(world *World)) {
 func (s *BasicScene) OnEnter(ctx SceneContext) {
 	if s.enterFn != nil {
 		s.enterFn(s.world, ctx)
+	}
+}
+
+// OnReady implements Scene.
+func (s *BasicScene) OnReady() {
+	if s.readyFn != nil {
+		s.readyFn(s.world)
 	}
 }
 

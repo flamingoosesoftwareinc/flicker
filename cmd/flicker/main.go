@@ -129,6 +129,8 @@ func main() {
 func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
 	var timeline *core.Timeline
+	var text core.Entity
+	var centerX float64
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		// Rasterize "INTRO" text
@@ -140,11 +142,11 @@ func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		})
 
 		// Center position (target)
-		centerX := float64(sw/2) - float64(layout.Bitmap.Width)/2
+		centerX = float64(sw/2) - float64(layout.Bitmap.Width)/2
 		centerY := float64(sh/2) - float64(layout.Bitmap.Height)/2
 
 		// Create text entity (start off-screen to the left)
-		text := w.Spawn()
+		text = w.Spawn()
 		w.AddTransform(text, &core.Transform{
 			Position: fmath.Vec3{X: -float64(layout.Bitmap.Width), Y: centerY},
 			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
@@ -152,15 +154,17 @@ func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		w.AddDrawable(text, &bitmap.HalfBlock{Bitmap: layout.Bitmap})
 		w.AddRoot(text)
 
-		// Create Timeline for slide-in animation
+		// Create Timeline (will start in OnReady)
 		timeline = core.NewTimeline(w)
-		track := timeline.AddTrack()
+	})
 
-		// Slide in from left with easing
+	scene.SetReady(func(w *core.World) {
+		// Start animation when scene is ready (transition complete)
+		track := timeline.AddTrack()
 		track.Add(core.NewPropertyTweenClip(
 			text,
 			"position.x",
-			-float64(layout.Bitmap.Width),
+			-float64(w.Transform(text).Position.X), // Get current position
 			centerX,
 			1.5,
 		).WithEasing(fmath.EaseOutCubic))
@@ -181,6 +185,9 @@ func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
 	var timeline *core.Timeline
+	var text1, text2 core.Entity
+	var targetY1 float64
+	var layout1Height float64
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		timeline = core.NewTimeline(w)
@@ -193,11 +200,12 @@ func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			Color: core.Color{R: 255, G: 100, B: 100},
 		})
 		centerX1 := float64(sw/2) - float64(layout1.Bitmap.Width)/2
-		targetY1 := float64(sh) * 0.25
+		targetY1 = float64(sh) * 0.25
+		layout1Height = float64(layout1.Bitmap.Height)
 
-		text1 := w.Spawn()
+		text1 = w.Spawn()
 		w.AddTransform(text1, &core.Transform{
-			Position: fmath.Vec3{X: centerX1, Y: -float64(layout1.Bitmap.Height)},
+			Position: fmath.Vec3{X: centerX1, Y: -layout1Height},
 			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
 		})
 		w.AddDrawable(text1, &bitmap.HalfBlock{Bitmap: layout1.Bitmap})
@@ -213,28 +221,30 @@ func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		centerX2 := float64(sw/2) - float64(layout2.Bitmap.Width)/2
 		centerY2 := float64(sh) * 0.55
 
-		text2 := w.Spawn()
+		text2 = w.Spawn()
 		w.AddTransform(text2, &core.Transform{
 			Position: fmath.Vec3{X: centerX2, Y: centerY2},
 			Scale:    fmath.Vec3{X: 0.1, Y: 0.1, Z: 1},
 		})
 		w.AddDrawable(text2, &bitmap.HalfBlock{Bitmap: layout2.Bitmap})
 		w.AddRoot(text2)
+	})
 
-		// Create animation tracks
-		// Track 1: Word 1 slides down with bounce (wait for transition + pause)
+	scene.SetReady(func(w *core.World) {
+		// Start animations when scene is ready (transition complete)
+		// Track 1: Word 1 slides down with bounce
 		track1 := timeline.AddTrack()
-		track1.At(2.0, core.NewPropertyTweenClip(
+		track1.Add(core.NewPropertyTweenClip(
 			text1,
 			"position.y",
-			-float64(layout1.Bitmap.Height),
+			-layout1Height,
 			targetY1,
 			1.2,
 		).WithEasing(fmath.EaseOutBounce))
 
 		// Track 2: Word 2 scales up after word 1 appears
 		track2 := timeline.AddTrack()
-		track2.At(2.8, core.NewParallelClip(
+		track2.At(0.8, core.NewParallelClip(
 			core.NewPropertyTweenClip(text2, "scale.x", 0.1, 1.0, 1.0).
 				WithEasing(fmath.EaseOutElastic),
 			core.NewPropertyTweenClip(text2, "scale.y", 0.1, 1.0, 1.0).
@@ -340,6 +350,7 @@ func createParticleScene(sw, sh int, font *asset.Font) *core.BasicScene {
 func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 	scene := core.NewBasicScene(sw, sh)
 	var timeline *core.Timeline
+	var text core.Entity
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
 		// Rasterize "THANKS" text
@@ -355,7 +366,7 @@ func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		centerY := float64(sh/2) - float64(layout.Bitmap.Height)/2
 
 		// Create text entity with rainbow material (start small)
-		text := w.Spawn()
+		text = w.Spawn()
 		w.AddTransform(text, &core.Transform{
 			Position: fmath.Vec3{X: centerX, Y: centerY},
 			Scale:    fmath.Vec3{X: 0.3, Y: 0.3, Z: 1},
@@ -365,12 +376,14 @@ func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		w.AddMaterial(text, particle.RainbowTime(3.0))
 		w.AddRoot(text)
 
-		// Create Timeline animation
+		// Create Timeline (will start in OnReady)
 		timeline = core.NewTimeline(w)
-		track := timeline.AddTrack()
+	})
 
-		// Scale up and rotate in parallel (wait for transition + pause)
-		track.At(2.0, core.NewParallelClip(
+	scene.SetReady(func(w *core.World) {
+		// Start animation when scene is ready (transition complete)
+		track := timeline.AddTrack()
+		track.Add(core.NewParallelClip(
 			core.NewPropertyTweenClip(text, "scale.x", 0.3, 1.0, 1.5).
 				WithEasing(fmath.EaseOutElastic),
 			core.NewPropertyTweenClip(text, "scale.y", 0.3, 1.0, 1.5).

@@ -81,6 +81,9 @@ func (sm *SceneManager) GoTo(index int) {
 	sm.active = true
 	ctx := SceneContext{Width: sm.width, Height: sm.height}
 	sm.scenes[sm.current].OnEnter(ctx)
+
+	// Scene is immediately ready (no transition)
+	sm.scenes[sm.current].OnReady()
 }
 
 // transitionTo starts a transition to the target scene.
@@ -130,6 +133,9 @@ func (sm *SceneManager) Update(t Time) {
 					break
 				}
 			}
+
+			// Notify new scene that transition is complete
+			sm.transition.To.OnReady()
 
 			sm.transition = nil
 		}
