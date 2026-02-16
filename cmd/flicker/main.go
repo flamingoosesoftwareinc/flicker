@@ -222,9 +222,9 @@ func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		w.AddRoot(text2)
 
 		// Create animation tracks
-		// Track 1: Word 1 slides down with bounce
+		// Track 1: Word 1 slides down with bounce (wait for transition to complete)
 		track1 := timeline.AddTrack()
-		track1.At(0.0, core.NewPropertyTweenClip(
+		track1.At(1.5, core.NewPropertyTweenClip(
 			text1,
 			"position.y",
 			-float64(layout1.Bitmap.Height),
@@ -234,7 +234,7 @@ func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 
 		// Track 2: Word 2 scales up after word 1 appears
 		track2 := timeline.AddTrack()
-		track2.At(0.8, core.NewParallelClip(
+		track2.At(2.3, core.NewParallelClip(
 			core.NewPropertyTweenClip(text2, "scale.x", 0.1, 1.0, 1.0).
 				WithEasing(fmath.EaseOutElastic),
 			core.NewPropertyTweenClip(text2, "scale.y", 0.1, 1.0, 1.0).
@@ -369,8 +369,8 @@ func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 		timeline = core.NewTimeline(w)
 		track := timeline.AddTrack()
 
-		// Scale up and rotate in parallel
-		track.Add(core.NewParallelClip(
+		// Scale up and rotate in parallel (wait for transition to complete)
+		track.At(1.5, core.NewParallelClip(
 			core.NewPropertyTweenClip(text, "scale.x", 0.3, 1.0, 1.5).
 				WithEasing(fmath.EaseOutElastic),
 			core.NewPropertyTweenClip(text, "scale.y", 0.3, 1.0, 1.5).
