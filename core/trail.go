@@ -108,55 +108,75 @@ func GravityTrail(decay, fallSpeed float64) func(Fragment) Cell {
 	}
 }
 
-// DustTrail creates a dissolving effect where trails turn into dust particles.
-// Decay controls fade, dustThreshold controls when transformation occurs.
-// Uses Voronoi-like noise pockets to create organic fading clusters.
+// DustTrail creates a selective dissolving effect where trails selectively spawn
+// dust particles that drift and fade. Uses noise for spawning probability,
+// turbulence-like offset for active movement, and gradient bias.
 func DustTrail(decay, dustThreshold float64, dustColor Color) func(Fragment) Cell {
 	return func(f Fragment) Cell {
 		c := f.Cell
 
-		// Create Voronoi-like pockets using layered Perlin noise
-		// Low frequency for large pockets
-		pocket1 := fmath.Noise2D(float64(f.ScreenX)*0.03, float64(f.ScreenY)*0.03+f.Time.Total*0.1)
-		// Higher frequency for detail
-		pocket2 := fmath.Noise2D(float64(f.ScreenX)*0.08, float64(f.ScreenY)*0.08+f.Time.Total*0.15)
-
-		// Combine noise layers (-1 to 1 range)
-		// Pockets determine local fade rate
-		pocketValue := (pocket1 + pocket2*0.5) / 1.5
-
-		// Modulate decay based on pocket - creates regions that fade faster/slower
-		localDecay := decay * (0.8 + pocketValue*0.3) // Range: 0.5*decay to 1.1*decay
-
-		// Modulate dust threshold based on pockets - some regions turn to dust sooner
-		localThreshold := dustThreshold * (0.7 + pocketValue*0.6) // Varies threshold
-
-		// As cell fades, convert to dust in pockets
-		// Only convert non-empty cells (rune must be printable, not null/space)
-		if c.FGAlpha < localThreshold && c.Rune != 0 && c.Rune != ' ' {
-			// Use various dust characters based on position for variety
-			dustChars := []rune{'·', '∙', '⋅', '•'}
-			idx := (f.ScreenX + f.ScreenY) % len(dustChars)
-			c.Rune = dustChars[idx]
-			c.FG = dustColor
-
-			// Boost alpha when converting to dust so it's visible and grayish
-			// Map from current low alpha to a visible range
-			c.FGAlpha = 0.3 + c.FGAlpha*0.5 // Range: 0.3 to 0.8
-			c.BGAlpha = 0.0                 // Dust has transparent background
-
-			// In deep pockets (low noise), fade dust faster
-			if pocketValue < -0.3 {
-				c.FGAlpha *= 0.85
-			}
-		} else {
-			// Not yet dust - apply normal decay
-			c.FGAlpha *= localDecay
-			c.BGAlpha *= localDecay * 0.5 // BG fades faster
+		// Skip empty cells immediately
+		if c.Rune == 0 || c.Rune == ' ' {
+			return Cell{}
 		}
 
-		// Clear cell when alpha drops too low
-		if c.FGAlpha < 0.01 && c.BGAlpha < 0.01 {
+		// Turbulence-like noise for dust position offset (creates active/wobbly movement)
+		turbX := fmath.Noise2D(float64(f.ScreenX)*0.05, f.Time.Total*0.4)
+		turbY := fmath.Noise2D(float64(f.ScreenY)*0.05+50.0, f.Time.Total*0.4)
+
+		// Sample from slightly offset position for turbulent appearance
+		offsetX := int(turbX * 2.0)
+		offsetY := int(turbY * 1.5)
+		sourceCell := f.Source.Get(f.ScreenX+offsetX, f.ScreenY+offsetY)
+
+		// If source cell is empty after turbulence offset, fade current cell fast
+		if sourceCell.Rune == 0 || sourceCell.Rune == ' ' {
+			c.FGAlpha *= 0.7
+			c.BGAlpha *= 0.7
+			if c.FGAlpha < 0.05 {
+				return Cell{}
+			}
+			return c
+		}
+
+		// Use source cell with turbulence
+		c = sourceCell
+
+		// Spawn probability based on noise (selective dust spawning)
+		spawnNoise := fmath.Noise2D(float64(f.ScreenX)*0.1, float64(f.ScreenY)*0.1+f.Time.Total*0.2)
+
+		// Gradient bias - more dust toward bottom/trailing edge
+		verticalBias := float64(f.ScreenY) / 50.0 // Increases downward
+		spawnProbability := (spawnNoise + 1.0) / 2.0 * (0.6 + verticalBias*0.4)
+
+		// Only spawn dust if probability is high enough AND cell is fading
+		shouldSpawnDust := c.FGAlpha < dustThreshold && spawnProbability > 0.55
+
+		if shouldSpawnDust {
+			// Convert to dust particle
+			dustChars := []rune{'·', '∙', '⋅', '•', '⋆'}
+			idx := (f.ScreenX + f.ScreenY + int(f.Time.Total*10)) % len(dustChars)
+			c.Rune = dustChars[idx]
+			c.FG = dustColor
+			c.BGAlpha = 0.0
+
+			// Dust particles are visible but fade quickly
+			c.FGAlpha = 0.4 + spawnNoise*0.3 // 0.4-0.7 range
+
+			// Fast decay for dust
+			c.FGAlpha *= 0.75
+		} else if c.FGAlpha < dustThreshold {
+			// Fading but didn't spawn dust - just clear quickly
+			c.FGAlpha *= 0.6
+			c.BGAlpha *= 0.6
+		} else {
+			// Still solid - apply gentle decay
+			c.FGAlpha *= decay
+			c.BGAlpha *= decay
+		}
+
+		// Clear very faint cells
+		if c.FGAlpha < 0.05 {
 			return Cell{}
 		}
 
