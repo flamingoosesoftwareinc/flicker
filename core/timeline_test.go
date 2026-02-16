@@ -23,7 +23,10 @@ func TestTimelineBasicCallback(t *testing.T) {
 	track.Add(NewCallbackClip(callback))
 
 	// Start timeline
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update once - callback should execute immediately
 	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.016})
@@ -56,7 +59,10 @@ func TestTimelineDelayedCallback(t *testing.T) {
 	track.At(2.0, NewCallbackClip(callback)) // Execute at 2 seconds
 
 	// Start timeline
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=1.0 - should not execute yet
 	UpdateBehaviors(world, Time{Total: 1.0, Delta: 0.016})
@@ -94,7 +100,10 @@ func TestTimelineParallelTracks(t *testing.T) {
 		track2Executed = true
 	}))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=1.1 - both should execute
 	UpdateBehaviors(world, Time{Total: 1.1, Delta: 0.016})
@@ -129,7 +138,10 @@ func TestTimelineSequentialClips(t *testing.T) {
 		executionOrder = append(executionOrder, 2)
 	}))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=0.5 - nothing should execute
 	UpdateBehaviors(world, Time{Total: 0.5, Delta: 0.016})
@@ -168,7 +180,10 @@ func TestTimelineTween(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(NewTweenClip(0.0, 100.0, 2.0, setter))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=0.0 - should be at start value
 	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.016})
@@ -211,7 +226,10 @@ func TestTimelinePropertyTween(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(NewPropertyTweenClip(entity, "position.x", 0.0, 100.0, 2.0))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=1.0 - should be halfway
 	UpdateBehaviors(world, Time{Total: 1.0, Delta: 0.016})
@@ -249,7 +267,10 @@ func TestTimelineParallelClip(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(parallel)
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=0.5 - both should be halfway
 	UpdateBehaviors(world, Time{Total: 0.5, Delta: 0.016})
@@ -296,7 +317,10 @@ func TestTimelineSequenceClip(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(sequence)
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=0.6 - first callback should execute
 	UpdateBehaviors(world, Time{Total: 0.6, Delta: 0.016})
@@ -331,7 +355,10 @@ func TestTimelineLoop(t *testing.T) {
 	track.Add(NewDelayClip(0.5))
 	track.Add(NewCallbackClip(callback))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// First execution at t=0.6
 	UpdateBehaviors(world, Time{Total: 0.6, Delta: 0.016})
@@ -369,7 +396,10 @@ func TestTimelinePauseResume(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(NewTweenClip(0.0, 100.0, 2.0, setter))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update to t=1.0 - should be at 50
 	UpdateBehaviors(world, Time{Total: 1.0, Delta: 0.016})
@@ -420,7 +450,10 @@ func TestTimelinePropertyTweenWithEasing(t *testing.T) {
 	track.Add(NewPropertyTweenClip(entity, "position.x", 0.0, 100.0, 2.0).
 		WithEasing(fmath.EaseInOutQuad))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=1.0 - with EaseInOutQuad, should still be near 50
 	UpdateBehaviors(world, Time{Total: 1.0, Delta: 0.016})
@@ -461,7 +494,10 @@ func TestTimelineMultipleProperties(t *testing.T) {
 		NewPropertyTweenClip(entity, "rotation", 0.0, 3.14159, 1.0),
 	))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update at t=1.1 - all should be at end values
 	UpdateBehaviors(world, Time{Total: 1.1, Delta: 0.016})
@@ -497,7 +533,10 @@ func TestTimelineStop(t *testing.T) {
 	track := timeline.AddTrack()
 	track.Add(NewTweenClip(0.0, 100.0, 2.0, setter))
 
-	timeline.Start(Time{Total: 0.0, Delta: 0.0})
+	timeline.Start()
+
+	// Initialize timeline at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
 
 	// Update to t=1.0
 	UpdateBehaviors(world, Time{Total: 1.0, Delta: 0.016})

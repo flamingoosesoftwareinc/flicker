@@ -17,7 +17,7 @@ func ExampleSimpleSequence() {
 	track.At(2.0, NewCallbackClip(spawnSubtitle))
 	track.At(4.0, NewCallbackClip(fadeOut))
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 
 	// In scene OnUpdate:
 	// UpdateBehaviors(world, t) - automatically updates timeline
@@ -49,7 +49,7 @@ func ExampleParallelAnimations() {
 		bgAlpha = v
 	}))
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 }
 
 // ============================================================================
@@ -70,7 +70,7 @@ func ExamplePropertyAnimation() {
 	track.Add(NewPropertyTweenClip(entity, "position.x", 0, 100, 2.0).
 		WithEasing(fmath.EaseInOutQuad))
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 }
 
 // ============================================================================
@@ -101,7 +101,7 @@ func ExampleComposition() {
 		NewCallbackClip(hideMessage),
 	))
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 }
 
 // ============================================================================
@@ -129,7 +129,7 @@ func ExampleBasicSceneIntegration() {
 		}))
 
 		// Start timeline at scene entry
-		timeline.Start(Time{Total: 0})
+		timeline.Start()
 	})
 
 	scene.SetExit(func(w *World) {
@@ -155,7 +155,7 @@ func ExampleLoopMode() {
 	track.Add(NewCallbackClip(pulse))
 	track.Add(NewDelayClip(1.0))
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 	// Timeline will restart after completing all tracks
 }
 
@@ -169,7 +169,7 @@ func ExamplePauseResume() {
 
 	// ... setup timeline ...
 
-	timeline.Start(Time{Total: 0.0})
+	timeline.Start()
 
 	// Later...
 	timeline.Pause() // Pause animation

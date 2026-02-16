@@ -83,7 +83,7 @@ scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
     track.At(2.0, core.NewCallbackClip(spawnText))
     track.At(5.0, core.NewCallbackClip(burstParticles))
 
-    timeline.Start(core.Time{Total: 0})
+    timeline.Start()
 })
 
 scene.SetExit(func(w *core.World) {

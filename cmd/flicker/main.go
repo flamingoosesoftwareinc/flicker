@@ -169,7 +169,7 @@ func createIntroScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			1.5,
 		).WithEasing(fmath.EaseOutCubic))
 
-		timeline.Start(core.Time{Total: 0})
+		timeline.Start()
 	})
 
 	scene.SetExit(func(w *core.World) {
@@ -251,7 +251,7 @@ func createTimelineScene(sw, sh int, font *asset.Font) *core.BasicScene {
 				WithEasing(fmath.EaseOutElastic),
 		))
 
-		timeline.Start(core.Time{Total: 0})
+		timeline.Start()
 	})
 
 	scene.SetExit(func(w *core.World) {
@@ -392,7 +392,7 @@ func createThanksScene(sw, sh int, font *asset.Font) *core.BasicScene {
 				WithEasing(fmath.EaseOutCubic),
 		))
 
-		timeline.Start(core.Time{Total: 0})
+		timeline.Start()
 	})
 
 	scene.SetExit(func(w *core.World) {

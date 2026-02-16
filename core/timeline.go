@@ -71,10 +71,10 @@ func NewTimeline(world *World) *Timeline {
 	return tl
 }
 
-// Start begins timeline playback from the given time.
-// Uses absolute time pattern (startTime = t.Total).
-func (tl *Timeline) Start(t Time) {
-	tl.startTime = t.Total
+// Start begins timeline playback. The timeline will initialize its start time
+// on the first update, ensuring animations begin at the correct moment.
+func (tl *Timeline) Start() {
+	tl.startTime = -1 // Sentinel value indicating "not yet started"
 	tl.isRunning = true
 	tl.isPaused = false
 
@@ -82,16 +82,7 @@ func (tl *Timeline) Start(t Time) {
 	for _, track := range tl.tracks {
 		track.currentIndex = 0
 		track.clipStart = 0
-
-		// Start first clip if available
-		if len(track.clips) > 0 {
-			ctx := ClipContext{
-				Timeline:  tl,
-				World:     tl.world,
-				StartTime: t.Total,
-			}
-			track.clips[0].Start(ctx)
-		}
+		// First clip will be started on first update
 	}
 }
 
@@ -145,6 +136,22 @@ func (tl *Timeline) update(t Time, e Entity, w *World) {
 		return
 	}
 
+	// Initialize on first update
+	if tl.startTime < 0 {
+		tl.startTime = t.Total
+		// Start first clip in each track
+		for _, track := range tl.tracks {
+			if len(track.clips) > 0 {
+				ctx := ClipContext{
+					Timeline:  tl,
+					World:     w,
+					StartTime: t.Total,
+				}
+				track.clips[0].Start(ctx)
+			}
+		}
+	}
+
 	elapsed := t.Total - tl.startTime // Absolute time math
 
 	// Update all tracks in parallel
@@ -192,8 +199,21 @@ func (tl *Timeline) update(t Time, e Entity, w *World) {
 	// Handle loop/completion
 	if allComplete {
 		if tl.loop {
-			// Restart timeline
-			tl.Start(t)
+			// Restart timeline immediately (don't wait for next update)
+			tl.startTime = t.Total
+			for _, track := range tl.tracks {
+				track.currentIndex = 0
+				track.clipStart = 0
+				// Start first clip if available
+				if len(track.clips) > 0 {
+					ctx := ClipContext{
+						Timeline:  tl,
+						World:     w,
+						StartTime: t.Total,
+					}
+					track.clips[0].Start(ctx)
+				}
+			}
 		} else {
 			tl.isRunning = false
 		}
