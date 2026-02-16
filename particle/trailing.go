@@ -44,48 +44,22 @@ func ComputeBottomEdgeEmission(bm *bitmap.Bitmap) EmissionParams {
 		return EmissionParams{}
 	}
 
-	// Compute SDF from bitmap to find shape boundaries
+	// Compute SDF and query its geometric bounds
 	sdf := bitmap.ComputeSDF(bm, float64(math.Max(float64(bm.Width), float64(bm.Height))))
+	bounds := sdf.Bounds()
 
-	// Find the bottom edge by scanning for the lowest Y position with content
-	var minX, maxX, maxY int
-	foundContent := false
-
-	for x := 0; x < bm.Width; x++ {
-		for y := bm.Height - 1; y >= 0; y-- {
-			// Check if this pixel is inside or on the boundary (distance <= 0)
-			if sdf.At(x, y) <= 0 {
-				if !foundContent {
-					minX = x
-					maxX = x
-					maxY = y
-					foundContent = true
-				} else {
-					if x < minX {
-						minX = x
-					}
-					if x > maxX {
-						maxX = x
-					}
-					if y > maxY {
-						maxY = y
-					}
-				}
-				break // Found bottom for this column
-			}
-		}
-	}
-
-	if !foundContent {
+	if bounds.Empty {
 		return EmissionParams{}
 	}
 
+	// Convert geometric bounds to particle emission parameters
+	// Emit from the bottom edge (maxY + 1) across the width
 	return EmissionParams{
 		Offset: fmath.Vec2{
-			X: float64(minX),
-			Y: float64(maxY + 1),
-		}, // +1 to emit just below bottom edge
-		Width: float64(maxX - minX),
+			X: float64(bounds.MinX),
+			Y: float64(bounds.MaxY + 1), // +1 to emit just below bottom edge
+		},
+		Width: float64(bounds.MaxX - bounds.MinX),
 	}
 }
 

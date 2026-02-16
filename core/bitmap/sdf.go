@@ -30,6 +30,52 @@ func (s *SDF) Gradient(x, y int) fmath.Vec2 {
 	return fmath.Vec2{X: dx, Y: dy}
 }
 
+// Bounds represents the axis-aligned bounding box of a shape.
+type Bounds struct {
+	MinX, MinY int
+	MaxX, MaxY int
+	Empty      bool // true if no content was found
+}
+
+// Bounds returns the bounding box of the shape in the SDF.
+// It finds the min/max X and Y coordinates where the SDF distance is <= 0
+// (inside or on the boundary of the shape).
+func (s *SDF) Bounds() Bounds {
+	minX, minY := s.Width, s.Height
+	maxX, maxY := -1, -1
+
+	for y := 0; y < s.Height; y++ {
+		for x := 0; x < s.Width; x++ {
+			if s.At(x, y) <= 0 {
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if y > maxY {
+					maxY = y
+				}
+			}
+		}
+	}
+
+	if maxX < 0 {
+		return Bounds{Empty: true}
+	}
+
+	return Bounds{
+		MinX:  minX,
+		MinY:  minY,
+		MaxX:  maxX,
+		MaxY:  maxY,
+		Empty: false,
+	}
+}
+
 // HalfBlockThreshold returns a material that reveals half-block encoded content
 // using SDF threshold animation. Cells where the SDF distance exceeds
 // *threshold are hidden. Each half (top/bottom) is masked independently.
