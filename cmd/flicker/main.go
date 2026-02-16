@@ -44,6 +44,7 @@ func main() {
 	sm.Add(createGravityTrailScene(sw, sh, textFont))
 	sm.Add(createDissolveTrailScene(sw, sh, textFont))
 	sm.Add(createFireTrailScene(sw, sh, textFont))
+	sm.Add(createTrailingScene(sw, sh, textFont))
 
 	// Original Timeline/Particle scenes
 	sm.Add(createIntroScene(sw, sh, textFont))
@@ -546,6 +547,74 @@ func createFireTrailScene(sw, sh int, font *asset.Font) *core.BasicScene {
 			}
 			trans := w.Transform(e)
 			trans.Position = tween.Update(0)
+		}))
+	})
+
+	return scene
+}
+
+// createTrailingScene - Entity-based particle emitter that spawns dust from moving text
+func createTrailingScene(sw, sh int, font *asset.Font) *core.BasicScene {
+	scene := core.NewBasicScene(sw, sh)
+
+	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		// Create title
+		titleLayout := asset.RasterizeText("TRAILING PARTICLES", asset.TextOptions{
+			Font:  font,
+			Size:  float64(sh) * 0.18,
+			Color: core.Color{R: 255, G: 255, B: 255},
+		})
+		titleEntity := w.Spawn()
+		w.AddTransform(titleEntity, &core.Transform{
+			Position: fmath.Vec3{
+				X: float64(sw/2) - float64(titleLayout.Bitmap.Width)/2,
+				Y: float64(sh) * 0.12,
+			},
+			Scale: fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		w.AddDrawable(titleEntity, &bitmap.HalfBlock{Bitmap: titleLayout.Bitmap})
+		w.AddRoot(titleEntity)
+
+		// Create moving text with trailing dust
+		textLayout := asset.RasterizeText("DUST", asset.TextOptions{
+			Font:  font,
+			Size:  float64(sh) * 0.4,
+			Color: core.Color{R: 255, G: 200, B: 100},
+		})
+		movingText := w.Spawn()
+
+		// Start at center for circular motion
+		centerX := float64(sw / 2)
+		centerY := float64(sh / 2)
+
+		w.AddTransform(movingText, &core.Transform{
+			Position: fmath.Vec3{X: centerX, Y: centerY},
+			Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+		})
+		w.AddDrawable(movingText, &bitmap.HalfBlock{Bitmap: textLayout.Bitmap})
+		w.AddRoot(movingText)
+
+		// Add trailing emitter at bottom-left corner of text
+		// Offset is relative to text position
+		emitter := particle.NewTrailingEmitter(fmath.Vec2{
+			X: 0,                                 // Left edge
+			Y: float64(textLayout.Bitmap.Height), // Bottom edge
+		})
+		emitter.EmitRate = 2.0     // More particles
+		emitter.ParticleLife = 2.0 // Longer lifetime
+		w.AddBehavior(movingText, emitter)
+
+		// Circular motion behavior
+		var angle float64
+		radius := float64(sh) * 0.25
+
+		w.AddBehavior(movingText, core.NewBehavior(func(t core.Time, e core.Entity, w *core.World) {
+			angle += t.Delta * 1.5 // Rotate speed
+			trans := w.Transform(e)
+			trans.Position = fmath.Vec3{
+				X: centerX + math.Cos(angle)*radius - float64(textLayout.Bitmap.Width)/2,
+				Y: centerY + math.Sin(angle)*radius - float64(textLayout.Bitmap.Height)/2,
+			}
 		}))
 	})
 
