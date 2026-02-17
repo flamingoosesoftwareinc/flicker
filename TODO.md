@@ -121,7 +121,7 @@ These are the target features, built on top of the foundations above. Dependenci
 - **Slide transitions (complete)** — Fragment shader-based transition system. `TransitionShader` is a per-pixel shader receiving `TransitionFragment` (FromCanvas, ToCanvas, Progress, Time). Built-in shaders: CrossFade, WipeLeft/Right/Up/Down, PushLeft/Right, RadialWipe, Pixelate. Consistent with existing Material/LayerPostProcess shader model. Lua-scriptable for custom transitions.
 - **Timeline/Sequencer (complete)** — `Timeline`, `Track`, and `Clip` interface for coordinating animations within scenes. Absolute time-based execution (frame-rate independent). Clips: Callback (execute functions), Delay (wait), Tween (interpolate values with easing), PropertyTween (animate entity transforms), Parallel (run clips simultaneously), Sequence (run clips sequentially). Track builder pattern with `At()` and `Add()` methods. Loop support. Integrates with `BasicScene` lifecycle via OnReady hook for post-transition animation start. Behavior-based implementation attached to container entity. Demo: All scenes use Timeline for coordinated animations (slide-in, bounce, elastic scale, rotation). Foundation ready for Lua bindings. See `core/timeline.go`, `core/timeline_test.go`, `core/timeline_example.go`.
 - **Trails (complete)** — Layer pre-process system for trail effects. `LayerPreProcess` runs before rendering entities (vs `LayerPostProcess` which runs after). Instead of clearing layer canvas, pre-process shader transforms previous frame. Fragment shader pattern: factory functions capture parameters via closure (e.g., `GhostTrail(decay)`), return `func(Fragment) Cell`. Built-in shaders: GhostTrail (simple alpha fade), BlurTrail (neighbor averaging/diffusion), FloatyTrail (Perlin noise distortion), GravityTrail (downward sampling drift), DissolveTrail (rune transformation to dust particles), FireTrail (color shift to orange/red). Full access to Fragment (Source canvas for neighbor reads, Time, World, screen position). Demo: 8 scenes (No Trail control + 6 LayerPreProcess trail effects + 1 entity-based trailing particle emitter), each showcasing different approach. See `core/layer.go` (LayerPreProcess), `core/trail.go` (shader factories), `cmd/flicker/main.go` (demo scenes).
-- **Scripting** — Lua bindings over Go API (gopher-lua). Primary interface for agent-generated content. Fluent API for scenes (`scene:text()`, `scene:particleMorph()`, `timeline:add()`). Hot reload for iteration. High-level helpers wrap low-level primitives for agent ergonomics.
+- **Scripting engine (complete)** — Low-level Lua bindings over Go API (gopher-lua). The engine exposes building blocks, not high-level helpers — scenes are built entirely in Lua without touching Go. Bindings: world/entity/transform, materials (solid + Lua function shaders), drawables (bitmap, braille, half_block, full_block, rect, SDF), particle system (cloud sequences, trailing emitters, distributions, phases, emission strategies), physics behaviors, text effects, trails, timelines, scene management. Fragment shaders receive `entity_id`, `vel_x`, `vel_y`, `age`, `lifetime`, `time` — enough to implement any material in pure Lua. Convention: required args are positional, optional args in trailing table. Typed constants for enums (emission strategies, encodings). Hot reload via fsnotify file watcher. See `lua/` package and `examples/` for demos.
 - **Theme/brand system** — Reusable color palettes, fonts, layout templates. Asset library for logos, brand elements. Style presets for materials/animations. Agents reference theme instead of hardcoding values.
 - **Playback/recording** — Frame-by-frame export to image sequence or video. VHS / asciinema integration. Deterministic playback with fixed timestep.
 - **Audio sync** — Timing markers for voice-over synchronization. Subtitle rendering synced to transcript timestamps. Frame-accurate coordination between slides and narration.
@@ -198,7 +198,8 @@ flicker/
     cloud.go       // BitmapToCloud, DistributeParticlesToTargets (structural distribution), distribution strategies
     phase.go       // PhaseContext, PhaseController, TransitionPhase, phase implementations (Behavior/Keyframe/Curve)
     sequence.go    // PointCloudSequence (morph target orchestration)
-    material.go    // BrailleDirectional, VelocityColor, RainbowTime, and other component-based materials
+    material.go    // Component-based materials (Go-internal; Lua scenes implement materials in pure Lua via fragment fields)
+    trailing.go    // TrailingEmitter (configurable drawable, material, behaviors, velocity range)
     target_test.go
     lifecycle_test.go
     emit_test.go
@@ -206,6 +207,30 @@ flicker/
   terminal/
     screen.go      // Screen interface, TcellScreen (tcell backend)
     simscreen.go   // SimScreen (in-memory backend for testing)
+  lua/
+    engine.go      // Lua VM lifecycle, hot reload (fsnotify), scene bridging
+    module.go      // Module registration (flicker table)
+    registry.go    // Userdata helpers, type metatables, option table readers
+    world.go       // World/entity/transform/behavior bindings
+    math.go        // vec2, vec3, tween_vec3 bindings
+    color.go       // Color, material (solid + Lua function shaders), fragment field exposure
+    bitmap.go      // Bitmap drawable bindings (braille, half_block, full_block, rect)
+    sdf.go         // SDF primitive bindings
+    particle.go    // Cloud sequence, trailing emitter, distributions, phases, emission strategies
+    physics.go     // Physics behavior bindings (gravity, turbulence, drag, spring, euler, verlet)
+    textfx.go      // Text effect bindings (wave, typewriter, staggered fade), encoding constants
+    trail.go       // Trail shader bindings (ghost, blur, floaty, gravity, dissolve, fire)
+    timeline.go    // Timeline/track/clip bindings
+    asset.go       // Font loading, text rasterization bindings
+    scene.go       // Scene lifecycle callback bindings
+    scene_manager.go // Scene manager bindings (add, next, previous, goto)
+  examples/
+    demo.lua       // Comprehensive demo (particles, materials, text effects, trails)
+    circle.lua     // Simple circle SDF example
+    physics.lua    // Physics behaviors demo
+    shapes.lua     // SDF shapes demo
+    text.lua       // Text rendering demo
+    timeline.lua   // Timeline animation demo
   cmd/
     flicker/
       main.go      // Wire everything, run the tick loop
@@ -213,4 +238,4 @@ flicker/
   testdata/        // Golden files
 ```
 
-`fmath` depends on nothing. `sdf` depends on `fmath`. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `textfx` depends on `core`, `core/bitmap`, `asset`, and `fmath`. `physics` depends on `core` and `fmath`. `particle` depends on `core`, `core/bitmap`, and `fmath`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
+`fmath` depends on nothing. `sdf` depends on `fmath`. `core` depends on `fmath`. `core/bitmap` depends on `core` and `fmath`. `asset` depends on `core/bitmap`, `core`, and `fmath`. `textfx` depends on `core`, `core/bitmap`, `asset`, and `fmath`. `physics` depends on `core` and `fmath`. `particle` depends on `core`, `core/bitmap`, and `fmath`. `lua` depends on `core`, `core/bitmap`, `fmath`, `asset`, `textfx`, `physics`, `particle`, `sdf`, and `gopher-lua`. `terminal` depends on `core` and `tcell`. `cmd` depends on all.
