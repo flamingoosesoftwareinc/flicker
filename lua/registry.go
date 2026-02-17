@@ -8,11 +8,13 @@ import (
 const (
 	typeVec2   = "flicker.vec2"
 	typeVec3   = "flicker.vec3"
+	typeMat4   = "flicker.mat4"
 	typeColor  = "flicker.color"
 	typeEntity = "flicker.entity"
 	typeWorld  = "flicker.world"
 	typeBitmap = "flicker.bitmap"
 	typeSDF    = "flicker.sdf"
+	typeMesh   = "flicker.mesh"
 )
 
 // registerType creates a metatable for typeName and sets __index to a method table.

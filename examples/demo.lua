@@ -471,6 +471,45 @@ local function create_timeline_scene()
     })
 end
 
+local function create_suzanne_scene()
+    return f.scene(sw, sh, {
+        on_enter = function(world, ctx)
+            make_title(world, "SUZANNE", 0.18, 0.12)
+
+            local mesh = f.asset.load_obj("suzanne.obj")
+
+            -- Bitmap size: fill most of the screen
+            local bm_w = math.floor(sw * 1.6)
+            local bm_h = math.floor(sh * 1.6)
+            local aspect = bm_w / bm_h
+
+            local proj = f.mat4.perspective(0.8, aspect, 0.1, 100)
+            local view = f.mat4.translate(0, 0, -3.5)
+
+            local entity = world:spawn()
+            entity:set_position(f.vec3(
+                sw / 2 - bm_w / 4,
+                sh / 2 - bm_h / 4,
+                0
+            ))
+            world:add_root(entity)
+
+            local angle = 0
+            entity:set_behavior(function(e, w, t)
+                angle = angle + t.delta * 0.8
+                local model = f.mat4.rotate_y(angle)
+                local mvp = proj * view * model
+                local bm = f.asset.rasterize_wireframe(mesh, mvp, {
+                    width = bm_w,
+                    height = bm_h,
+                    color = f.color(0, 255, 180),
+                })
+                e:set_drawable(f.bitmap.braille(bm))
+            end)
+        end,
+    })
+end
+
 local function create_particle_scene()
     return f.scene(sw, sh, {
         on_enter = function(world, ctx)
@@ -619,7 +658,8 @@ f.on_enter(function(world, ctx)
     sm:add(create_fire_trail_scene())
     sm:add(create_trailing_scene())
 
-    -- Timeline & particle scenes
+    -- 3D, timeline & particle scenes
+    sm:add(create_suzanne_scene())
     sm:add(create_intro_scene())
     sm:add(create_timeline_scene())
     sm:add(create_particle_scene())

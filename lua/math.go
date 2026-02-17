@@ -9,6 +9,7 @@ import (
 func registerMathTypes(L *lua.LState, mod *lua.LTable) {
 	registerVec2(L, mod)
 	registerVec3(L, mod)
+	registerMat4Type(L, mod)
 	registerTweenVec3(L, mod)
 	registerMathModule(L, mod)
 }
@@ -540,6 +541,126 @@ func mathBezierCubic(L *lua.LState) int {
 	p3 := checkVec2(L, 4)
 	t := float64(L.CheckNumber(5))
 	pushVec2(L, fmath.BezierCubic(p0, p1, p2, p3, t))
+	return 1
+}
+
+// --- Mat4 ---
+
+func registerMat4Type(L *lua.LState, mod *lua.LTable) {
+	mt := registerType(L, typeMat4, map[string]lua.LGFunction{
+		"multiply": mat4Multiply,
+		"apply":    mat4Apply,
+		"inverse":  mat4Inverse,
+	})
+	L.SetField(mt, "__index", L.GetField(mt, "methods"))
+	L.SetField(mt, "__mul", L.NewFunction(mat4MulOp))
+	L.SetField(mt, "__tostring", L.NewFunction(mat4ToString))
+
+	m4 := L.NewTable()
+	L.SetField(mod, "mat4", m4)
+
+	L.SetField(m4, "identity", L.NewFunction(mat4Identity))
+	L.SetField(m4, "perspective", L.NewFunction(mat4Perspective))
+	L.SetField(m4, "ortho", L.NewFunction(mat4Ortho))
+	L.SetField(m4, "translate", L.NewFunction(mat4Translate))
+	L.SetField(m4, "rotate_x", L.NewFunction(mat4RotateX))
+	L.SetField(m4, "rotate_y", L.NewFunction(mat4RotateY))
+	L.SetField(m4, "rotate_z", L.NewFunction(mat4RotateZ))
+}
+
+func pushMat4(L *lua.LState, m fmath.Mat4) {
+	pushUserData(L, typeMat4, m)
+}
+
+func checkMat4(L *lua.LState, n int) fmath.Mat4 {
+	ud := L.CheckUserData(n)
+	if m, ok := ud.Value.(fmath.Mat4); ok {
+		return m
+	}
+	L.ArgError(n, "mat4 expected")
+	return fmath.Mat4{}
+}
+
+func mat4Identity(L *lua.LState) int {
+	pushMat4(L, fmath.Mat4Identity())
+	return 1
+}
+
+func mat4Perspective(L *lua.LState) int {
+	fovY := float64(L.CheckNumber(1))
+	aspect := float64(L.CheckNumber(2))
+	near := float64(L.CheckNumber(3))
+	far := float64(L.CheckNumber(4))
+	pushMat4(L, fmath.Mat4Perspective(fovY, aspect, near, far))
+	return 1
+}
+
+func mat4Ortho(L *lua.LState) int {
+	left := float64(L.CheckNumber(1))
+	right := float64(L.CheckNumber(2))
+	bottom := float64(L.CheckNumber(3))
+	top := float64(L.CheckNumber(4))
+	near := float64(L.CheckNumber(5))
+	far := float64(L.CheckNumber(6))
+	pushMat4(L, fmath.Mat4Ortho(left, right, bottom, top, near, far))
+	return 1
+}
+
+func mat4Translate(L *lua.LState) int {
+	x := float64(L.CheckNumber(1))
+	y := float64(L.CheckNumber(2))
+	z := float64(L.CheckNumber(3))
+	pushMat4(L, fmath.Mat4Translate(x, y, z))
+	return 1
+}
+
+func mat4RotateX(L *lua.LState) int {
+	angle := float64(L.CheckNumber(1))
+	pushMat4(L, fmath.Mat4RotateX(angle))
+	return 1
+}
+
+func mat4RotateY(L *lua.LState) int {
+	angle := float64(L.CheckNumber(1))
+	pushMat4(L, fmath.Mat4RotateY(angle))
+	return 1
+}
+
+func mat4RotateZ(L *lua.LState) int {
+	angle := float64(L.CheckNumber(1))
+	pushMat4(L, fmath.Mat4RotateZ(angle))
+	return 1
+}
+
+func mat4Multiply(L *lua.LState) int {
+	a := checkMat4(L, 1)
+	b := checkMat4(L, 2)
+	pushMat4(L, a.Multiply(b))
+	return 1
+}
+
+func mat4MulOp(L *lua.LState) int {
+	a := checkMat4(L, 1)
+	b := checkMat4(L, 2)
+	pushMat4(L, a.Multiply(b))
+	return 1
+}
+
+func mat4Apply(L *lua.LState) int {
+	m := checkMat4(L, 1)
+	v := checkVec3(L, 2)
+	pushVec3(L, m.Apply(v))
+	return 1
+}
+
+func mat4Inverse(L *lua.LState) int {
+	m := checkMat4(L, 1)
+	pushMat4(L, m.Inverse())
+	return 1
+}
+
+func mat4ToString(L *lua.LState) int {
+	L.Push(lua.LString("mat4(...)"))
 	return 1
 }
 
