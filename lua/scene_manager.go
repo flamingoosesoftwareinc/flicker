@@ -7,6 +7,12 @@ import (
 
 const typeSceneManager = "flicker.scene_manager"
 
+// sceneWithConfig wraps a scene with optional auto-advance configuration.
+type sceneWithConfig struct {
+	scene       core.Scene
+	autoAdvance core.SceneAutoAdvance
+}
+
 func registerSceneManagerModule(L *lua.LState, mod *lua.LTable, engine *Engine) {
 	// SceneManager metatable
 	mt := registerType(L, typeSceneManager, map[string]lua.LGFunction{
@@ -89,8 +95,39 @@ func registerSceneManagerModule(L *lua.LState, mod *lua.LTable, engine *Engine) 
 			}
 		}
 
+		// Wrap scene with optional auto-advance config
+		wrapper := &sceneWithConfig{scene: scene}
+
+		// Check for duration (auto-advance)
+		if dur := L.GetField(opts, "duration"); dur != lua.LNil {
+			if d, ok := dur.(lua.LNumber); ok {
+				wrapper.autoAdvance.Duration = float64(d)
+				// Default transition
+				wrapper.autoAdvance.TransitionShader = core.CrossFade
+				wrapper.autoAdvance.TransitionTime = 1.0
+			}
+		}
+
+		// Check for transition config
+		if tr := L.GetField(opts, "transition"); tr != lua.LNil {
+			if trTable, ok := tr.(*lua.LTable); ok {
+				if shader := L.GetField(trTable, "shader"); shader != lua.LNil {
+					if ud, ok := shader.(*lua.LUserData); ok {
+						if s, ok := ud.Value.(core.TransitionShader); ok {
+							wrapper.autoAdvance.TransitionShader = s
+						}
+					}
+				}
+				if dur := L.GetField(trTable, "duration"); dur != lua.LNil {
+					if d, ok := dur.(lua.LNumber); ok {
+						wrapper.autoAdvance.TransitionTime = float64(d)
+					}
+				}
+			}
+		}
+
 		ud := L.NewUserData()
-		ud.Value = core.Scene(scene)
+		ud.Value = wrapper
 		L.Push(ud)
 		return 1
 	}))
@@ -125,9 +162,16 @@ func checkSceneManager(L *lua.LState, n int) *core.SceneManager {
 func smAdd(L *lua.LState) int {
 	sm := checkSceneManager(L, 1)
 	ud := L.CheckUserData(2)
-	if s, ok := ud.Value.(core.Scene); ok {
-		sm.Add(s)
-	} else {
+	switch v := ud.Value.(type) {
+	case *sceneWithConfig:
+		idx := sm.Count()
+		sm.Add(v.scene)
+		if v.autoAdvance.Duration > 0 {
+			sm.SetAutoAdvance(idx, v.autoAdvance)
+		}
+	case core.Scene:
+		sm.Add(v)
+	default:
 		L.ArgError(2, "scene expected")
 	}
 	return 0

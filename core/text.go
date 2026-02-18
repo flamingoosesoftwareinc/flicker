@@ -66,7 +66,8 @@ func (t *Text) CellAt(x, y int) Cell {
 // Draw writes each rune to the canvas at (x+col, y+row), skipping spaces.
 func (t *Text) Draw(canvas *Canvas, x, y int) {
 	for row, line := range t.lines {
-		for col, r := range line {
+		runes := []rune(line)
+		for col, r := range runes {
 			if r == ' ' || r == 0 {
 				continue
 			}
@@ -89,7 +90,8 @@ func (t *Text) Renderer() RenderFunc {
 		cy := float64(bh) / 2.0
 
 		for row, line := range t.lines {
-			for col, r := range line {
+			runes := []rune(line)
+			for col, r := range runes {
 				if r == ' ' || r == 0 {
 					continue
 				}

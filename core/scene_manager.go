@@ -1,11 +1,20 @@
 package core
 
+// SceneAutoAdvance configures automatic scene advancement.
+type SceneAutoAdvance struct {
+	Duration         float64          // How long the scene shows before advancing (0 = manual)
+	TransitionShader TransitionShader // Shader to use when auto-advancing
+	TransitionTime   float64          // Duration of the transition animation
+}
+
 // SceneManager manages a linear sequence of scenes with transitions.
 type SceneManager struct {
-	scenes     []Scene
-	current    int  // Index of current scene (-1 = none)
-	active     bool // Whether a scene is active
-	transition *Transition
+	scenes      []Scene
+	autoAdvance []SceneAutoAdvance // parallel to scenes; nil entry = manual
+	current     int                // Index of current scene (-1 = none)
+	active      bool               // Whether a scene is active
+	transition  *Transition
+	sceneTime   float64 // Time elapsed in current scene (reset on scene change)
 
 	width  int
 	height int
@@ -24,6 +33,14 @@ func NewSceneManager(width, height int) *SceneManager {
 // Add appends a scene to the sequence.
 func (sm *SceneManager) Add(scene Scene) {
 	sm.scenes = append(sm.scenes, scene)
+	sm.autoAdvance = append(sm.autoAdvance, SceneAutoAdvance{})
+}
+
+// SetAutoAdvance configures auto-advance for a scene by index.
+func (sm *SceneManager) SetAutoAdvance(index int, aa SceneAutoAdvance) {
+	if index >= 0 && index < len(sm.autoAdvance) {
+		sm.autoAdvance[index] = aa
+	}
 }
 
 // Count returns the number of scenes.
@@ -79,6 +96,7 @@ func (sm *SceneManager) GoTo(index int) {
 	// Enter new scene
 	sm.current = index
 	sm.active = true
+	sm.sceneTime = 0
 	ctx := SceneContext{Width: sm.width, Height: sm.height}
 	sm.scenes[sm.current].OnEnter(ctx)
 
@@ -134,6 +152,8 @@ func (sm *SceneManager) Update(t Time) {
 				}
 			}
 
+			sm.sceneTime = 0
+
 			// Notify new scene that transition is complete
 			sm.transition.To.OnReady()
 
@@ -142,6 +162,22 @@ func (sm *SceneManager) Update(t Time) {
 	} else if sm.active && sm.current >= 0 {
 		// Update current scene
 		sm.scenes[sm.current].OnUpdate(t)
+
+		// Check auto-advance
+		sm.sceneTime += t.Delta
+		aa := sm.autoAdvance[sm.current]
+		if aa.Duration > 0 && sm.sceneTime >= aa.Duration {
+			shader := aa.TransitionShader
+			if shader == nil {
+				shader = CrossFade
+			}
+			transTime := aa.TransitionTime
+			if transTime <= 0 {
+				transTime = 1.0
+			}
+			nextIndex := (sm.current + 1) % len(sm.scenes)
+			sm.transitionTo(nextIndex, shader, transTime)
+		}
 	}
 }
 
