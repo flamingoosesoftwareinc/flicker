@@ -1,18 +1,19 @@
--- blog_working_code.lua: "Working Code is Not Enough" blog post explainer
--- Press SPACE to advance slides. Press 'q' or ESC to quit.
+-- blog_working_code.lua: "Working Code is Not Enough" — visual-first redesign
+-- Auto-advances through slides. Press 'q' or ESC to quit.
 local f = require("flicker")
 
 local sw, sh
 
 -- Color palette
-local BG       = f.color(222, 220, 215) -- #DEDCD7
-local BLACK    = f.color(30, 30, 30)
-local DARK     = f.color(60, 60, 60)
-local MID      = f.color(120, 120, 120)
-local ACCENT   = f.color(180, 60, 40)   -- muted red for emphasis
-local ACCENT2  = f.color(40, 100, 160)  -- muted blue
+local BG      = f.color(222, 220, 215) -- warm gray
+local BLACK   = f.color(30, 30, 30)
+local DARK    = f.color(60, 60, 60)
+local MID     = f.color(120, 120, 120)
+local ACCENT  = f.color(180, 60, 40)   -- tactical / warning red
+local ACCENT2 = f.color(40, 100, 160)  -- strategic / calm blue
 
--- Background fill material: forces every cell to have the warm gray BG
+-- ── Helpers ──────────────────────────────────────────────────────────────
+
 local function bg_material()
     return function(frag)
         return {
@@ -25,7 +26,6 @@ local function bg_material()
     end
 end
 
--- Helper: create a full-screen background rect on a given layer
 local function make_bg(world, layer)
     local bg = world:spawn()
     bg:set_position(f.vec3(0, 0, 0))
@@ -35,7 +35,6 @@ local function make_bg(world, layer)
     return bg
 end
 
--- Helper: create a raw text entity
 local function make_text(world, text, x, y, color, layer)
     local txt = f.text(text, { fg = color or BLACK })
     local ent = world:spawn()
@@ -47,12 +46,10 @@ local function make_text(world, text, x, y, color, layer)
     return ent, txt
 end
 
--- Helper: center text horizontally
 local function cx(text)
     return math.floor(sw / 2 - #text / 2)
 end
 
--- Helper: build typewriter keyframes for a string
 local function typewriter_frames(str, char_delay)
     char_delay = char_delay or 0.03
     local frames = {}
@@ -66,149 +63,278 @@ local function typewriter_frames(str, char_delay)
 end
 
 -- ============================================================================
--- Slide 1: Title Card
+-- Slide 1: Title Card — particle cloud formation (5s, auto-advance)
 -- ============================================================================
 local function create_title_slide()
+    return f.scene(sw, sh, {
+        duration = 5.0,
+        transition = { shader = f.transition.cross_fade, duration = 1.5 },
+        on_enter = function(world, ctx)
+            make_bg(world, -1)
+
+            -- "Working code is" as regular text above the particle title
+            local prefix = "Working code is"
+            make_text(world, prefix, cx(prefix), math.floor(sh * 0.22), MID, 1)
+
+            -- Rasterize "NOT ENOUGH" for particle cloud
+            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local layout = f.asset.rasterize_text("NOT ENOUGH", {
+                font = font,
+                size = sh * 0.35,
+                color = BLACK,
+            })
+
+            -- Convert to particle cloud
+            local cloud = f.particle.bitmap_to_cloud(layout.bitmap)
+            local offset_x = sw / 2 - layout.width / 2
+            local offset_y = sh * 0.32
+
+            -- Target positions: centered text
+            local text_cloud = {}
+            for i, pos in ipairs(cloud) do
+                text_cloud[i] = f.vec2(pos.x + offset_x, pos.y + offset_y)
+            end
+
+            -- Initial positions: random scatter from center
+            local initial_cloud = {}
+            for i = 1, #cloud do
+                local angle = math.random() * 2 * math.pi
+                local radius = math.random() * 8 + 1
+                initial_cloud[i] = f.vec2(
+                    sw / 2 + math.cos(angle) * radius,
+                    sh / 2 + math.sin(angle) * radius
+                )
+            end
+
+            -- Single pixel drawable for particles
+            local pixel = f.bitmap.new(1, 1)
+            pixel:set_dot(0, 0, BLACK)
+
+            -- Particle material
+            local material = f.compose_materials(function(frag)
+                return {
+                    rune = frag.rune,
+                    fg_r = BLACK.r, fg_g = BLACK.g, fg_b = BLACK.b,
+                    fg_alpha = frag.fg_alpha,
+                    bg_r = BG.r, bg_g = BG.g, bg_b = BG.b,
+                    bg_alpha = 1.0,
+                }
+            end)
+
+            -- Create cloud sequence: random positions → text formation
+            local seq = f.particle.cloud_sequence(
+                world, initial_cloud, f.bitmap.braille(pixel), material, 0
+            )
+            seq:add_target({
+                cloud = text_cloud,
+                duration = 3.0,
+                strategy = f.particle.linear(),
+                phases = {
+                    f.particle.burst_phase(sh * 0.3),
+                    f.particle.seek_phase(),
+                },
+            })
+
+            -- Subtitle: staggered word reveal
+            local timeline = f.timeline.new(world)
+            local sub_str = "When tools change, the principles stay the same"
+            local _, sub_txt = make_text(world, "", cx(sub_str), math.floor(sh * 0.72), MID, 1)
+            local sub_words = { "When", "tools", "change,", "the", "principles", "stay", "the", "same" }
+
+            local track = timeline:add_track()
+            local word_frames = {}
+            local built = ""
+            local t = 2.5
+            for i, word in ipairs(sub_words) do
+                if i > 1 then built = built .. " " end
+                built = built .. word
+                table.insert(word_frames, { time = t, value = built })
+                t = t + 0.18
+            end
+            track:add(f.timeline.text_keyframes(sub_txt, word_frames, 5.0))
+            timeline:start()
+        end,
+    })
+end
+
+-- ============================================================================
+-- Slide 2: The Cost of "Just Working" (8s, auto-advance)
+-- ============================================================================
+local function create_cost_slide()
+    local timeline
+    local fade_start = 0
+    local fading = false
+
+    return f.scene(sw, sh, {
+        duration = 8.0,
+        transition = { shader = f.transition.cross_fade, duration = 1.5 },
+        trail = { layer = 0, effect = f.trail.ghost(0.92) },
+        on_enter = function(world, ctx)
+            make_bg(world, -1)
+            timeline = f.timeline.new(world)
+
+            -- Quote on layer 0 (ghost trail creates dissolve smear when fading)
+            local quote_str = '"If it works, it\'s good code."'
+            local _, quote_txt = make_text(world, "", cx(quote_str), math.floor(sh * 0.25), MID, 0)
+
+            -- Rebuttal on layer 1 (no trail, clean reveal)
+            local reb_str = "Working code is the start of its long-term cost."
+            local _, reb_txt = make_text(world, "", cx(reb_str), math.floor(sh * 0.55), ACCENT, 1)
+
+            -- Typewrite the quote
+            local track = timeline:add_track()
+            local frames, dur = typewriter_frames(quote_str, 0.03)
+            track:add(f.timeline.text_keyframes(quote_txt, frames, dur))
+
+            -- After quote finishes + pause, start dissolving
+            track:at(dur + 1.5, f.timeline.callback(function(w, t)
+                fading = true
+                fade_start = t.total
+            end))
+
+            -- Reveal rebuttal after dissolve starts
+            local track2 = timeline:add_track()
+            local reb_frames, reb_dur = typewriter_frames(reb_str, 0.025)
+            track2:at(dur + 2.5, f.timeline.text_keyframes(reb_txt, reb_frames, reb_dur))
+
+            timeline:start()
+        end,
+        on_update = function(world, time)
+            -- Fade the quote layer via post-process shader
+            if fading then
+                local elapsed = time.total - fade_start
+                local alpha = math.max(0, 1.0 - elapsed * 0.5)
+                f.set_post_process(0, function(frag)
+                    return {
+                        rune = frag.rune,
+                        fg_r = frag.fg_r, fg_g = frag.fg_g, fg_b = frag.fg_b,
+                        fg_alpha = frag.fg_alpha * alpha,
+                        bg_r = BG.r, bg_g = BG.g, bg_b = BG.b,
+                        bg_alpha = frag.bg_alpha,
+                    }
+                end)
+            end
+        end,
+        on_exit = function(world)
+            if timeline then timeline:cleanup() end
+        end,
+    })
+end
+
+-- ============================================================================
+-- Slide 3: Change Amplification — Domino Effect (10s, auto-advance)
+-- ============================================================================
+local function create_domino_slide()
     local timeline
 
     return f.scene(sw, sh, {
-        duration = 6.0,
+        duration = 10.0,
         transition = { shader = f.transition.cross_fade, duration = 1.5 },
+        trail = { layer = 1, effect = f.trail.dissolve(0.90, 0.5, MID) },
         on_enter = function(world, ctx)
-            make_bg(world)
+            make_bg(world, -1)
             timeline = f.timeline.new(world)
 
             -- Title
-            local title_str = "Working Code is Not Enough"
-            local _, title_txt = make_text(world, "", cx(title_str), math.floor(sh * 0.35), BLACK)
+            make_text(world, "Change Amplification",
+                cx("Change Amplification"), math.floor(sh * 0.05), DARK, 2)
 
-            -- Subtitle
-            local sub_str = "When tools change, the principles stay the same"
-            local _, sub_txt = make_text(world, "", cx(sub_str), math.floor(sh * 0.35) + 3, MID)
+            -- ASCII domino boxes — center of screen
+            local box_x = math.floor(sw / 2 - 24)
+            local box_y = math.floor(sh * 0.20)
+            local _, box_txt = make_text(world, "", box_x, box_y, DARK, 0)
 
-            -- Author
-            local author_str = "Ahmed Al-Hulaibi"
-            make_text(world, author_str, cx(author_str), math.floor(sh * 0.35) + 6, DARK)
-
-            local title_frames, title_dur = typewriter_frames(title_str, 0.04)
-            local sub_frames, sub_dur = typewriter_frames(sub_str, 0.03)
-
-            local t1 = timeline:add_track()
-            t1:add(f.timeline.text_keyframes(title_txt, title_frames, title_dur))
-
-            local t2 = timeline:add_track()
-            t2:at(title_dur, f.timeline.text_keyframes(sub_txt, sub_frames, sub_dur))
-
-            timeline:start()
-        end,
-        on_exit = function(world)
-            if timeline then timeline:cleanup() end
-        end,
-    })
-end
-
--- ============================================================================
--- Slide 2: "The Hot Take"
--- ============================================================================
-local function create_hot_take_slide()
-    local timeline
-
-    return f.scene(sw, sh, {
-        duration = 8.0,
-        transition = { shader = f.transition.cross_fade, duration = 1.5 },
-        on_enter = function(world, ctx)
-            make_bg(world)
-            timeline = f.timeline.new(world)
-
-            -- Quote
-            local quote = {
-                '  "Software is just a means to an end.',
-                '   If it works, it\'s good code."',
+            local domino_states = {
+                { time = 0.0, value =
+                    "                  [A]" },
+                { time = 1.8, value =
+                    "            [A]       [B]" },
+                { time = 3.2, value =
+                    "        [A]   [B]   [C]   [D]" },
+                { time = 4.8, value =
+                    "    [A] [B] [C] [D]\n" ..
+                    "      [E] [F] [G] [H]" },
+                { time = 6.2, value =
+                    "[A][B][C][D][E][F][G][H]\n" ..
+                    "  [I][J][K][L][M][N][O][P]\n" ..
+                    "[Q][R][S][T][U][V][W][X][Y]" },
             }
-            local quote_y = math.floor(sh * 0.25)
-
-            local quote_txts = {}
-            for i, line in ipairs(quote) do
-                local _, txt = make_text(world, "", cx(line), quote_y + (i - 1), MID)
-                table.insert(quote_txts, txt)
-            end
-
-            -- Rebuttal
-            local rebuttal_lines = {
-                { text = "Working code is not the end of software engineering",  color = BLACK },
-                { text = "it's the start of its long-term cost.",               color = ACCENT },
-            }
-            local reb_y = math.floor(sh * 0.50)
-
-            local reb_txts = {}
-            for i, line in ipairs(rebuttal_lines) do
-                local _, txt = make_text(world, "", cx(line.text), reb_y + (i - 1) * 2, line.color)
-                table.insert(reb_txts, txt)
-            end
-
-            -- Timeline: typewriter the quote, then reveal rebuttal
-            local t1 = timeline:add_track()
-            local offset = 0
-            for i, line in ipairs(quote) do
-                local frames, dur = typewriter_frames(line, 0.03)
-                t1:at(offset, f.timeline.text_keyframes(quote_txts[i], frames, dur))
-                offset = offset + dur
-            end
-
-            local t2 = timeline:add_track()
-            local reb_start = offset + 0.5
-            for i, line in ipairs(rebuttal_lines) do
-                local frames, dur = typewriter_frames(line.text, 0.02)
-                t2:at(reb_start, f.timeline.text_keyframes(reb_txts[i], frames, dur))
-                reb_start = reb_start + dur
-            end
-
-            timeline:start()
-        end,
-        on_exit = function(world)
-            if timeline then timeline:cleanup() end
-        end,
-    })
-end
-
--- ============================================================================
--- Slide 3: "The Hard Questions" - progressive reveal
--- ============================================================================
-local function create_questions_slide()
-    local timeline
-
-    return f.scene(sw, sh, {
-        duration = 8.0,
-        transition = { shader = f.transition.cross_fade, duration = 1.5 },
-        on_enter = function(world, ctx)
-            make_bg(world)
-            timeline = f.timeline.new(world)
-
-            make_text(world, "Time changes everything in software.",
-                cx("Time changes everything in software."), math.floor(sh * 0.15), DARK)
-
-            local questions = {
-                "Can it be understood and maintained by others?",
-                "Can it be deployed, operated, and debugged?",
-                "Can it scale as more people depend on it?",
-            }
-
-            local q_y = math.floor(sh * 0.35)
-            local q_txts = {}
-
-            for i, q in ipairs(questions) do
-                local full = "  " .. tostring(i) .. ". " .. q
-                local _, txt = make_text(world, "", cx(full), q_y + (i - 1) * 3, BLACK)
-                table.insert(q_txts, { txt = txt, full = full })
-            end
 
             local track = timeline:add_track()
-            local t = 0.8
-            for _, q in ipairs(q_txts) do
-                local frames, dur = typewriter_frames(q.full, 0.025)
-                track:at(t, f.timeline.text_keyframes(q.txt, frames, dur))
-                t = t + dur + 0.3
+            track:add(f.timeline.text_keyframes(box_txt, domino_states, 8.5))
+
+            -- Particle burst pixel
+            local pixel = f.bitmap.new(2, 2)
+            for py = 0, 1 do
+                for px = 0, 1 do
+                    pixel:set_dot(px, py, ACCENT)
+                end
             end
+
+            local function spawn_burst(w, bx, by, count)
+                for _ = 1, count do
+                    local p = w:spawn()
+                    local angle = math.random() * 2 * math.pi
+                    local speed = 3 + math.random() * 12
+                    p:set_position(f.vec3(bx, by, 0))
+                    p:set_drawable(f.bitmap.braille(pixel))
+                    p:set_layer(1)
+                    p:set_body({
+                        velocity = f.vec2(
+                            math.cos(angle) * speed,
+                            math.sin(angle) * speed
+                        ),
+                    })
+                    p:set_age({ lifetime = 1.5 + math.random() * 1.5 })
+                    p:set_behavior(f.physics.gravity(f.vec2(0, 5)))
+                    p:set_behavior(f.physics.turbulence(0.3, 4.0))
+                    p:set_behavior(f.physics.drag(0.3))
+                    p:set_behavior(f.physics.euler())
+                    p:set_behavior(f.particle.age_and_despawn())
+                    p:set_material(function(frag)
+                        local life_frac = 0
+                        if frag.lifetime > 0 then
+                            life_frac = frag.age / frag.lifetime
+                        end
+                        return {
+                            rune = frag.rune,
+                            fg_r = ACCENT.r, fg_g = ACCENT.g, fg_b = ACCENT.b,
+                            fg_alpha = 1.0 - life_frac,
+                            bg_alpha = 0,
+                        }
+                    end)
+                    w:add_root(p)
+                end
+            end
+
+            -- Bursts at each split moment
+            local center_x = sw / 2
+            local center_y = box_y + 1
+            local burst_track = timeline:add_track()
+            burst_track:at(1.8, f.timeline.callback(function(w, t)
+                spawn_burst(w, center_x, center_y, 15)
+            end))
+            burst_track:at(3.2, f.timeline.callback(function(w, t)
+                spawn_burst(w, center_x - 8, center_y, 12)
+                spawn_burst(w, center_x + 8, center_y, 12)
+            end))
+            burst_track:at(4.8, f.timeline.callback(function(w, t)
+                for dx = -15, 15, 10 do
+                    spawn_burst(w, center_x + dx, center_y, 8)
+                end
+            end))
+            burst_track:at(6.2, f.timeline.callback(function(w, t)
+                for dx = -20, 20, 5 do
+                    spawn_burst(w, center_x + dx, center_y + 1, 6)
+                end
+            end))
+
+            -- Bottom text after cascade
+            local insight = "Each shortcut compounds into complexity"
+            local _, insight_txt = make_text(world, "", cx(insight), math.floor(sh * 0.85), ACCENT, 2)
+            local ins_track = timeline:add_track()
+            local ins_frames, ins_dur = typewriter_frames(insight, 0.03)
+            ins_track:at(7.0, f.timeline.text_keyframes(insight_txt, ins_frames, ins_dur))
 
             timeline:start()
         end,
@@ -219,119 +345,193 @@ local function create_questions_slide()
 end
 
 -- ============================================================================
--- Slide 4: Tactical vs Strategic - animated tree diagram
+-- Slide 4: Tactical vs Strategic (12s, auto-advance)
 -- ============================================================================
-local function create_tree_slide()
+local function create_tactical_slide()
     local timeline
+    local darken_start = nil
 
     return f.scene(sw, sh, {
-        duration = 10.0,
+        duration = 12.0,
         transition = { shader = f.transition.cross_fade, duration = 1.5 },
+        trail = { layer = 0, effect = f.trail.dissolve(0.88, 0.4, MID) },
         on_enter = function(world, ctx)
-            make_bg(world)
+            make_bg(world, -1)
             timeline = f.timeline.new(world)
 
-            make_text(world, "Tactical vs Strategic",
-                cx("Tactical vs Strategic"), math.floor(sh * 0.08), BLACK)
-
-            local left_x = math.floor(sw * 0.08)
+            local mid_x = math.floor(sw / 2)
+            local left_x = math.floor(sw * 0.05)
             local right_x = math.floor(sw * 0.55)
-            local diagram_y = math.floor(sh * 0.20)
+            local diagram_y = math.floor(sh * 0.22)
 
-            make_text(world, "Tactical: \"just make it work\"", left_x, diagram_y - 2, ACCENT)
-            make_text(world, "Strategic: design for change", right_x, diagram_y - 2, ACCENT2)
+            -- Divider line on layer 2
+            local divider = ""
+            for _ = 1, sh do
+                divider = divider .. "\xe2\x94\x82\n" -- │
+            end
+            make_text(world, divider, mid_x, 0, MID, 2)
 
-            -- Tactical side: tree that grows messy
-            local tactical_diagram = f.text("", { fg = DARK })
-            local td_ent = world:spawn()
-            td_ent:set_position(f.vec3(left_x, diagram_y, 0))
-            td_ent:set_drawable(tactical_diagram)
-            td_ent:set_material(bg_material())
-            world:add_root(td_ent)
+            -- Labels on layer 2
+            make_text(world, "Tactical", left_x + 8, diagram_y - 4, ACCENT, 2)
+            make_text(world, "Strategic", right_x + 6, diagram_y - 4, ACCENT2, 2)
 
-            -- Strategic side: clean tree
-            local strategic_diagram = f.text("", { fg = DARK })
-            local sd_ent = world:spawn()
-            sd_ent:set_position(f.vec3(right_x, diagram_y, 0))
-            sd_ent:set_drawable(strategic_diagram)
-            sd_ent:set_material(bg_material())
-            world:add_root(sd_ent)
+            -- Tactical tree on layer 0 (dissolve trail + chaos particles)
+            local _, tac_txt = make_text(world, "", left_x, diagram_y, DARK, 0)
+
+            -- Strategic tree on layer 1 (clean, no trail)
+            local _, str_txt = make_text(world, "", right_x, diagram_y, DARK, 1)
 
             local tactical_states = {
-                { time = 0.0, value = [[app.go]] },
-                { time = 1.0, value = [[
-app.go
- └── handler.go]] },
-                { time = 2.0, value = [[
-app.go
- ├── handler.go
- └── handler2.go (copy-paste)]] },
-                { time = 3.0, value = [[
-app.go
- ├── handler.go
- ├── handler2.go (copy-paste)
- ├── utils.go
- └── fix_handler.go (hotfix)]] },
-                { time = 4.5, value = [[
-app.go
- ├── handler.go
- ├── handler2.go (copy-paste)
- ├── utils.go
- ├── fix_handler.go (hotfix)
- ├── handler3.go (copy-paste)
- ├── utils2.go (why?)
- └── tmp_workaround.go]] },
+                { time = 0.0, value = "app.go" },
+                { time = 1.5, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 handler.go" },
+                { time = 3.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 handler2.go (copy)" },
+                { time = 5.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler2.go (copy)\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 utils.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 fix_handler.go (hotfix)" },
+                { time = 7.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler2.go (copy)\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 utils.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 fix_handler.go (hotfix)\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler3.go (why?)\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 utils2.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 tmp_workaround.go" },
             }
 
             local strategic_states = {
-                { time = 0.0, value = [[app.go]] },
-                { time = 1.0, value = [[
-app.go
- └── routes/
-      └── handler.go]] },
-                { time = 2.0, value = [[
-app.go
- ├── routes/
- │    └── handler.go
- └── middleware/
-      └── auth.go]] },
-                { time = 3.0, value = [[
-app.go
- ├── routes/
- │    ├── handler.go
- │    └── users.go
- ├── middleware/
- │    └── auth.go
- └── domain/
-      └── user.go]] },
-                { time = 4.5, value = [[
-app.go
- ├── routes/
- │    ├── handler.go
- │    └── users.go
- ├── middleware/
- │    └── auth.go
- ├── domain/
- │    └── user.go
- └── store/
-      └── postgres.go]] },
+                { time = 0.0, value = "app.go" },
+                { time = 2.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 routes/\n" ..
+                    "      \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 handler.go" },
+                { time = 4.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 routes/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 middleware/\n" ..
+                    "      \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 auth.go" },
+                { time = 6.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 routes/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 users.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 middleware/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 auth.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 domain/\n" ..
+                    "      \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 user.go" },
+                { time = 8.0, value =
+                    "app.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 routes/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 handler.go\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 users.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 middleware/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 auth.go\n" ..
+                    " \xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 domain/\n" ..
+                    " \xe2\x94\x82    \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 user.go\n" ..
+                    " \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 store/\n" ..
+                    "      \xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 postgres.go" },
             }
 
             local t1 = timeline:add_track()
-            t1:add(f.timeline.text_keyframes(tactical_diagram, tactical_states, 7.0))
+            t1:add(f.timeline.text_keyframes(tac_txt, tactical_states, 10.0))
 
             local t2 = timeline:add_track()
-            t2:add(f.timeline.text_keyframes(strategic_diagram, strategic_states, 7.0))
+            t2:add(f.timeline.text_keyframes(str_txt, strategic_states, 10.0))
 
-            -- Bottom insight
-            local insight_str = "Each shortcut adds complexity. Over time, it compounds."
-            local _, insight_txt = make_text(world, "", cx(insight_str), math.floor(sh * 0.85), ACCENT)
-
+            -- Start darkening the tactical side after 5s
             local t3 = timeline:add_track()
-            local frames, dur = typewriter_frames(insight_str, 0.03)
-            t3:at(5.0, f.timeline.text_keyframes(insight_txt, frames, dur))
+            t3:at(5.0, f.timeline.callback(function(w, t)
+                darken_start = t.total
+            end))
+
+            -- Chaos particles on the left side (layer 0)
+            local pixel = f.bitmap.new(2, 2)
+            for py = 0, 1 do
+                for px = 0, 1 do
+                    pixel:set_dot(px, py, ACCENT)
+                end
+            end
+
+            local spawner = world:spawn()
+            spawner:set_position(f.vec3(0, 0, 0))
+            world:add_root(spawner)
+            local spawn_timer = 0
+            local spawn_elapsed = 0
+            spawner:set_behavior(function(e, w, t)
+                spawn_elapsed = spawn_elapsed + t.delta
+                if spawn_elapsed < 3.0 then return end
+                spawn_timer = spawn_timer + t.delta
+                if spawn_timer < 0.3 then return end
+                spawn_timer = 0
+
+                local p = w:spawn()
+                local px_pos = left_x + math.random() * (mid_x - left_x - 4)
+                local py_pos = diagram_y + math.random() * (sh * 0.5)
+                p:set_position(f.vec3(px_pos, py_pos, 0))
+                p:set_drawable(f.bitmap.braille(pixel))
+                p:set_layer(0)
+                p:set_body({
+                    velocity = f.vec2(
+                        (math.random() - 0.5) * 6,
+                        (math.random() - 0.5) * 4
+                    ),
+                })
+                p:set_age({ lifetime = 2.0 + math.random() * 2.0 })
+                p:set_behavior(f.physics.turbulence(0.5, 3.0))
+                p:set_behavior(f.physics.drag(0.4))
+                p:set_behavior(f.physics.euler())
+                p:set_behavior(f.particle.age_and_despawn())
+                p:set_material(function(frag)
+                    local life_frac = 0
+                    if frag.lifetime > 0 then
+                        life_frac = frag.age / frag.lifetime
+                    end
+                    return {
+                        rune = frag.rune,
+                        fg_r = ACCENT.r, fg_g = ACCENT.g, fg_b = ACCENT.b,
+                        fg_alpha = (1.0 - life_frac) * 0.4,
+                        bg_alpha = 0,
+                    }
+                end)
+                w:add_root(p)
+            end)
+
+            -- Bottom insight on layer 2
+            local insight = "Complexity compounds. Structure compounds too."
+            local _, insight_txt = make_text(world, "", cx(insight), math.floor(sh * 0.88), BLACK, 2)
+            local t4 = timeline:add_track()
+            local ins_frames, ins_dur = typewriter_frames(insight, 0.03)
+            t4:at(8.5, f.timeline.text_keyframes(insight_txt, ins_frames, ins_dur))
 
             timeline:start()
+        end,
+        on_update = function(world, time)
+            -- Gradually darken the tactical (left) side
+            if darken_start then
+                local elapsed = time.total - darken_start
+                local darken = math.min(0.6, elapsed * 0.1)
+                f.set_post_process(0, function(frag)
+                    local factor = 1.0 - darken
+                    return {
+                        rune = frag.rune,
+                        fg_r = frag.fg_r * factor,
+                        fg_g = frag.fg_g * factor,
+                        fg_b = frag.fg_b * factor,
+                        fg_alpha = frag.fg_alpha,
+                        bg_r = frag.bg_r, bg_g = frag.bg_g, bg_b = frag.bg_b,
+                        bg_alpha = frag.bg_alpha,
+                    }
+                end)
+            end
         end,
         on_exit = function(world)
             if timeline then timeline:cleanup() end
@@ -340,146 +540,297 @@ app.go
 end
 
 -- ============================================================================
--- Slide 5: The Vibe Loop vs The Real Loop
+-- Slide 5: Tetris — AI vs Human (12s, auto-advance)
 -- ============================================================================
-local function create_loops_slide()
+local function create_tetris_slide()
     local timeline
 
     return f.scene(sw, sh, {
-        duration = 10.0,
+        duration = 12.0,
         transition = { shader = f.transition.cross_fade, duration = 1.5 },
+        trail = { layer = 0, effect = f.trail.ghost(0.88) },
         on_enter = function(world, ctx)
-            make_bg(world)
+            make_bg(world, -1)
             timeline = f.timeline.new(world)
 
-            make_text(world, "Two Development Loops",
-                cx("Two Development Loops"), math.floor(sh * 0.08), BLACK)
+            -- Title
+            make_text(world, "Speed vs Intentionality",
+                cx("Speed vs Intentionality"), math.floor(sh * 0.05), BLACK, 2)
 
-            local left_x = math.floor(sw * 0.05)
+            local left_x = math.floor(sw * 0.08)
             local right_x = math.floor(sw * 0.55)
-            local loop_y = math.floor(sh * 0.20)
+            local board_y = math.floor(sh * 0.15)
 
-            make_text(world, "Strategic Loop", left_x + 6, loop_y - 2, ACCENT2)
-            make_text(world, "Vibe Loop", right_x + 8, loop_y - 2, ACCENT)
+            -- Labels
+            make_text(world, "Agent", left_x + 5, board_y - 2, ACCENT, 2)
+            make_text(world, "Engineer", right_x + 3, board_y - 2, ACCENT2, 2)
 
-            local real_diagram = f.text("", { fg = DARK })
-            local rd_ent = world:spawn()
-            rd_ent:set_position(f.vec3(left_x, loop_y, 0))
-            rd_ent:set_drawable(real_diagram)
-            rd_ent:set_material(bg_material())
-            world:add_root(rd_ent)
+            -- Left Tetris on layer 0 (ghost trail for speed blur)
+            local _, left_txt = make_text(world, "", left_x, board_y, DARK, 0)
 
-            local vibe_diagram = f.text("", { fg = DARK })
-            local vd_ent = world:spawn()
-            vd_ent:set_position(f.vec3(right_x, loop_y, 0))
-            vd_ent:set_drawable(vibe_diagram)
-            vd_ent:set_material(bg_material())
-            world:add_root(vd_ent)
+            -- Right Tetris on layer 1 (no trail)
+            local _, right_txt = make_text(world, "", right_x, board_y, DARK, 1)
 
-            local real_states = {
-                { time = 0.0, value = [[
-┌─────────────────────────┐
-│  Define the problem     │
-└────────────┬────────────┘
-             │]] },
-                { time = 1.2, value = [[
-┌─────────────────────────┐
-│  Define the problem     │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Design the solution    │
-└────────────┬────────────┘
-             │]] },
-                { time = 2.4, value = [[
-┌─────────────────────────┐
-│  Define the problem     │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Design the solution    │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Build + Review         │
-└────────────┬────────────┘
-             │]] },
-                { time = 3.6, value = [[
-┌─────────────────────────┐
-│  Define the problem     │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Design the solution    │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Build + Review         │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Ship + Maintain        │
-└─────────────────────────┘]] },
+            -- Board border chars
+            local TL = "\xe2\x94\x8c" -- ┌
+            local TR = "\xe2\x94\x90" -- ┐
+            local BL = "\xe2\x94\x94" -- └
+            local BR = "\xe2\x94\x98" -- ┘
+            local HZ = "\xe2\x94\x80" -- ─
+            local VT = "\xe2\x94\x82" -- │
+            local BK = "\xe2\x96\x88\xe2\x96\x88" -- ██
+            local SP = "  " -- 2 spaces
+            local W = 10 -- board width in blocks
+
+            local function board_top()
+                return TL .. string.rep(HZ, W * 2) .. TR
+            end
+            local function board_bot()
+                return BL .. string.rep(HZ, W * 2) .. BR
+            end
+            local function row(blocks)
+                -- blocks is a string of W chars: '#' = filled, '.' = empty
+                local s = VT
+                for i = 1, #blocks do
+                    local c = blocks:sub(i, i)
+                    if c == "#" then s = s .. BK
+                    else s = s .. SP end
+                end
+                return s .. VT
+            end
+
+            -- Messy board states (fast cycling — agent dumps blocks)
+            local messy = {
+                { time = 0.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    board_bot() },
+                { time = 1.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("....##....") .. "\n" ..
+                    row(".##.......") .. "\n" ..
+                    board_bot() },
+                { time = 1.8, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("...##.....") .. "\n" ..
+                    row("..####....") .. "\n" ..
+                    row(".##..#....") .. "\n" ..
+                    board_bot() },
+                { time = 2.6, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..#.......") .. "\n" ..
+                    row("..##......") .. "\n" ..
+                    row("..####.##.") .. "\n" ..
+                    row(".##..#.##.") .. "\n" ..
+                    board_bot() },
+                { time = 3.4, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("#.........") .. "\n" ..
+                    row("##........") .. "\n" ..
+                    row("####......") .. "\n" ..
+                    row("..####.##.") .. "\n" ..
+                    row(".##..#.##.") .. "\n" ..
+                    board_bot() },
+                { time = 4.2, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row(".....#....") .. "\n" ..
+                    row("....##....") .. "\n" ..
+                    row("#...#.....") .. "\n" ..
+                    row("##..##....") .. "\n" ..
+                    row("####.##...") .. "\n" ..
+                    row("..####.##.") .. "\n" ..
+                    row(".##..#.##.") .. "\n" ..
+                    board_bot() },
+                { time = 5.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("....##....") .. "\n" ..
+                    row(".#...#..#.") .. "\n" ..
+                    row("##..##..#.") .. "\n" ..
+                    row("#...#..##.") .. "\n" ..
+                    row("##..##..#.") .. "\n" ..
+                    row("####.##...") .. "\n" ..
+                    row("..####.##.") .. "\n" ..
+                    row(".##..#.##.") .. "\n" ..
+                    board_bot() },
+                { time = 6.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..##......") .. "\n" ..
+                    row("..####..#.") .. "\n" ..
+                    row(".#.#.#..#.") .. "\n" ..
+                    row("##..##.##.") .. "\n" ..
+                    row("#.#.#..##.") .. "\n" ..
+                    row("##.###..#.") .. "\n" ..
+                    row("####.##.#.") .. "\n" ..
+                    row("..####.##.") .. "\n" ..
+                    row(".##..#.##.") .. "\n" ..
+                    board_bot() },
+                { time = 7.0, value =
+                    board_top() .. "\n" ..
+                    row(".##.......") .. "\n" ..
+                    row(".####.#.#.") .. "\n" ..
+                    row("..####..#.") .. "\n" ..
+                    row(".#.#.#.##.") .. "\n" ..
+                    row("##.###.##.") .. "\n" ..
+                    row("#.#.#..##.") .. "\n" ..
+                    row("##.###.##.") .. "\n" ..
+                    row("####.####.") .. "\n" ..
+                    row("#.####.##.") .. "\n" ..
+                    row(".##.##.##.") .. "\n" ..
+                    board_bot() .. "\n" ..
+                    "     GAME OVER" },
             }
 
-            local vibe_states = {
-                { time = 0.0, value = [[
-┌─────────────────────────┐
-│  Prompt                 │
-└────────────┬────────────┘
-             │]] },
-                { time = 1.2, value = [[
-┌─────────────────────────┐
-│  Prompt                 │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Smoke test             │
-└────────────┬────────────┘
-             │]] },
-                { time = 2.4, value = [[
-┌─────────────────────────┐
-│  Prompt                 │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Smoke test             │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Ship it                │
-└────────────┬────────────┘
-             │]] },
-                { time = 3.6, value = [[
-┌─────────────────────────┐
-│  Prompt                 │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Smoke test             │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Ship it                │
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│  Fix it later (maybe)   │
-└─────────────────────────┘]] },
+            -- Clean board states (slow, methodical — engineer thinks)
+            local clean = {
+                { time = 0.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    board_bot() },
+                { time = 2.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("...####...") .. "\n" ..
+                    board_bot() },
+                { time = 3.5, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("......##..") .. "\n" ..
+                    row("...####...") .. "\n" ..
+                    board_bot() },
+                { time = 5.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..######..") .. "\n" ..
+                    row("..########") .. "\n" ..
+                    board_bot() },
+                { time = 6.5, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("##########") .. "\n" ..
+                    row("##########") .. "\n" ..
+                    board_bot() .. "\n" ..
+                    "   \xe2\x94\x80\xe2\x94\x80 rows cleared \xe2\x94\x80\xe2\x94\x80" },
+                { time = 8.0, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("....##....") .. "\n" ..
+                    board_bot() .. "\n" ..
+                    "   \xe2\x94\x80\xe2\x94\x80 rows cleared \xe2\x94\x80\xe2\x94\x80" },
+                { time = 9.5, value =
+                    board_top() .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..........") .. "\n" ..
+                    row("..##..##..") .. "\n" ..
+                    row("..########") .. "\n" ..
+                    board_bot() .. "\n" ..
+                    "   \xe2\x94\x80\xe2\x94\x80 rows cleared \xe2\x94\x80\xe2\x94\x80" },
             }
 
             local t1 = timeline:add_track()
-            t1:add(f.timeline.text_keyframes(real_diagram, real_states, 6.0))
+            t1:add(f.timeline.text_keyframes(left_txt, messy, 10.0))
 
             local t2 = timeline:add_track()
-            t2:add(f.timeline.text_keyframes(vibe_diagram, vibe_states, 6.0))
+            t2:add(f.timeline.text_keyframes(right_txt, clean, 10.0))
 
-            local missing = "What's missing? Intentionality."
-            local _, missing_txt = make_text(world, "", cx(missing), math.floor(sh * 0.88), ACCENT)
-
+            -- Bottom text
+            local bottom = "Same blocks. Different judgment."
+            local _, bottom_txt = make_text(world, "", cx(bottom), math.floor(sh * 0.90), BLACK, 2)
             local t3 = timeline:add_track()
-            local frames, dur = typewriter_frames(missing, 0.04)
-            t3:at(4.5, f.timeline.text_keyframes(missing_txt, frames, dur))
+            local frames, dur = typewriter_frames(bottom, 0.04)
+            t3:at(8.0, f.timeline.text_keyframes(bottom_txt, frames, dur))
 
             timeline:start()
         end,
@@ -490,7 +841,7 @@ local function create_loops_slide()
 end
 
 -- ============================================================================
--- Slide 6: Takeaways
+-- Slide 6: Takeaways (no auto-advance, final slide)
 -- ============================================================================
 local function create_takeaways_slide()
     local timeline
@@ -503,11 +854,9 @@ local function create_takeaways_slide()
             make_text(world, "Takeaways", cx("Takeaways"), math.floor(sh * 0.10), BLACK)
 
             local points = {
-                "Software success is measured over time, not at first run",
-                "Tactical programming trades future clarity for present speed",
-                "LLMs lower the cost of choosing the tactical path",
-                "Lower cost does not mean lower consequence",
-                "Design judgment determines whether speed compounds or collapses",
+                "Working code is the beginning, not the finish line",
+                "Every shortcut is a bet against your future self",
+                "AI accelerates output \xe2\x94\x80 judgment determines direction",
             }
 
             local start_y = math.floor(sh * 0.28)
@@ -525,14 +874,20 @@ local function create_takeaways_slide()
             for _, pt in ipairs(point_txts) do
                 local frames, dur = typewriter_frames(pt.full, 0.02)
                 track:at(t, f.timeline.text_keyframes(pt.txt, frames, dur))
-                t = t + dur + 0.4
+                t = t + dur + 0.5
             end
 
+            -- Closing phrase
             local closing = "Ask which decisions you're accelerating and which you're skipping."
-            local _, closing_txt = make_text(world, "", cx(closing), math.floor(sh * 0.82), ACCENT)
+            local _, closing_txt = make_text(world, "", cx(closing), math.floor(sh * 0.78), DARK)
+            local closing_frames, closing_dur = typewriter_frames(closing, 0.03)
+            track:at(t + 0.8, f.timeline.text_keyframes(closing_txt, closing_frames, closing_dur))
 
-            local frames, dur = typewriter_frames(closing, 0.03)
-            track:at(t + 0.5, f.timeline.text_keyframes(closing_txt, frames, dur))
+            -- Final emphasis
+            local emphasis = "Be intentional."
+            local _, emphasis_txt = make_text(world, "", cx(emphasis), math.floor(sh * 0.85), ACCENT)
+            local emp_frames, _ = typewriter_frames(emphasis, 0.06)
+            track:at(t + closing_dur + 1.5, f.timeline.text_keyframes(emphasis_txt, emp_frames, 2.0))
 
             timeline:start()
         end,
@@ -552,10 +907,10 @@ f.on_enter(function(world, ctx)
     local sm = f.scene_manager(sw, sh)
 
     sm:add(create_title_slide())
-    sm:add(create_hot_take_slide())
-    sm:add(create_questions_slide())
-    sm:add(create_tree_slide())
-    sm:add(create_loops_slide())
+    sm:add(create_cost_slide())
+    sm:add(create_domino_slide())
+    sm:add(create_tactical_slide())
+    sm:add(create_tetris_slide())
     sm:add(create_takeaways_slide())
 
     sm:start()
