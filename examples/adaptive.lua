@@ -7,8 +7,8 @@ local f = require("flicker")
 f.on_enter(function(world, ctx)
     local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
 
-    -- Header labels
-    local label_size = ctx.height * 0.08
+    -- Header labels (font scaled by 4.5 for adaptive's 6×9 px/cell)
+    local label_size = ctx.height * 0.08 * 4.5
     local label_y = ctx.height * 0.03
 
     local braille_label = f.asset.rasterize_text("BRAILLE", {
@@ -17,8 +17,8 @@ f.on_enter(function(world, ctx)
         color = f.color(100, 100, 100),
     })
     local bl = world:spawn()
-    bl:set_position(f.vec3(ctx.width * 0.25 - braille_label.width / 2, label_y, 0))
-    bl:set_drawable(f.bitmap.adaptive(braille_label.bitmap))
+    bl:set_position(f.vec3(ctx.width * 0.25 - braille_label.width / 12, label_y, 0))
+    bl:set_drawable(f.bitmap.adaptive(braille_label.bitmap, { threshold = 0.3 }))
     world:add_root(bl)
 
     local adaptive_label = f.asset.rasterize_text("ADAPTIVE", {
@@ -27,8 +27,8 @@ f.on_enter(function(world, ctx)
         color = f.color(100, 100, 100),
     })
     local al = world:spawn()
-    al:set_position(f.vec3(ctx.width * 0.75 - adaptive_label.width / 2, label_y, 0))
-    al:set_drawable(f.bitmap.adaptive(adaptive_label.bitmap))
+    al:set_position(f.vec3(ctx.width * 0.75 - adaptive_label.width / 12, label_y, 0))
+    al:set_drawable(f.bitmap.adaptive(adaptive_label.bitmap, { threshold = 0.3 }))
     world:add_root(al)
 
     -- Divider line down the center
@@ -39,7 +39,7 @@ f.on_enter(function(world, ctx)
     end
     local div = world:spawn()
     div:set_position(f.vec3(ctx.width / 2, 0, 0))
-    div:set_drawable(f.bitmap.adaptive(div_bm))
+    div:set_drawable(f.bitmap.adaptive(div_bm, { threshold = 0.3 }))
     world:add_root(div)
 
     -- Render text at multiple sizes to show the difference
@@ -70,10 +70,10 @@ f.on_enter(function(world, ctx)
         eb:set_drawable(f.bitmap.braille(layout_b.bitmap))
         world:add_root(eb)
 
-        -- Right side: adaptive
+        -- Right side: adaptive (font scaled by 9/4 to match braille cell height)
         local layout_a = f.asset.rasterize_text(word, {
             font = font,
-            size = text_size,
+            size = text_size * 2.25,
             color = colors[i],
         })
         local ea = world:spawn()
@@ -82,7 +82,7 @@ f.on_enter(function(world, ctx)
             y_cursor,
             0
         ))
-        ea:set_drawable(f.bitmap.adaptive(layout_a.bitmap))
+        ea:set_drawable(f.bitmap.adaptive(layout_a.bitmap, { threshold = 0.3 }))
         world:add_root(ea)
 
         -- Advance y based on the larger of the two encoded heights

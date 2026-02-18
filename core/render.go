@@ -18,6 +18,16 @@ func viewMatrix(w *World, canvasW, canvasH int) fmath.Mat3 {
 	return ViewMatrix(w.Camera(e), w.Transform(e), canvasW, canvasH)
 }
 
+// layerViewMatrix returns the view matrix for a specific layer. If the layer
+// has an explicit camera override, that camera is used; otherwise falls back
+// to the global active camera.
+func layerViewMatrix(w *World, layer, canvasW, canvasH int) fmath.Mat3 {
+	if e, ok := w.LayerCamera(layer); ok {
+		return ViewMatrix(w.Camera(e), w.Transform(e), canvasW, canvasH)
+	}
+	return viewMatrix(w, canvasW, canvasH)
+}
+
 func renderEntity(w *World, c *Canvas, e Entity, parent fmath.Mat3, t Time) {
 	tr := w.Transform(e)
 	if tr == nil {

@@ -146,9 +146,12 @@ func newBraille(L *lua.LState) int {
 
 func newAdaptive(L *lua.LState) int {
 	bm := checkBitmap(L, 1)
-	drawable := &bitmap.Adaptive{Bitmap: bm}
+	ad := &bitmap.Adaptive{Bitmap: bm}
+	if opts := L.OptTable(2, nil); opts != nil {
+		ad.AlphaThreshold = getNumberField(L, opts, "threshold", 0)
+	}
 	ud := L.NewUserData()
-	ud.Value = core.Drawable(drawable)
+	ud.Value = core.Drawable(ad)
 	L.Push(ud)
 	return 1
 }

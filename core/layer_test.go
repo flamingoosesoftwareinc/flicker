@@ -160,6 +160,59 @@ func TestCompositor_PostProcess(t *testing.T) {
 	}
 }
 
+func TestCompositor_PerLayerCamera(t *testing.T) {
+	world := core.NewWorld()
+
+	// Camera panned far off-screen so entities at (0,0) won't appear
+	// on a small canvas when rendered through this camera.
+	cam := world.Spawn()
+	world.AddTransform(cam, &core.Transform{
+		Position: fmath.Vec3{X: 1000, Y: 1000},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	world.AddCamera(cam, &core.Camera{Zoom: 1})
+
+	// Layer 0: screen-space (identity). Entity at (0,0) should render
+	// at screen (0,0) because identity view doesn't shift anything.
+	screenBox := world.Spawn()
+	world.AddTransform(screenBox, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(screenBox, &bitmap.Rect{Width: 2, Height: 1, FG: core.Color{R: 255}})
+	world.AddLayer(screenBox, 0)
+	world.AddRoot(screenBox)
+
+	// Layer 1: world camera. Same entity position (0,0), but viewed
+	// through a camera at (1000,1000) — shifts it off-screen entirely.
+	worldBox := world.Spawn()
+	world.AddTransform(worldBox, &core.Transform{Scale: fmath.Vec3{X: 1, Y: 1, Z: 1}})
+	world.AddDrawable(worldBox, &bitmap.Rect{Width: 2, Height: 1, FG: core.Color{B: 255}})
+	world.AddLayer(worldBox, 1)
+	world.AddRoot(worldBox)
+
+	world.SetLayerCamera(0, 0) // screen-space
+	world.SetLayerCamera(1, cam)
+
+	w, h := 10, 5
+	dst := core.NewCanvas(w, h)
+	comp := core.NewCompositor(w, h)
+	comp.Composite(world, dst, core.Time{})
+
+	// Screen-space entity should render at (0,0).
+	cell := dst.Get(0, 0)
+	if cell.FG.R != 255 {
+		t.Errorf("screen-space entity: expected FG.R=255 at (0,0), got %d", cell.FG.R)
+	}
+
+	// World-camera entity should be off-screen — no blue anywhere on canvas.
+	for y := range h {
+		for x := range w {
+			c := dst.Get(x, y)
+			if c.FG.B == 255 {
+				t.Errorf("world-camera entity should be off-screen, found blue at (%d,%d)", x, y)
+			}
+		}
+	}
+}
+
 func TestCompositor_DefaultLayer(t *testing.T) {
 	world := core.NewWorld()
 

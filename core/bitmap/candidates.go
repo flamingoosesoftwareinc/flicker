@@ -16,16 +16,16 @@ func init() {
 	candidates = buildCandidates()
 }
 
-// sampleCell extracts a 54-bit pattern from a bitmap at cell position (cx, cy).
+// sampleCellThreshold extracts a 54-bit pattern from a bitmap at cell position (cx, cy).
 // Each cell covers a 6×9 pixel region. A bit is set if the corresponding
-// pixel has alpha > 0.
-func sampleCell(bm *Bitmap, cx, cy int) uint64 {
+// pixel has alpha strictly greater than thresh.
+func sampleCellThreshold(bm *Bitmap, cx, cy int, thresh float64) uint64 {
 	var pattern uint64
 	for row := range 9 {
 		for col := range 6 {
 			px := cx*6 + col
 			py := cy*9 + row
-			if px < bm.Width && py < bm.Height && bm.Alpha[py*bm.Width+px] > 0 {
+			if px < bm.Width && py < bm.Height && bm.Alpha[py*bm.Width+px] > thresh {
 				pattern |= 1 << uint(row*6+col)
 			}
 		}

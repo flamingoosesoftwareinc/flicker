@@ -61,20 +61,22 @@ type World struct {
 	ages         map[Entity]*Age
 	children     map[Entity][]Entity
 	roots        []Entity
-	activeCamera Entity // 0 = no camera; safe because Spawn() starts at 1
+	activeCamera Entity         // 0 = no camera; safe because Spawn() starts at 1
+	layerCameras map[int]Entity // layer index → camera entity (0 = screen-space)
 }
 
 func NewWorld() *World {
 	return &World{
-		transforms: make(map[Entity]*Transform),
-		drawables:  make(map[Entity]Drawable),
-		behaviors:  make(map[Entity][]Behavior),
-		materials:  make(map[Entity]Material),
-		layers:     make(map[Entity]int),
-		cameras:    make(map[Entity]*Camera),
-		bodies:     make(map[Entity]*Body),
-		ages:       make(map[Entity]*Age),
-		children:   make(map[Entity][]Entity),
+		transforms:   make(map[Entity]*Transform),
+		drawables:    make(map[Entity]Drawable),
+		behaviors:    make(map[Entity][]Behavior),
+		materials:    make(map[Entity]Material),
+		layers:       make(map[Entity]int),
+		cameras:      make(map[Entity]*Camera),
+		bodies:       make(map[Entity]*Body),
+		ages:         make(map[Entity]*Age),
+		children:     make(map[Entity][]Entity),
+		layerCameras: make(map[int]Entity),
 	}
 }
 
@@ -197,6 +199,25 @@ func (w *World) SetActiveCamera(e Entity) {
 
 func (w *World) ActiveCamera() Entity {
 	return w.activeCamera
+}
+
+// SetLayerCamera assigns a camera entity to a layer. Entity 0 means
+// screen-space (ViewMatrix returns identity for nil camera/transform).
+func (w *World) SetLayerCamera(layer int, e Entity) {
+	w.layerCameras[layer] = e
+}
+
+// LayerCamera returns the camera entity for a layer and whether it was
+// explicitly set. Returns (0, false) if no override exists.
+func (w *World) LayerCamera(layer int) (Entity, bool) {
+	e, ok := w.layerCameras[layer]
+	return e, ok
+}
+
+// ClearLayerCamera removes a per-layer camera override, restoring fallback
+// to the global active camera.
+func (w *World) ClearLayerCamera(layer int) {
+	delete(w.layerCameras, layer)
 }
 
 func (w *World) AddBody(e Entity, b *Body) {

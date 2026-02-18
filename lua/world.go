@@ -15,14 +15,16 @@ type luaEntity struct {
 func registerWorldType(L *lua.LState) {
 	// World metatable
 	mt := registerType(L, typeWorld, map[string]lua.LGFunction{
-		"spawn":             worldSpawn,
-		"despawn":           worldDespawn,
-		"add_root":          worldAddRoot,
-		"roots":             worldRoots,
-		"attach":            worldAttach,
-		"children":          worldChildren,
-		"set_active_camera": worldSetActiveCamera,
-		"active_camera":     worldActiveCamera,
+		"spawn":              worldSpawn,
+		"despawn":            worldDespawn,
+		"add_root":           worldAddRoot,
+		"roots":              worldRoots,
+		"attach":             worldAttach,
+		"children":           worldChildren,
+		"set_active_camera":  worldSetActiveCamera,
+		"active_camera":      worldActiveCamera,
+		"set_layer_camera":   worldSetLayerCamera,
+		"clear_layer_camera": worldClearLayerCamera,
 	})
 	L.SetField(mt, "__index", L.GetField(mt, "methods"))
 
@@ -365,4 +367,23 @@ func worldActiveCamera(L *lua.LState) int {
 	}
 	pushEntity(L, luaEntity{ID: e, World: w})
 	return 1
+}
+
+func worldSetLayerCamera(L *lua.LState) int {
+	w := checkWorld(L, 1)
+	layer := L.CheckInt(2)
+	if L.GetTop() < 3 || L.Get(3) == lua.LNil {
+		w.SetLayerCamera(layer, 0) // screen-space
+	} else {
+		e := checkEntity(L, 3)
+		w.SetLayerCamera(layer, e.ID)
+	}
+	return 0
+}
+
+func worldClearLayerCamera(L *lua.LState) int {
+	w := checkWorld(L, 1)
+	layer := L.CheckInt(2)
+	w.ClearLayerCamera(layer)
+	return 0
 }

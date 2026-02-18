@@ -12,7 +12,8 @@ import (
 // templates (sextants, diagonal blocks, triangular blocks, and standard block
 // elements) to find the best-fit character via minimum hamming distance.
 type Adaptive struct {
-	Bitmap *Bitmap
+	Bitmap         *Bitmap
+	AlphaThreshold float64 // pixels with alpha ≤ threshold are treated as empty
 }
 
 // Draw renders the bitmap onto the canvas at the given offset.
@@ -89,7 +90,7 @@ func (ad *Adaptive) Renderer() core.RenderFunc {
 
 // cellFromBitmap samples a 6×9 region from the bitmap and returns the best-fit cell.
 func (ad *Adaptive) cellFromBitmap(bm *Bitmap, col, row int) core.Cell {
-	sample := sampleCell(bm, col, row)
+	sample := sampleCellThreshold(bm, col, row, ad.AlphaThreshold)
 	if sample == 0 {
 		return core.Cell{}
 	}
@@ -100,6 +101,7 @@ func (ad *Adaptive) cellFromBitmap(bm *Bitmap, col, row int) core.Cell {
 	}
 
 	// Compute average color of filled pixels.
+	thresh := ad.AlphaThreshold
 	var rSum, gSum, bSum int
 	var count int
 	var maxAlpha float64
@@ -111,7 +113,7 @@ func (ad *Adaptive) cellFromBitmap(bm *Bitmap, col, row int) core.Cell {
 				continue
 			}
 			a := bm.Alpha[py*bm.Width+px]
-			if a > 0 {
+			if a > thresh {
 				c := bm.Pix[py*bm.Width+px]
 				rSum += int(c.R)
 				gSum += int(c.G)

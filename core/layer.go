@@ -94,13 +94,11 @@ func (c *Compositor) Composite(world *World, dst *Canvas, t Time) {
 		}
 	}
 
-	// Compute view matrix once for all layers.
-	view := viewMatrix(world, c.width, c.height)
-
 	// Render each root's entity tree into its layer canvas.
 	for _, root := range world.Roots() {
 		idx := world.Layer(root)
 		lc := c.getLayer(idx)
+		view := layerViewMatrix(world, idx, c.width, c.height)
 		renderEntity(world, lc, root, view, t)
 	}
 

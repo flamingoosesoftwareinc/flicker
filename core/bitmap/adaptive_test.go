@@ -156,6 +156,42 @@ func TestAdaptiveDiagonalPattern(t *testing.T) {
 	}
 }
 
+func TestAdaptiveAlphaThreshold(t *testing.T) {
+	// Fill one cell with low-alpha pixels in the right half.
+	// Without threshold, sextant should include those pixels.
+	// With threshold, they should be ignored.
+	bm := New(6, 9)
+	solid := core.Color{R: 255}
+	// Left 3 columns: fully opaque.
+	for y := range 9 {
+		for x := range 3 {
+			bm.SetDot(x, y, solid)
+		}
+	}
+	// Right 3 columns: low alpha (antialiased fringe).
+	for y := range 9 {
+		for x := 3; x < 6; x++ {
+			idx := y*bm.Width + x
+			bm.Pix[idx] = solid
+			bm.Alpha[idx] = 0.1
+		}
+	}
+
+	// Without threshold: both halves count → full block.
+	ad := &Adaptive{Bitmap: bm}
+	cell := ad.CellAt(0, 0)
+	if cell.Rune != '\u2588' {
+		t.Errorf("no threshold: expected full block U+2588, got %U", cell.Rune)
+	}
+
+	// With threshold 0.3: right half is below threshold → left half block.
+	ad = &Adaptive{Bitmap: bm, AlphaThreshold: 0.3}
+	cell = ad.CellAt(0, 0)
+	if cell.Rune != '\u258C' {
+		t.Errorf("threshold 0.3: expected left half U+258C, got %U", cell.Rune)
+	}
+}
+
 func TestCandidatesNotEmpty(t *testing.T) {
 	// 63 sextants (1–63, no space) + 2 half blocks + 10 quadrants = 75
 	if len(candidates) < 75 {

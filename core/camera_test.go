@@ -125,3 +125,89 @@ func TestViewMatrixActiveCamera(t *testing.T) {
 		t.Errorf("active camera: pos maps to %v, want (40,12)", got)
 	}
 }
+
+func TestLayerViewMatrixExplicitCamera(t *testing.T) {
+	// Layer with explicit camera entity uses that camera's view matrix.
+	w := NewWorld()
+	cam := w.Spawn()
+	w.AddTransform(cam, &Transform{
+		Position: fmath.Vec3{X: 20, Y: 10},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	w.AddCamera(cam, &Camera{Zoom: 1})
+	w.SetLayerCamera(0, cam)
+
+	m := layerViewMatrix(w, 0, 80, 24)
+	// Camera at (20,10) → that point maps to screen center.
+	got := m.Apply(fmath.Vec2{X: 20, Y: 10})
+	if !approxEqual(got.X, 40) || !approxEqual(got.Y, 12) {
+		t.Errorf("layer camera: pos maps to %v, want (40,12)", got)
+	}
+}
+
+func TestLayerViewMatrixScreenSpace(t *testing.T) {
+	// Layer with entity 0 (screen-space) gets identity matrix.
+	w := NewWorld()
+	// Set a global camera to prove it's not used.
+	globalCam := w.Spawn()
+	w.AddTransform(globalCam, &Transform{
+		Position: fmath.Vec3{X: 50, Y: 50},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	w.AddCamera(globalCam, &Camera{Zoom: 2})
+	w.SetActiveCamera(globalCam)
+
+	// Layer 1 set to entity 0 → screen-space.
+	w.SetLayerCamera(1, 0)
+
+	m := layerViewMatrix(w, 1, 80, 24)
+	if m != fmath.Mat3Identity() {
+		t.Errorf("screen-space layer: got %v, want identity", m)
+	}
+}
+
+func TestLayerViewMatrixFallbackToGlobal(t *testing.T) {
+	// Layer with no camera set falls back to global active camera.
+	w := NewWorld()
+	cam := w.Spawn()
+	w.AddTransform(cam, &Transform{
+		Position: fmath.Vec3{X: 10, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	w.AddCamera(cam, &Camera{Zoom: 1})
+	w.SetActiveCamera(cam)
+
+	// Layer 0 has no override → should use global active camera.
+	m := layerViewMatrix(w, 0, 80, 24)
+	expected := viewMatrix(w, 80, 24)
+	if m != expected {
+		t.Errorf("fallback: got %v, want %v", m, expected)
+	}
+}
+
+func TestClearLayerCameraRestoresFallback(t *testing.T) {
+	// ClearLayerCamera restores fallback behavior.
+	w := NewWorld()
+	globalCam := w.Spawn()
+	w.AddTransform(globalCam, &Transform{
+		Position: fmath.Vec3{X: 10, Y: 5},
+		Scale:    fmath.Vec3{X: 1, Y: 1, Z: 1},
+	})
+	w.AddCamera(globalCam, &Camera{Zoom: 1})
+	w.SetActiveCamera(globalCam)
+
+	// Set layer 0 to screen-space.
+	w.SetLayerCamera(0, 0)
+	m := layerViewMatrix(w, 0, 80, 24)
+	if m != fmath.Mat3Identity() {
+		t.Errorf("after set: got %v, want identity", m)
+	}
+
+	// Clear → should fall back to global camera.
+	w.ClearLayerCamera(0)
+	m = layerViewMatrix(w, 0, 80, 24)
+	expected := viewMatrix(w, 80, 24)
+	if m != expected {
+		t.Errorf("after clear: got %v, want %v", m, expected)
+	}
+}
