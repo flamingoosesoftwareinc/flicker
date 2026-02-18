@@ -41,5 +41,33 @@ func registerAll(L *lua.LState, engine *Engine) *lua.LTable {
 		return 0
 	}))
 
+	// Set blend mode on compositor layer: flicker.set_blend(layer, blend)
+	L.SetField(mod, "set_blend", L.NewFunction(func(L *lua.LState) int {
+		layer := L.CheckInt(1)
+		ud := L.CheckUserData(2)
+		if b, ok := ud.Value.(core.ColorBlend); ok {
+			if engine.activeScene != nil {
+				engine.activeScene.Compositor().SetBlend(layer, b)
+			}
+		} else {
+			L.ArgError(2, "blend mode expected")
+		}
+		return 0
+	}))
+
+	// Set post-process on compositor layer: flicker.set_post_process(layer, shader_fn)
+	L.SetField(mod, "set_post_process", L.NewFunction(func(L *lua.LState) int {
+		layer := L.CheckInt(1)
+		fn := L.CheckFunction(2)
+		pp := core.LayerPostProcess(materialFromLua(L, fn))
+		if engine.activeScene != nil {
+			engine.activeScene.Compositor().SetPostProcess(layer, pp)
+		}
+		return 0
+	}))
+
+	// Blend modes sub-table
+	registerBlendModule(L, mod)
+
 	return mod
 }

@@ -15,12 +15,14 @@ type luaEntity struct {
 func registerWorldType(L *lua.LState) {
 	// World metatable
 	mt := registerType(L, typeWorld, map[string]lua.LGFunction{
-		"spawn":    worldSpawn,
-		"despawn":  worldDespawn,
-		"add_root": worldAddRoot,
-		"roots":    worldRoots,
-		"attach":   worldAttach,
-		"children": worldChildren,
+		"spawn":             worldSpawn,
+		"despawn":           worldDespawn,
+		"add_root":          worldAddRoot,
+		"roots":             worldRoots,
+		"attach":            worldAttach,
+		"children":          worldChildren,
+		"set_active_camera": worldSetActiveCamera,
+		"active_camera":     worldActiveCamera,
 	})
 	L.SetField(mt, "__index", L.GetField(mt, "methods"))
 
@@ -35,6 +37,9 @@ func registerWorldType(L *lua.LState) {
 		"set_material":  entitySetMaterial,
 		"set_behavior":  entitySetBehavior,
 		"set_layer":     entitySetLayer,
+		"set_camera":    entitySetCamera,
+		"set_age":       entitySetAge,
+		"age":           entityGetAge,
 		"id":            entityID,
 	})
 	L.SetField(emt, "__index", L.GetField(emt, "methods"))
@@ -300,5 +305,64 @@ func entitySetLayer(L *lua.LState) int {
 func entityID(L *lua.LState) int {
 	e := checkEntity(L, 1)
 	L.Push(lua.LNumber(e.ID))
+	return 1
+}
+
+func entitySetCamera(L *lua.LState) int {
+	e := checkEntity(L, 1)
+	opts := L.OptTable(2, nil)
+
+	cam := &core.Camera{}
+	if opts != nil {
+		cam.Zoom = getNumberField(L, opts, "zoom", 0)
+	}
+
+	e.World.AddCamera(e.ID, cam)
+	return 0
+}
+
+func entitySetAge(L *lua.LState) int {
+	e := checkEntity(L, 1)
+	opts := L.OptTable(2, nil)
+
+	age := &core.Age{}
+	if opts != nil {
+		age.Age = getNumberField(L, opts, "age", 0)
+		age.Lifetime = getNumberField(L, opts, "lifetime", 0)
+	}
+
+	e.World.AddAge(e.ID, age)
+	return 0
+}
+
+func entityGetAge(L *lua.LState) int {
+	e := checkEntity(L, 1)
+	age := e.World.Age(e.ID)
+	if age == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	t := L.NewTable()
+	L.SetField(t, "age", lua.LNumber(age.Age))
+	L.SetField(t, "lifetime", lua.LNumber(age.Lifetime))
+	L.Push(t)
+	return 1
+}
+
+func worldSetActiveCamera(L *lua.LState) int {
+	w := checkWorld(L, 1)
+	e := checkEntity(L, 2)
+	w.SetActiveCamera(e.ID)
+	return 0
+}
+
+func worldActiveCamera(L *lua.LState) int {
+	w := checkWorld(L, 1)
+	e := w.ActiveCamera()
+	if e == 0 {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushEntity(L, luaEntity{ID: e, World: w})
 	return 1
 }

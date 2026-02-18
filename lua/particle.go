@@ -283,6 +283,20 @@ func registerParticleModule(L *lua.LState, mod *lua.LTable) {
 		return 1
 	}))
 
+	// Particle materials
+	L.SetField(pt, "velocity_color", L.NewFunction(particleVelocityColor))
+	L.SetField(pt, "idle_and_motion", L.NewFunction(particleIdleAndMotion))
+	L.SetField(pt, "braille_directional", L.NewFunction(particleBrailleDirectional))
+	L.SetField(pt, "speed_states", L.NewFunction(particleSpeedStates))
+	L.SetField(pt, "age_based_size", L.NewFunction(particleAgeBasedSize))
+	L.SetField(pt, "rainbow_velocity", L.NewFunction(particleRainbowVelocity))
+	L.SetField(pt, "rainbow_time", L.NewFunction(particleRainbowTime))
+	L.SetField(pt, "fire_time", L.NewFunction(particleFireTime))
+	L.SetField(pt, "cycle_materials", L.NewFunction(particleCycleMaterials))
+
+	// Particle lifecycle
+	L.SetField(pt, "age_and_despawn", L.NewFunction(particleAgeAndDespawn))
+
 	// compose_materials(mat1, mat2, ...)
 	// Accepts both Go material userdata and Lua functions.
 	L.SetField(mod, "compose_materials", L.NewFunction(func(L *lua.LState) int {
@@ -405,6 +419,153 @@ func seqParticles(L *lua.LState) int {
 		t.RawSetInt(i+1, lua.LNumber(p))
 	}
 	L.Push(t)
+	return 1
+}
+
+// --- Particle material constructors ---
+
+func particleVelocityColor(L *lua.LState) int {
+	opts := L.CheckTable(1)
+	gradient := particle.ColorGradient{
+		MinSpeed: getNumberField(L, opts, "min_speed", 0),
+		MaxSpeed: getNumberField(L, opts, "max_speed", 10),
+	}
+	if v := L.GetField(opts, "min_color"); v != lua.LNil {
+		if ud, ok := v.(*lua.LUserData); ok {
+			if c, ok := ud.Value.(core.Color); ok {
+				gradient.MinColor = c
+			}
+		}
+	}
+	if v := L.GetField(opts, "max_color"); v != lua.LNil {
+		if ud, ok := v.(*lua.LUserData); ok {
+			if c, ok := ud.Value.(core.Color); ok {
+				gradient.MaxColor = c
+			}
+		}
+	}
+	mat := particle.VelocityColor(gradient)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleIdleAndMotion(L *lua.LState) int {
+	runesStr := L.CheckString(1)
+	threshold := float64(L.OptNumber(2, 0.5))
+	idleRunes := []rune(runesStr)
+	mat := particle.IdleAndMotion(idleRunes, threshold)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleBrailleDirectional(L *lua.LState) int {
+	mat := particle.BrailleDirectional()
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleSpeedStates(L *lua.LState) int {
+	threshTable := L.CheckTable(1)
+	runesStr := L.CheckString(2)
+
+	var thresholds []float64
+	threshTable.ForEach(func(_, v lua.LValue) {
+		if n, ok := v.(lua.LNumber); ok {
+			thresholds = append(thresholds, float64(n))
+		}
+	})
+
+	mat := particle.SpeedStates(thresholds, []rune(runesStr))
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleAgeBasedSize(L *lua.LState) int {
+	threshTable := L.CheckTable(1)
+	runesStr := L.CheckString(2)
+
+	var thresholds []float64
+	threshTable.ForEach(func(_, v lua.LValue) {
+		if n, ok := v.(lua.LNumber); ok {
+			thresholds = append(thresholds, float64(n))
+		}
+	})
+
+	mat := particle.AgeBasedSize(thresholds, []rune(runesStr))
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleRainbowVelocity(L *lua.LState) int {
+	minSpeed := float64(L.CheckNumber(1))
+	maxSpeed := float64(L.CheckNumber(2))
+	mat := particle.RainbowVelocity(minSpeed, maxSpeed)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleRainbowTime(L *lua.LState) int {
+	frequency := float64(L.CheckNumber(1))
+	mat := particle.RainbowTime(frequency)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleFireTime(L *lua.LState) int {
+	frequency := float64(L.CheckNumber(1))
+	mat := particle.FireTime(frequency)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleCycleMaterials(L *lua.LState) int {
+	period := float64(L.CheckNumber(1))
+	fadeRatio := float64(L.CheckNumber(2))
+
+	var materials []core.Material
+	for i := 3; i <= L.GetTop(); i++ {
+		v := L.Get(i)
+		switch val := v.(type) {
+		case *lua.LUserData:
+			if m, ok := val.Value.(core.Material); ok {
+				materials = append(materials, m)
+			} else {
+				L.ArgError(i, "material expected")
+				return 0
+			}
+		case *lua.LFunction:
+			materials = append(materials, materialFromLua(L, val))
+		default:
+			L.ArgError(i, "material or function expected")
+			return 0
+		}
+	}
+
+	mat := particle.CycleMaterials(period, fadeRatio, materials...)
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+	return 1
+}
+
+func particleAgeAndDespawn(L *lua.LState) int {
+	pushBehavior(L, particle.AgeAndDespawn())
 	return 1
 }
 

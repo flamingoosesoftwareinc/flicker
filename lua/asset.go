@@ -35,6 +35,7 @@ func registerAssetModule(L *lua.LState, mod *lua.LTable) {
 
 	L.SetField(a, "load_font", L.NewFunction(assetLoadFont))
 	L.SetField(a, "load_obj", L.NewFunction(assetLoadOBJ))
+	L.SetField(a, "load_image", L.NewFunction(assetLoadImage))
 	L.SetField(a, "rasterize_text", L.NewFunction(assetRasterizeText))
 	L.SetField(a, "rasterize_wireframe", L.NewFunction(assetRasterizeWireframe))
 }
@@ -47,6 +48,19 @@ func assetLoadFont(L *lua.LState) int {
 		return 0
 	}
 	pushUserData(L, typeFont, f)
+	return 1
+}
+
+func assetLoadImage(L *lua.LState) int {
+	path := L.CheckString(1)
+	maxW := L.OptInt(2, 0)
+	maxH := L.OptInt(3, 0)
+	bm, err := asset.LoadImage(path, maxW, maxH)
+	if err != nil {
+		L.RaiseError("load_image: %s", err.Error())
+		return 0
+	}
+	pushUserData(L, typeBitmap, bm)
 	return 1
 }
 
