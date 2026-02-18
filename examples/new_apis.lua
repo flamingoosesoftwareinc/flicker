@@ -31,7 +31,7 @@ end
 
 -- Helper: rasterize centered title text
 local function make_title(world, text, size_frac, y_frac, color)
-    local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+    local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
     local layout = f.asset.rasterize_text(text, {
         font = font,
         size = sh * size_frac,
@@ -85,7 +85,7 @@ local function create_drawables_scene()
                 { name = "BG",      make = function() return f.bitmap.bg_block(bm) end },
             }
 
-            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
             local spacing = sw / (#encodings + 1)
             local top_y = sh * 0.28
 
@@ -128,7 +128,7 @@ local function create_sdf_scene()
         on_enter = function(world, ctx)
             make_title(world, "SDF REVEAL", 0.2, 0.03)
 
-            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
             local layout = f.asset.rasterize_text("FLICKER", {
                 font = font,
                 size = sh * 0.5,
@@ -282,7 +282,7 @@ local function create_blend_scene()
             f.set_blend(1, blend_modes[1].mode)
 
             -- Label showing current mode
-            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
             label_entity = world:spawn()
             label_entity:set_position(f.vec3(0, sh * 0.85, 0))
             world:add_root(label_entity)
@@ -309,7 +309,7 @@ local function create_blend_scene()
                 f.set_blend(1, blend_modes[current_idx].mode)
 
                 -- Update label
-                local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+                local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
                 local layout = f.asset.rasterize_text(blend_modes[current_idx].name, {
                     font = font,
                     size = sh * 0.18,
@@ -330,7 +330,7 @@ local function create_post_process_scene()
         on_enter = function(world, ctx)
             make_title(world, "POST-PROCESS", 0.2, 0.03)
 
-            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
             local layout = f.asset.rasterize_text("SHADER", {
                 font = font,
                 size = sh * 0.5,
@@ -380,7 +380,7 @@ local function create_camera_scene()
             world:set_active_camera(cam_entity)
 
             -- Scene title
-            local font = f.asset.load_font("Oxanium/static/Oxanium-Bold.ttf")
+            local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
             local layout = f.asset.rasterize_text("CAMERA ZOOM", {
                 font = font,
                 size = sh * 0.2,
