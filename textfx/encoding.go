@@ -15,6 +15,8 @@ const (
 	Braille
 	// FullBlock encodes 1:1 pixels per cell.
 	FullBlock
+	// Adaptive encodes 6×9 pixels per cell using best-fit Unicode blocks.
+	Adaptive
 )
 
 // glyphAtForEncoding maps fragment coordinates to glyph index based on encoding.
@@ -29,6 +31,9 @@ func glyphAtForEncoding(layout *asset.TextLayout, encoding Encoding, f core.Frag
 	case FullBlock:
 		// FullBlock: 1:1 pixel-to-cell mapping.
 		return layout.GlyphAt(f.X, f.Y)
+	case Adaptive:
+		// Adaptive: 6×9 pixels per cell, sample at center.
+		return layout.GlyphAt(f.X*6+3, f.Y*9+4)
 	default:
 		return -1
 	}

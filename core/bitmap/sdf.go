@@ -114,6 +114,20 @@ func BrailleThreshold(s *SDF, threshold *float64) core.Material {
 	}
 }
 
+// AdaptiveThreshold returns a material that reveals adaptive-encoded content
+// using SDF threshold animation. Samples the SDF at the cell center
+// (6x9 pixels per cell) and hides the entire cell if above *threshold.
+func AdaptiveThreshold(s *SDF, threshold *float64) core.Material {
+	return func(f core.Fragment) core.Cell {
+		px := f.X*6 + 3
+		py := f.Y*9 + 4
+		if s.At(px, py) > *threshold {
+			return core.Cell{}
+		}
+		return f.Cell
+	}
+}
+
 // ComputeSDF computes a signed distance field from a bitmap using the
 // 8SSEDT (8-point Sequential Signed Euclidean Distance Transform) algorithm.
 // maxDist clamps the result range to [-maxDist, +maxDist].

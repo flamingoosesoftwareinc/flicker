@@ -46,19 +46,31 @@ func RasterizeText(text string, opts TextOptions) *TextLayout {
 	ppem := fixed26_6(opts.Size)
 	m := opts.Font.Metrics(opts.Size)
 
-	// Pass 1: measure total advance width.
+	// Pass 1: measure total advance width (with kerning).
 	var totalAdvance float64
 	runes := []rune(text)
+	var prevGI sfnt.GlyphIndex
+	hasPrev := false
 	for _, r := range runes {
 		gi, err := sf.GlyphIndex(buf, r)
 		if err != nil || gi == 0 {
 			continue
 		}
+		if hasPrev {
+			kern, kerr := sf.Kern(buf, prevGI, gi, ppem, font.HintingNone)
+			if kerr == nil {
+				totalAdvance += float64(kern) / 64.0
+			}
+		}
 		adv, err := sf.GlyphAdvance(buf, gi, ppem, font.HintingNone)
 		if err != nil {
+			prevGI = gi
+			hasPrev = true
 			continue
 		}
 		totalAdvance += float64(adv) / 64.0
+		prevGI = gi
+		hasPrev = true
 	}
 
 	bmW := int(math.Ceil(totalAdvance))
@@ -72,6 +84,8 @@ func RasterizeText(text string, opts TextOptions) *TextLayout {
 	var xOffset float64
 	ascent := m.Ascent
 	var glyphs []Glyph
+	prevGI = 0
+	hasPrev = false
 
 	for idx, ch := range runes {
 		gi, err := sf.GlyphIndex(buf, ch)
@@ -79,8 +93,18 @@ func RasterizeText(text string, opts TextOptions) *TextLayout {
 			continue
 		}
 
+		// Apply kerning adjustment.
+		if hasPrev {
+			kern, kerr := sf.Kern(buf, prevGI, gi, ppem, font.HintingNone)
+			if kerr == nil {
+				xOffset += float64(kern) / 64.0
+			}
+		}
+
 		adv, err := sf.GlyphAdvance(buf, gi, ppem, font.HintingNone)
 		if err != nil {
+			prevGI = gi
+			hasPrev = true
 			continue
 		}
 		glyphWidth := float64(adv) / 64.0
@@ -137,6 +161,8 @@ func RasterizeText(text string, opts TextOptions) *TextLayout {
 		}
 
 		xOffset += glyphWidth
+		prevGI = gi
+		hasPrev = true
 	}
 
 	// Draw the rasterizer into an alpha mask.

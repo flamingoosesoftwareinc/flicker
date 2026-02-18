@@ -93,6 +93,48 @@ func TestRasterizeTextMultiChar(t *testing.T) {
 	}
 }
 
+func TestRasterizeTextKerning(t *testing.T) {
+	f, err := LoadFont("../Oxanium/static/Oxanium-Regular.ttf")
+	if err != nil {
+		t.Fatalf("LoadFont: %v", err)
+	}
+
+	opts := TextOptions{Font: f, Size: 48, Color: core.Color{R: 255}}
+
+	// Single character should be unaffected by kerning.
+	layoutA := RasterizeText("A", opts)
+	if layoutA == nil {
+		t.Fatal("RasterizeText('A') returned nil")
+	}
+	if len(layoutA.Glyphs) != 1 {
+		t.Errorf("expected 1 glyph for 'A', got %d", len(layoutA.Glyphs))
+	}
+
+	// Two characters — kerning should not cause negative widths or crashes.
+	layoutAV := RasterizeText("AV", opts)
+	if layoutAV == nil {
+		t.Fatal("RasterizeText('AV') returned nil")
+	}
+	if len(layoutAV.Glyphs) != 2 {
+		t.Errorf("expected 2 glyphs for 'AV', got %d", len(layoutAV.Glyphs))
+	}
+	if layoutAV.Bitmap.Width <= 0 {
+		t.Errorf("kerned 'AV' bitmap width should be positive, got %d", layoutAV.Bitmap.Width)
+	}
+
+	// Compare: "AV" with kerning should be <= sum of individual advances
+	// (kerning typically reduces spacing for this pair).
+	layoutV := RasterizeText("V", opts)
+	if layoutV == nil {
+		t.Fatal("RasterizeText('V') returned nil")
+	}
+	sumWidth := layoutA.Bitmap.Width + layoutV.Bitmap.Width
+	if layoutAV.Bitmap.Width > sumWidth {
+		t.Errorf("kerned 'AV' width (%d) should be <= sum of 'A' (%d) + 'V' (%d) = %d",
+			layoutAV.Bitmap.Width, layoutA.Bitmap.Width, layoutV.Bitmap.Width, sumWidth)
+	}
+}
+
 func TestRasterizeTextEmpty(t *testing.T) {
 	f, err := LoadFont("../Oxanium/static/Oxanium-Regular.ttf")
 	if err != nil {

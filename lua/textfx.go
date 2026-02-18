@@ -20,6 +20,8 @@ func registerTextFXModule(L *lua.LState, mod *lua.LTable) {
 				L.Push(lua.LString("encoding(braille)"))
 			case textfx.FullBlock:
 				L.Push(lua.LString("encoding(full_block)"))
+			case textfx.Adaptive:
+				L.Push(lua.LString("encoding(adaptive)"))
 			default:
 				L.Push(lua.LString("encoding(half_block)"))
 			}
@@ -44,6 +46,9 @@ func registerTextFXModule(L *lua.LState, mod *lua.LTable) {
 	L.Pop(1)
 	pushUserData(L, typeEncoding, textfx.FullBlock)
 	L.SetField(enc, "full_block", L.Get(-1))
+	L.Pop(1)
+	pushUserData(L, typeEncoding, textfx.Adaptive)
+	L.SetField(enc, "adaptive", L.Get(-1))
 	L.Pop(1)
 
 	L.SetField(tfx, "wave", L.NewFunction(textfxWave))
@@ -163,6 +168,8 @@ func parseEncoding(s string) textfx.Encoding {
 		return textfx.Braille
 	case "full_block":
 		return textfx.FullBlock
+	case "adaptive":
+		return textfx.Adaptive
 	default:
 		return textfx.HalfBlock
 	}

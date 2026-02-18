@@ -37,6 +37,7 @@ func registerBitmapModule(L *lua.LState, mod *lua.LTable) {
 	// Encoding constructors (return Drawables)
 	L.SetField(bm, "half_block", L.NewFunction(newHalfBlock))
 	L.SetField(bm, "braille", L.NewFunction(newBraille))
+	L.SetField(bm, "adaptive", L.NewFunction(newAdaptive))
 	L.SetField(bm, "full_block", L.NewFunction(newFullBlock))
 	L.SetField(bm, "bg_block", L.NewFunction(newBGBlock))
 	L.SetField(bm, "rect", L.NewFunction(newRect))
@@ -45,6 +46,7 @@ func registerBitmapModule(L *lua.LState, mod *lua.LTable) {
 	L.SetField(bm, "compute_sdf", L.NewFunction(bitmapComputeSDF))
 	L.SetField(bm, "half_block_threshold", L.NewFunction(bitmapHalfBlockThreshold))
 	L.SetField(bm, "braille_threshold", L.NewFunction(bitmapBrailleThreshold))
+	L.SetField(bm, "adaptive_threshold", L.NewFunction(bitmapAdaptiveThreshold))
 }
 
 func newBitmap(L *lua.LState) int {
@@ -136,6 +138,15 @@ func newHalfBlock(L *lua.LState) int {
 func newBraille(L *lua.LState) int {
 	bm := checkBitmap(L, 1)
 	drawable := &bitmap.Braille{Bitmap: bm}
+	ud := L.NewUserData()
+	ud.Value = core.Drawable(drawable)
+	L.Push(ud)
+	return 1
+}
+
+func newAdaptive(L *lua.LState) int {
+	bm := checkBitmap(L, 1)
+	drawable := &bitmap.Adaptive{Bitmap: bm}
 	ud := L.NewUserData()
 	ud.Value = core.Drawable(drawable)
 	L.Push(ud)
@@ -260,6 +271,27 @@ func bitmapBrailleThreshold(L *lua.LState) int {
 
 	t := &threshold
 	mat := bitmap.BrailleThreshold(s, t)
+
+	ud := L.NewUserData()
+	ud.Value = core.Material(mat)
+	L.Push(ud)
+
+	setter := L.NewFunction(func(L *lua.LState) int {
+		*t = float64(L.CheckNumber(1))
+		return 0
+	})
+	L.Push(setter)
+
+	return 2
+}
+
+// bitmapAdaptiveThreshold returns a material that reveals adaptive content via SDF threshold.
+func bitmapAdaptiveThreshold(L *lua.LState) int {
+	s := checkBitmapSDF(L, 1)
+	threshold := float64(L.OptNumber(2, 0))
+
+	t := &threshold
+	mat := bitmap.AdaptiveThreshold(s, t)
 
 	ud := L.NewUserData()
 	ud.Value = core.Material(mat)
