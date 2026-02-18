@@ -29,16 +29,16 @@ local function hsv_to_rgb(h, s, v)
     return (r + m) * 255, (g + m) * 255, (b + m) * 255
 end
 
--- Helper: rasterize centered title text
+-- Helper: rasterize centered title text (adaptive: 6×9 px/cell vs half_block 1×2)
 local function make_title(world, text, size_frac, y_frac, color)
     local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
     local layout = f.asset.rasterize_text(text, {
         font = font,
-        size = sh * size_frac,
+        size = sh * size_frac * 4.5,
         color = color or f.color(255, 255, 255),
     })
     local entity = world:spawn()
-    entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * y_frac, 0))
+    entity:set_position(f.vec3(sw / 2 - layout.width / 12, sh * y_frac, 0))
     entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
     world:add_root(entity)
     return entity, layout
@@ -48,11 +48,11 @@ end
 local function make_label(world, font, text, cx, y)
     local layout = f.asset.rasterize_text(text, {
         font = font,
-        size = sh * 0.12,
+        size = sh * 0.54,
         color = f.color(200, 200, 200),
     })
     local lbl = world:spawn()
-    lbl:set_position(f.vec3(cx - layout.width / 6, y, 0))
+    lbl:set_position(f.vec3(cx - layout.width / 12, y, 0))
     lbl:set_drawable(f.bitmap.adaptive(layout.bitmap))
     world:add_root(lbl)
     return lbl, layout
@@ -290,10 +290,10 @@ local function create_blend_scene()
             local function update_label(name)
                 local layout = f.asset.rasterize_text(name, {
                     font = font,
-                    size = sh * 0.18,
+                    size = sh * 0.81,
                     color = f.color(255, 255, 100),
                 })
-                label_entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * 0.85, 0))
+                label_entity:set_position(f.vec3(sw / 2 - layout.width / 12, sh * 0.85, 0))
                 label_entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
             end
             update_label(blend_modes[1].name)
@@ -312,10 +312,10 @@ local function create_blend_scene()
                 local font = f.asset.load_font("Oxanium/static/Oxanium-ExtraLight.ttf")
                 local layout = f.asset.rasterize_text(blend_modes[current_idx].name, {
                     font = font,
-                    size = sh * 0.18,
+                    size = sh * 0.81,
                     color = f.color(255, 255, 100),
                 })
-                label_entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * 0.85, 0))
+                label_entity:set_position(f.vec3(sw / 2 - layout.width / 12, sh * 0.85, 0))
                 label_entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
             end
         end,
