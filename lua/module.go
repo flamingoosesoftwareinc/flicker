@@ -21,6 +21,7 @@ func registerAll(L *lua.LState, engine *Engine) *lua.LTable {
 	registerTimelineModule(L, mod, engine)
 	registerPhysicsModule(L, mod)
 	registerBodyMethod(L)
+	registerTextModule(L, mod)
 	registerTextFXModule(L, mod)
 	registerParticleModule(L, mod)
 

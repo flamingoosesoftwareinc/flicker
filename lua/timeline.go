@@ -48,6 +48,9 @@ func registerTimelineModule(L *lua.LState, mod *lua.LTable, engine *Engine) {
 	L.SetField(tl, "callback", L.NewFunction(timelineCallback))
 	L.SetField(tl, "parallel", L.NewFunction(timelineParallel))
 	L.SetField(tl, "sequence_clip", L.NewFunction(timelineSequenceClip))
+
+	// Text keyframe clip (defined in text.go)
+	registerTextKeyframesClip(L, tl)
 }
 
 func checkTimeline(L *lua.LState, n int) *core.Timeline {

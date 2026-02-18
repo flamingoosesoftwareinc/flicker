@@ -521,6 +521,84 @@ func TestTimelineMultipleProperties(t *testing.T) {
 // Test 13: Stop Timeline
 // ============================================================================
 
+// ============================================================================
+// Test: TextKeyframeClip - Discrete string keyframes
+// ============================================================================
+
+func TestTextKeyframeClip(t *testing.T) {
+	world := NewWorld()
+	timeline := NewTimeline(world)
+
+	var values []string
+	setter := func(s string) {
+		values = append(values, s)
+	}
+
+	keyframes := []TextKeyframe{
+		{Time: 0.0, Value: "Step 1"},
+		{Time: 0.5, Value: "Step 2"},
+		{Time: 1.0, Value: "Step 3"},
+	}
+
+	track := timeline.AddTrack()
+	track.Add(NewTextKeyframeClip(keyframes, 1.5, setter))
+
+	timeline.Start()
+
+	// Initialize at t=0.0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.0})
+
+	// First update fires keyframe 0
+	UpdateBehaviors(world, Time{Total: 0.0, Delta: 0.016})
+	if len(values) != 1 || values[0] != "Step 1" {
+		t.Errorf("at t=0.0: expected [Step 1], got %v", values)
+	}
+
+	// Redundant update at same time — no duplicate call
+	UpdateBehaviors(world, Time{Total: 0.1, Delta: 0.016})
+	if len(values) != 1 {
+		t.Errorf("at t=0.1: expected no additional call, got %v", values)
+	}
+
+	// Advance to t=0.6 — keyframe 1 fires
+	UpdateBehaviors(world, Time{Total: 0.6, Delta: 0.016})
+	if len(values) != 2 || values[1] != "Step 2" {
+		t.Errorf("at t=0.6: expected [Step 1, Step 2], got %v", values)
+	}
+
+	// Advance to t=1.1 — keyframe 2 fires
+	UpdateBehaviors(world, Time{Total: 1.1, Delta: 0.016})
+	if len(values) != 3 || values[2] != "Step 3" {
+		t.Errorf("at t=1.1: expected [Step 1, Step 2, Step 3], got %v", values)
+	}
+
+	timeline.Cleanup()
+}
+
+func TestTextKeyframeClipEnd(t *testing.T) {
+	var lastValue string
+	setter := func(s string) {
+		lastValue = s
+	}
+
+	keyframes := []TextKeyframe{
+		{Time: 0.0, Value: "A"},
+		{Time: 0.5, Value: "B"},
+	}
+
+	clip := NewTextKeyframeClip(keyframes, 1.0, setter)
+	clip.Start(ClipContext{})
+	clip.End()
+
+	if lastValue != "B" {
+		t.Errorf("End() should apply last keyframe, got %q", lastValue)
+	}
+}
+
+// ============================================================================
+// Test 13: Stop Timeline
+// ============================================================================
+
 func TestTimelineStop(t *testing.T) {
 	world := NewWorld()
 	timeline := NewTimeline(world)

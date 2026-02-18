@@ -18,7 +18,7 @@ f.on_enter(function(world, ctx)
     })
     local bl = world:spawn()
     bl:set_position(f.vec3(ctx.width * 0.25 - braille_label.width / 12, label_y, 0))
-    bl:set_drawable(f.bitmap.adaptive(braille_label.bitmap, { threshold = 0.3 }))
+    bl:set_drawable(f.bitmap.adaptive(braille_label.bitmap, { threshold = 0.6 }))
     world:add_root(bl)
 
     local adaptive_label = f.asset.rasterize_text("ADAPTIVE", {
@@ -28,7 +28,7 @@ f.on_enter(function(world, ctx)
     })
     local al = world:spawn()
     al:set_position(f.vec3(ctx.width * 0.75 - adaptive_label.width / 12, label_y, 0))
-    al:set_drawable(f.bitmap.adaptive(adaptive_label.bitmap, { threshold = 0.3 }))
+    al:set_drawable(f.bitmap.adaptive(adaptive_label.bitmap, { threshold = 0.6 }))
     world:add_root(al)
 
     -- Divider line down the center
@@ -39,7 +39,7 @@ f.on_enter(function(world, ctx)
     end
     local div = world:spawn()
     div:set_position(f.vec3(ctx.width / 2, 0, 0))
-    div:set_drawable(f.bitmap.adaptive(div_bm, { threshold = 0.3 }))
+    div:set_drawable(f.bitmap.adaptive(div_bm, { threshold = 0.6 }))
     world:add_root(div)
 
     -- Render text at multiple sizes to show the difference
@@ -82,7 +82,7 @@ f.on_enter(function(world, ctx)
             y_cursor,
             0
         ))
-        ea:set_drawable(f.bitmap.adaptive(layout_a.bitmap, { threshold = 0.3 }))
+        ea:set_drawable(f.bitmap.adaptive(layout_a.bitmap, { threshold = 0.6 }))
         world:add_root(ea)
 
         -- Advance y based on the larger of the two encoded heights

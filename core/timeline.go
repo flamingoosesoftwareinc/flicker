@@ -631,6 +631,81 @@ func (c *SequenceClip) End() {
 }
 
 // ============================================================================
+// TextKeyframeClip - Discrete string keyframes
+// ============================================================================
+
+// TextKeyframe holds a timed string value.
+type TextKeyframe struct {
+	Time  float64
+	Value string
+}
+
+// TextKeyframeClip applies discrete string keyframes via a setter function.
+// At each update, it finds the last keyframe where Time <= elapsed and calls
+// the setter only when the active keyframe changes.
+type TextKeyframeClip struct {
+	keyframes []TextKeyframe
+	duration  float64
+	setter    func(string)
+	lastIndex int
+}
+
+// NewTextKeyframeClip creates a clip that steps through string keyframes.
+// Keyframes must be sorted by Time. The setter is called with the value of
+// the active keyframe whenever it changes.
+func NewTextKeyframeClip(
+	keyframes []TextKeyframe,
+	duration float64,
+	setter func(string),
+) *TextKeyframeClip {
+	// Copy to avoid mutation
+	kf := make([]TextKeyframe, len(keyframes))
+	copy(kf, keyframes)
+	return &TextKeyframeClip{
+		keyframes: kf,
+		duration:  duration,
+		setter:    setter,
+		lastIndex: -1,
+	}
+}
+
+func (c *TextKeyframeClip) Duration() float64 {
+	return c.duration
+}
+
+func (c *TextKeyframeClip) Start(ctx ClipContext) {
+	c.lastIndex = -1
+}
+
+func (c *TextKeyframeClip) Update(elapsed float64) bool {
+	// Find last keyframe where Time <= elapsed
+	idx := -1
+	for i, kf := range c.keyframes {
+		if kf.Time <= elapsed {
+			idx = i
+		} else {
+			break
+		}
+	}
+
+	if idx >= 0 && idx != c.lastIndex {
+		c.lastIndex = idx
+		if c.setter != nil {
+			c.setter(c.keyframes[idx].Value)
+		}
+	}
+
+	return elapsed >= c.duration
+}
+
+func (c *TextKeyframeClip) End() {
+	// Apply last keyframe value
+	if len(c.keyframes) > 0 && c.setter != nil {
+		c.setter(c.keyframes[len(c.keyframes)-1].Value)
+	}
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
