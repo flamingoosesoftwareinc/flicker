@@ -47,6 +47,10 @@ func buildScene(
 	scene := core.NewBasicScene(width, height)
 
 	scene.SetEnter(func(w *core.World, ctx core.SceneContext) {
+		// Update active scene so f.set_blend/set_trail/set_post_process
+		// target the correct compositor in multi-scene mode.
+		engine.activeScene = scene
+
 		if cb.OnEnter == nil {
 			return
 		}
@@ -121,9 +125,6 @@ func buildScene(
 			engine.logError("on_exit", err)
 		}
 	})
-
-	// Store scene on engine so trail effects can access compositor
-	engine.activeScene = scene
 
 	return scene
 }
