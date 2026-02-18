@@ -38,8 +38,8 @@ local function make_title(world, text, size_frac, y_frac, color)
         color = color or f.color(255, 255, 255),
     })
     local entity = world:spawn()
-    entity:set_position(f.vec3(sw / 2 - layout.width / 2, sh * y_frac, 0))
-    entity:set_drawable(f.bitmap.half_block(layout.bitmap))
+    entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * y_frac, 0))
+    entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
     world:add_root(entity)
     return entity, layout
 end
@@ -52,8 +52,8 @@ local function make_label(world, font, text, cx, y)
         color = f.color(200, 200, 200),
     })
     local lbl = world:spawn()
-    lbl:set_position(f.vec3(cx - layout.width / 2, y, 0))
-    lbl:set_drawable(f.bitmap.half_block(layout.bitmap))
+    lbl:set_position(f.vec3(cx - layout.width / 6, y, 0))
+    lbl:set_drawable(f.bitmap.adaptive(layout.bitmap))
     world:add_root(lbl)
     return lbl, layout
 end
@@ -293,8 +293,8 @@ local function create_blend_scene()
                     size = sh * 0.18,
                     color = f.color(255, 255, 100),
                 })
-                label_entity:set_position(f.vec3(sw / 2 - layout.width / 2, sh * 0.85, 0))
-                label_entity:set_drawable(f.bitmap.half_block(layout.bitmap))
+                label_entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * 0.85, 0))
+                label_entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
             end
             update_label(blend_modes[1].name)
 
@@ -315,8 +315,8 @@ local function create_blend_scene()
                     size = sh * 0.18,
                     color = f.color(255, 255, 100),
                 })
-                label_entity:set_position(f.vec3(sw / 2 - layout.width / 2, sh * 0.85, 0))
-                label_entity:set_drawable(f.bitmap.half_block(layout.bitmap))
+                label_entity:set_position(f.vec3(sw / 2 - layout.width / 6, sh * 0.85, 0))
+                label_entity:set_drawable(f.bitmap.adaptive(layout.bitmap))
             end
         end,
     })
