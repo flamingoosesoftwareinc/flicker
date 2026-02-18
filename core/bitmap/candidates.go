@@ -91,8 +91,7 @@ func sextantPattern(mask byte) uint64 {
 func buildSextants() []candidate {
 	var cs []candidate
 
-	// Pattern 0 = space (empty), pattern 63 = full block.
-	cs = append(cs, candidate{r: ' ', pattern: 0})
+	// Pattern 63 = full block.
 	cs = append(cs, candidate{r: '\u2588', pattern: sextantPattern(0x3F)})
 
 	sextantRune := rune(0x1FB00)

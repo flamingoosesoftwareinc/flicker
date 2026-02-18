@@ -157,9 +157,9 @@ func TestAdaptiveDiagonalPattern(t *testing.T) {
 }
 
 func TestCandidatesNotEmpty(t *testing.T) {
-	// 64 sextants (0–63) + 2 half blocks + 10 quadrants = 76
-	if len(candidates) < 76 {
-		t.Errorf("expected at least 76 candidates, got %d", len(candidates))
+	// 63 sextants (1–63, no space) + 2 half blocks + 10 quadrants = 75
+	if len(candidates) < 75 {
+		t.Errorf("expected at least 75 candidates, got %d", len(candidates))
 	}
 }
 
@@ -179,11 +179,14 @@ func TestBestMatchFullBits(t *testing.T) {
 }
 
 func TestBestMatchEmpty(t *testing.T) {
+	// With space removed from candidates, bestMatch(0) returns the
+	// candidate with the fewest set bits. Callers handle empty patterns
+	// before calling bestMatch (sampleCell returns 0 → early return).
 	r, dist := bestMatch(0)
-	if r != ' ' {
-		t.Errorf("empty pattern rune = %U, want space", r)
+	if r == 0 {
+		t.Error("empty pattern should still return a rune")
 	}
-	if dist != 0 {
-		t.Errorf("empty pattern distance = %d, want 0", dist)
+	if dist == 0 {
+		t.Error("empty pattern should have non-zero distance (no space candidate)")
 	}
 }
