@@ -20,13 +20,14 @@ func (tp *TimeProvider) Now(ctx context.Context) (time.Time, error) {
 	tp.counter++
 	stepName := fmt.Sprintf("_time.now:%d", tp.counter)
 
-	var t time.Time
-
-	err := Run(ctx, tp.wc, stepName, &t, func(_ context.Context) (time.Time, error) {
-		return tp.nowFn(), nil
+	t, err := Run(ctx, tp.wc, stepName, func(_ context.Context) (*time.Time, error) {
+		return Val(tp.nowFn()), nil
 	})
+	if err != nil {
+		return time.Time{}, err
+	}
 
-	return t, err
+	return *t, nil
 }
 
 // IDProvider is a durable service for ID generation.
@@ -43,11 +44,12 @@ func (ip *IDProvider) New(ctx context.Context) (string, error) {
 	ip.counter++
 	stepName := fmt.Sprintf("_id.new:%d", ip.counter)
 
-	var id string
-
-	err := Run(ctx, ip.wc, stepName, &id, func(_ context.Context) (string, error) {
-		return ip.newFn(), nil
+	id, err := Run(ctx, ip.wc, stepName, func(_ context.Context) (*string, error) {
+		return Val(ip.newFn()), nil
 	})
+	if err != nil {
+		return "", err
+	}
 
-	return id, err
+	return *id, nil
 }

@@ -40,6 +40,12 @@ type RetryPolicy struct {
 	MaxDelay    time.Duration
 }
 
+// Val wraps a value in a pointer. Use in step functions that return
+// primitive types: return flicker.Val("hello"), nil
+func Val[T any](v T) *T {
+	return &v
+}
+
 // DefaultRetryPolicy returns sensible safe defaults.
 func DefaultRetryPolicy() RetryPolicy {
 	return RetryPolicy{

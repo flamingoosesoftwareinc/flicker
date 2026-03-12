@@ -27,19 +27,14 @@ var Definition = flicker.Define[Request]("greeting", "v1",
 
 func (w *Workflow) Execute(ctx context.Context, req Request) error {
 	// Step 1: fetch name (durable read).
-	var name string
-
-	if err := flicker.Run(
-		ctx,
-		w.WorkflowContext,
-		"fetch_name",
-		&name,
-		func(_ context.Context) (string, error) {
+	name, err := flicker.Run(ctx, w.WorkflowContext, "fetch_name",
+		func(_ context.Context) (*string, error) {
 			w.Log("fetching name", "user_id", req.UserID)
 
-			return "Alice", nil
+			return flicker.Val("Alice"), nil
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -49,23 +44,17 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 		return err
 	}
 
-	// Step 3: send greeting (durable write).
-	var greeting string
+	// Between steps: pure computation on cached data.
+	msg := fmt.Sprintf("Hello, %s! (%s)", *name, now.Format("2006-01-02T15:04:05Z"))
 
-	if err := flicker.Run(
-		ctx,
-		w.WorkflowContext,
-		"send_greeting",
-		&greeting,
-		func(_ context.Context) (string, error) {
-			msg := fmt.Sprintf("Hello, %s! (%s)", name, now.Format("2006-01-02T15:04:05Z"))
+	// Step 3: send greeting (durable write).
+	_, err = flicker.Run(ctx, w.WorkflowContext, "send_greeting",
+		func(_ context.Context) (*string, error) {
 			w.Log("sending greeting", "greeting", msg)
 
-			return msg, nil
+			return &msg, nil
 		},
-	); err != nil {
-		return err
-	}
+	)
 
-	return nil
+	return err
 }
