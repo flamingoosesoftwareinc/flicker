@@ -1,0 +1,16 @@
+{
+  "workflow": {
+    "id": "wf-001",
+    "type": "duplicate_test:v1",
+    "version": "v1",
+    "status": "failed",
+    "error": "duplicate step name \"same_name\": each step must have a unique name",
+    "attempts": 0
+  },
+  "steps": [
+    {
+      "step_name": "same_name",
+      "result": "first"
+    }
+  ]
+}

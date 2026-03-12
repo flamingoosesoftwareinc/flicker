@@ -79,4 +79,9 @@ func TestDuplicateStepName_Errors(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, record.Error, "duplicate step name")
 	require.Contains(t, record.Error, "same_name")
+
+	snapshot := buildSnapshot(t, ctx, store, wf.ID())
+
+	g := newGoldie(t)
+	assertGolden(t, g, snapshot)
 }
