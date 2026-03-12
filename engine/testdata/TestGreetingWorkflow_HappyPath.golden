@@ -1,0 +1,22 @@
+{
+  "workflow": {
+    "id": "wf-001",
+    "type": "greeting:v1",
+    "status": "completed",
+    "attempts": 0
+  },
+  "steps": [
+    {
+      "step_name": "_time.now:1",
+      "result": "2026-01-01T00:00:00Z"
+    },
+    {
+      "step_name": "fetch_name",
+      "result": "Alice"
+    },
+    {
+      "step_name": "send_greeting",
+      "result": "Hello, Alice! (2026-01-01T00:00:00Z)"
+    }
+  ]
+}

@@ -8,21 +8,54 @@ Flicker provides durable execution for multi-step integration workflows without 
 operational complexity of Temporal/Cadence. Your code stays your code — no framework DSL,
 no magic replay, no special contexts.
 
+## Package structure
+
+```
+flicker.go        # Core types: Workflow[R], Status, Signal, RetryPolicy, WorkflowContext
+engine.go         # Engine: scheduler (polling) + worker pool + registry + execution
+store.go          # WorkflowStore interface + record types
+sqlite.go         # SQLite implementation (modernc.org/sqlite, no CGO)
+durable/durable.go  # Step cache: read-through/write-through durable step wrapper
+example_test.go   # Golden tests demonstrating workflow execution + retry
+cmd/flicker/      # Placeholder CLI binary
+testdata/         # Golden files (.golden, binary in .gitattributes)
+```
+
 ## Core concepts
 
-- **WorkflowStore** — DB table tracking workflow instances (ID, type, version, status)
-- **Job Runner** — polling loop that picks up incomplete workflows and calls `Execute()`
-- **Durable Wrappers** — GoWrap-generated decorators that add checkpointing to existing interfaces
-- **Named Steps** — each step has a key, not a position. Supports parallel execution via errgroup.
+- **Workflow[R]** — generic interface on input type R. `Execute(ctx, request) error`
+- **Engine** — scheduler + worker pool combined. Polls store, dispatches to workers
+- **WorkflowStore** — interface for workflow persistence. SQLite impl for POC
+- **durable.Step[T]** — read-through/write-through step cache. Independently useful
+- **Named Steps** — each step has a string key, not a position
+- **Three-way outcome** — `return nil` (complete), `return error` (retry), `Stop(WithError(err))` (permanent fail)
+- **Status vs Signal** — status = where workflow IS, signal = what you WANT it to do
 
 ## Design principles
 
-- Recovery points are internal to the job, not exposed to the runner
-- Workflow ID on struct, not context — explicit structural dependency
+- Recovery points are internal to the workflow, not exposed to the runner
+- Workflow ID injected via `SetWorkflowID()` — explicit structural dependency
 - Cached vs fresh reads depend on workflow state (guard mode vs replay mode)
 - Compensation is the workflow's problem — framework surfaces failures generically
-- Optimistic locking on all state transitions
+- Optimistic concurrency control on all state transitions (`WHERE occ_version = $expected`)
 - Status and signals are separate concerns
+
+## Key interfaces
+
+Workflows implement `Workflow[R]` + `ExecuteJSON` (for engine dispatch) + embed `WorkflowContext`:
+
+```go
+type MyWorkflow struct {
+    flicker.WorkflowContext
+    store      durable.StepStore
+    workflowID string
+}
+
+func (w *MyWorkflow) Execute(ctx context.Context, req MyRequest) error { ... }
+func (w *MyWorkflow) ExecuteJSON(ctx context.Context, payload []byte) error { ... }
+func (w *MyWorkflow) SetWorkflowID(id string) { w.workflowID = id }
+func (w *MyWorkflow) GetWorkflowContext() *flicker.WorkflowContext { return &w.WorkflowContext }
+```
 
 ## Make targets
 
@@ -49,6 +82,18 @@ A pre-commit hook enforces that staged changes have been verified before committ
 3. Commit (`git commit ...`) — pre-commit hook confirms staged tree matches verified one
 
 If you modify staged files after running `make verify`, you must run it again.
+
+## Testing
+
+Golden tests with `goldie/v2`. Update golden files: `UPDATE_GOLDEN=1 go test ./...` or `make update-golden-go`.
+
+Assertions use `testify/require` (not `testify/assert`).
+
+## Lint rules
+
+- No direct `slog` usage — use instance logger (`w.Log()` or `e.logger`)
+- `gofumpt` formatting enforced
+- All linters enabled by default (see `.golangci.yml` for disabled list)
 
 ## See also
 
