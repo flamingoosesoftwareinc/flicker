@@ -2,7 +2,6 @@ package flicker
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -25,13 +24,14 @@ func WithError(err error) StopOption {
 // WorkflowContext is the framework handle embedded by workflow structs.
 // Workflows see Stop(), Log(), Time, ID, and SleepUntil — nothing else.
 type WorkflowContext struct {
-	id           string
-	store        WorkflowStore
-	logger       *slog.Logger
-	stopped      atomic.Bool
-	stopCfg      stopConfig
-	sleepCounter int
-	nowFn        func() time.Time
+	id        string
+	store     WorkflowStore
+	logger    *slog.Logger
+	stopped   atomic.Bool
+	stopCfg   stopConfig
+	seenSteps map[string]struct{}
+	nowFn     func() time.Time
+	sleep     *Provider[time.Time]
 
 	// Time provides durable time operations. w.Time.Now(ctx) returns a
 	// cached timestamp that survives replay.
@@ -73,18 +73,20 @@ func (wc *WorkflowContext) Log(msg string, args ...any) {
 // durably cached so it survives replay. On re-execution after promotion, if
 // the wall clock has passed the cached time, execution continues normally.
 func (wc *WorkflowContext) SleepUntil(ctx context.Context, resumeAt time.Time) error {
-	wc.sleepCounter++
-	stepName := fmt.Sprintf("_sleep.until:%d", wc.sleepCounter)
+	if wc.sleep == nil {
+		wc.sleep = NewProvider(wc, "_sleep.until", func() time.Time { return resumeAt })
+	}
 
-	cached, err := Run(ctx, wc, stepName, func(_ context.Context) (*time.Time, error) {
-		return &resumeAt, nil
-	})
+	// Update the generator to capture the current resumeAt value.
+	wc.sleep.gen = func() time.Time { return resumeAt }
+
+	cached, err := wc.sleep.Get(ctx)
 	if err != nil {
 		return err
 	}
 
-	if wc.nowFn().Before(*cached) {
-		return &SuspendError{ResumeAt: *cached}
+	if wc.nowFn().Before(cached) {
+		return &SuspendError{ResumeAt: cached}
 	}
 
 	return nil

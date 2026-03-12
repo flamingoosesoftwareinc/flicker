@@ -15,6 +15,16 @@ func Run[T any](
 	stepName string,
 	fn func(context.Context) (*T, error),
 ) (*T, error) {
+	// Duplicate step name detection.
+	if _, seen := wc.seenSteps[stepName]; seen {
+		return nil, fmt.Errorf(
+			"duplicate step name %q: each step must have a unique name",
+			stepName,
+		)
+	}
+
+	wc.seenSteps[stepName] = struct{}{}
+
 	// Read-through: check cache.
 	cached, err := wc.store.GetStepResult(ctx, wc.id, stepName)
 	if err == nil && cached != nil {

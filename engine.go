@@ -197,13 +197,14 @@ func (e *Engine) executeWorkflow(ctx context.Context, record *WorkflowRecord) er
 
 	// Create the workflow context — fully initialized before the factory sees it.
 	wc := &WorkflowContext{
-		id:     record.ID,
-		store:  e.store,
-		logger: e.logger,
-		nowFn:  e.nowFunc,
+		id:        record.ID,
+		store:     e.store,
+		logger:    e.logger,
+		nowFn:     e.nowFunc,
+		seenSteps: make(map[string]struct{}),
 	}
-	wc.Time = &TimeProvider{wc: wc, nowFn: e.nowFunc}
-	wc.ID = &IDProvider{wc: wc, newFn: e.idFunc}
+	wc.Time = NewTimeProvider(wc, e.nowFunc)
+	wc.ID = NewIDProvider(wc, e.idFunc)
 
 	execErr := entry.def.executeWorkflow(ctx, wc, record.Payload)
 
