@@ -12,12 +12,18 @@
       "result": "2026-01-01T01:00:00Z"
     },
     {
-      "step_name": "fetch_name",
-      "result": "Alice"
+      "step_name": "fetch_user",
+      "result": {
+        "id": "user-42",
+        "name": "Alice"
+      }
     },
     {
       "step_name": "send_greeting",
-      "result": "Hello, Alice! (2026-01-01T01:00:00Z)"
+      "result": {
+        "message": "Hello, Alice! (2026-01-01T01:00:00Z)",
+        "user_id": "user-42"
+      }
     }
   ]
 }

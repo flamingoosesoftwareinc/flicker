@@ -12,8 +12,20 @@ type Request struct {
 	UserID string `json:"user_id"`
 }
 
-// Workflow is a minimal two-step durable workflow that fetches a name
-// and sends a greeting.
+// User is a struct returned from the "fetch" step — exercises struct caching.
+type User struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Greeting is the final output — exercises struct with computed fields.
+type Greeting struct {
+	Message string `json:"message"`
+	UserID  string `json:"user_id"`
+}
+
+// Workflow is a multi-step durable workflow that fetches a user,
+// computes a greeting, and persists the result.
 type Workflow struct {
 	*flicker.WorkflowContext
 }
@@ -26,12 +38,12 @@ var Definition = flicker.Define[Request]("greeting", "v1",
 )
 
 func (w *Workflow) Execute(ctx context.Context, req Request) error {
-	// Step 1: fetch name (durable read).
-	name, err := flicker.Run(ctx, w.WorkflowContext, "fetch_name",
-		func(_ context.Context) (*string, error) {
-			w.Log("fetching name", "user_id", req.UserID)
+	// Step 1: fetch user (durable read, returns struct).
+	user, err := flicker.Run(ctx, w.WorkflowContext, "fetch_user",
+		func(_ context.Context) (*User, error) {
+			w.Log("fetching user", "user_id", req.UserID)
 
-			return flicker.Val("Alice"), nil
+			return &User{ID: req.UserID, Name: "Alice"}, nil
 		},
 	)
 	if err != nil {
@@ -45,14 +57,14 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 	}
 
 	// Between steps: pure computation on cached data.
-	msg := fmt.Sprintf("Hello, %s! (%s)", *name, now.Format("2006-01-02T15:04:05Z"))
+	msg := fmt.Sprintf("Hello, %s! (%s)", user.Name, now.Format("2006-01-02T15:04:05Z"))
 
-	// Step 3: send greeting (durable write).
+	// Step 3: send greeting (durable write, returns struct).
 	_, err = flicker.Run(ctx, w.WorkflowContext, "send_greeting",
-		func(_ context.Context) (*string, error) {
+		func(_ context.Context) (*Greeting, error) {
 			w.Log("sending greeting", "greeting", msg)
 
-			return &msg, nil
+			return &Greeting{Message: msg, UserID: user.ID}, nil
 		},
 	)
 
