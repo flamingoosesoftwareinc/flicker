@@ -1,0 +1,46 @@
+{
+  "workflow": {
+    "id": "wf-001",
+    "type": "order:v1",
+    "version": "v1",
+    "status": "completed",
+    "attempts": 0
+  },
+  "steps": [
+    {
+      "step_name": "_sleep.until:1",
+      "result": "2026-01-01T01:00:00Z"
+    },
+    {
+      "step_name": "check_payment",
+      "result": {
+        "status": "approved",
+        "reference": "pay-ref-001"
+      }
+    },
+    {
+      "step_name": "fetch_user",
+      "result": {
+        "id": "cust-1",
+        "name": "Alice",
+        "email": "alice@example.com"
+      }
+    },
+    {
+      "step_name": "reserve_inventory",
+      "result": {
+        "id": "res-001",
+        "expires_at": "2026-01-01T01:00:00Z"
+      }
+    },
+    {
+      "step_name": "save_result",
+      "result": {
+        "order_id": "ord-1",
+        "status": "confirmed",
+        "payment_ref": "pay-ref-001",
+        "reservation_id": "res-001"
+      }
+    }
+  ]
+}

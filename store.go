@@ -37,6 +37,8 @@ type WorkflowStore interface {
 	UpdateStatus(ctx context.Context, id string, status Status, occVersion int) error
 	SetError(ctx context.Context, id string, status Status, errMsg string, occVersion int) error
 	SetRetry(ctx context.Context, id string, retryAfter time.Time, occVersion int) error
+	Suspend(ctx context.Context, id string, resumeAt time.Time, occVersion int) error
+	PromoteSuspended(ctx context.Context, now time.Time) (int, error)
 	ListSchedulable(ctx context.Context, limit int) ([]*WorkflowRecord, error)
 	SaveStepResult(ctx context.Context, result *StepResult) error
 	GetStepResult(ctx context.Context, workflowID, stepName string) (*StepResult, error)

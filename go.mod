@@ -3,6 +3,7 @@ module github.com/flamingoosesoftwareinc/flicker
 go 1.25.0
 
 require (
+	github.com/alitto/pond/v2 v2.7.0
 	github.com/google/uuid v1.6.0
 	github.com/sebdah/goldie/v2 v2.8.0
 	github.com/stretchr/testify v1.11.1

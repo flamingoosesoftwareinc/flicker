@@ -1,8 +1,11 @@
 package flicker
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 )
 
 // StopOption is a functional option for Stop().
@@ -20,13 +23,15 @@ func WithError(err error) StopOption {
 }
 
 // WorkflowContext is the framework handle embedded by workflow structs.
-// Workflows see Stop(), Log(), Time, and ID — nothing else.
+// Workflows see Stop(), Log(), Time, ID, and SleepUntil — nothing else.
 type WorkflowContext struct {
-	id      string
-	store   WorkflowStore
-	logger  *slog.Logger
-	stopped atomic.Bool
-	stopCfg stopConfig
+	id           string
+	store        WorkflowStore
+	logger       *slog.Logger
+	stopped      atomic.Bool
+	stopCfg      stopConfig
+	sleepCounter int
+	nowFn        func() time.Time
 
 	// Time provides durable time operations. w.Time.Now(ctx) returns a
 	// cached timestamp that survives replay.
@@ -62,4 +67,25 @@ func (wc *WorkflowContext) Log(msg string, args ...any) {
 	if wc.logger != nil {
 		wc.logger.Info(msg, args...)
 	}
+}
+
+// SleepUntil suspends the workflow until the given time. The resume time is
+// durably cached so it survives replay. On re-execution after promotion, if
+// the wall clock has passed the cached time, execution continues normally.
+func (wc *WorkflowContext) SleepUntil(ctx context.Context, resumeAt time.Time) error {
+	wc.sleepCounter++
+	stepName := fmt.Sprintf("_sleep.until:%d", wc.sleepCounter)
+
+	cached, err := Run(ctx, wc, stepName, func(_ context.Context) (*time.Time, error) {
+		return &resumeAt, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if wc.nowFn().Before(*cached) {
+		return &SuspendError{ResumeAt: *cached}
+	}
+
+	return nil
 }

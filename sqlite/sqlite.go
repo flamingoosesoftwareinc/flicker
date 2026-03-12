@@ -206,6 +206,47 @@ func (s *Store) SetRetry(
 	return checkRowsAffected(res)
 }
 
+func (s *Store) Suspend(
+	ctx context.Context,
+	id string,
+	resumeAt time.Time,
+	occVersion int,
+) error {
+	res, err := s.db.ExecContext(
+		ctx,
+		`UPDATE workflows SET status = ?, retry_after = ?, occ_version = occ_version + 1, updated_at = ?
+		 WHERE id = ? AND occ_version = ?`,
+		flicker.StatusSuspended,
+		formatTime(resumeAt),
+		formatTime(s.now()),
+		id,
+		occVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("suspend: %w", err)
+	}
+
+	return checkRowsAffected(res)
+}
+
+func (s *Store) PromoteSuspended(ctx context.Context, now time.Time) (int, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE workflows SET status = ?, occ_version = occ_version + 1, updated_at = ?
+		 WHERE status = ? AND retry_after != '' AND retry_after <= ?`,
+		flicker.StatusPending, formatTime(s.now()), flicker.StatusSuspended, formatTime(now),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("promote suspended: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("rows affected: %w", err)
+	}
+
+	return int(n), nil
+}
+
 func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*flicker.WorkflowRecord, error) {
 	rows, err := s.db.QueryContext(
 		ctx,

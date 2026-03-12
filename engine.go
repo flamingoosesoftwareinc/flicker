@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
+	"github.com/alitto/pond/v2"
 	"github.com/google/uuid"
 )
 
@@ -51,6 +51,14 @@ func WithNowFunc(fn func() time.Time) EngineOption {
 	}
 }
 
+// WithTrigger adds a trigger to the engine. Triggers are started alongside
+// the scheduler when Start() is called.
+func WithTrigger(t Trigger) EngineOption {
+	return func(e *Engine) {
+		e.triggers = append(e.triggers, t)
+	}
+}
+
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
@@ -61,6 +69,7 @@ type Engine struct {
 	logger       *slog.Logger
 	idFunc       func() string
 	nowFunc      func() time.Time
+	triggers     []Trigger
 }
 
 type registryEntry struct {
@@ -104,24 +113,33 @@ func (e *Engine) register(def definition, policy RetryPolicy) {
 
 // Start begins the scheduler + worker pool. It blocks until ctx is cancelled.
 func (e *Engine) Start(ctx context.Context) error {
-	work := make(chan string, e.workers)
+	pool := pond.NewPool(e.workers)
 
-	var wg sync.WaitGroup
-
-	for range e.workers {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			e.worker(ctx, work)
-		}()
+	// Launch triggers.
+	deps := TriggerDeps{
+		Store:  e.store,
+		NowFn:  e.nowFunc,
+		Logger: e.logger,
 	}
 
-	e.scheduler(ctx, work)
-	close(work)
-	wg.Wait()
+	for _, t := range e.triggers {
+		pool.Submit(func() {
+			if err := t.Start(ctx, deps); err != nil {
+				e.logger.Info("trigger stopped", "error", err)
+			}
+		})
+	}
+
+	e.scheduler(ctx, pool)
+	pool.StopAndWait()
 
 	return nil
+}
+
+// PromoteSuspended promotes suspended workflows whose resume time has arrived.
+// This is a convenience for tests — in production, use a TimeTrigger.
+func (e *Engine) PromoteSuspended(ctx context.Context) (int, error) {
+	return e.store.PromoteSuspended(ctx, e.now())
 }
 
 // RunOnce executes a single poll cycle — useful for testing.
@@ -140,7 +158,7 @@ func (e *Engine) RunOnce(ctx context.Context) error {
 	return nil
 }
 
-func (e *Engine) scheduler(ctx context.Context, work chan<- string) {
+func (e *Engine) scheduler(ctx context.Context, pool pond.Pool) {
 	ticker := time.NewTicker(e.pollInterval)
 	defer ticker.Stop()
 
@@ -157,35 +175,14 @@ func (e *Engine) scheduler(ctx context.Context, work chan<- string) {
 			}
 
 			for _, r := range records {
-				select {
-				case work <- r.ID:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}
-}
+				record := r
 
-func (e *Engine) worker(ctx context.Context, work <-chan string) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case id, ok := <-work:
-			if !ok {
-				return
-			}
-
-			record, err := e.store.Get(ctx, id)
-			if err != nil {
-				e.logger.Info("load workflow failed", "workflow_id", id, "error", err)
-
-				continue
-			}
-
-			if err := e.executeWorkflow(ctx, record); err != nil {
-				e.logger.Info("workflow execution failed", "workflow_id", id, "error", err)
+				pool.Submit(func() {
+					if err := e.executeWorkflow(ctx, record); err != nil {
+						e.logger.Info("workflow execution failed",
+							"workflow_id", record.ID, "error", err)
+					}
+				})
 			}
 		}
 	}
@@ -209,6 +206,7 @@ func (e *Engine) executeWorkflow(ctx context.Context, record *WorkflowRecord) er
 		id:     record.ID,
 		store:  e.store,
 		logger: e.logger,
+		nowFn:  e.nowFunc,
 	}
 	wc.Time = &TimeProvider{wc: wc, nowFn: e.nowFunc}
 	wc.ID = &IDProvider{wc: wc, newFn: e.idFunc}
@@ -236,6 +234,10 @@ func (e *Engine) resolveOutcome(
 	}
 
 	if execErr != nil {
+		if se, ok := IsSuspend(execErr); ok {
+			return e.store.Suspend(ctx, record.ID, se.ResumeAt, occVersion)
+		}
+
 		if record.Attempts+1 >= entry.retryPolicy.MaxAttempts {
 			return e.store.SetError(ctx, record.ID, StatusFailed, execErr.Error(), occVersion)
 		}

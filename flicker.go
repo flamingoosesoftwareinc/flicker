@@ -23,6 +23,7 @@ const (
 	StatusCompleted Status = "completed"
 	StatusFailed    Status = "failed"
 	StatusCancelled Status = "cancelled"
+	StatusSuspended Status = "suspended"
 )
 
 // Signal represents what you want the workflow to do (separate from status).
