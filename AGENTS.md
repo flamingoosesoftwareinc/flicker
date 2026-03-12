@@ -11,50 +11,73 @@ no magic replay, no special contexts.
 ## Package structure
 
 ```
-flicker.go        # Core types: Workflow[R], Status, Signal, RetryPolicy, WorkflowContext
-engine.go         # Engine: scheduler (polling) + worker pool + registry + execution
-store.go          # WorkflowStore interface + record types
-sqlite.go         # SQLite implementation (modernc.org/sqlite, no CGO)
-durable/durable.go  # Step cache: read-through/write-through durable step wrapper
-example_test.go   # Golden tests demonstrating workflow execution + retry
-cmd/flicker/      # Placeholder CLI binary
-testdata/         # Golden files (.golden, binary in .gitattributes)
+flicker.go          # Core types: Workflow[R], Status, Signal, RetryPolicy
+context.go          # WorkflowContext: Stop(), Log(), Time, ID
+run.go              # Run[T]() — durable step cache (read-through/write-through)
+providers.go        # TimeProvider, IDProvider — deterministic on replay
+engine.go           # Engine: scheduler (polling) + worker pool + execution
+store.go            # WorkflowStore interface + WorkflowRecord + StepResult
+registry.go         # Define[R](), WorkflowDef, Factory, Instance
+sqlite/sqlite.go    # SQLite implementation (modernc.org/sqlite, pure Go, no CGO)
+workflows/          # Example workflow implementations
+test/               # Golden tests
+cmd/flicker/        # CLI binary (placeholder)
 ```
 
 ## Core concepts
 
 - **Workflow[R]** — generic interface on input type R. `Execute(ctx, request) error`
-- **Engine** — scheduler + worker pool combined. Polls store, dispatches to workers
+- **Engine** — scheduler + worker pool. Polls store, dispatches to workers
 - **WorkflowStore** — interface for workflow persistence. SQLite impl for POC
-- **durable.Step[T]** — read-through/write-through step cache. Independently useful
-- **Named Steps** — each step has a string key, not a position
+- **Run[T]()** — read-through/write-through step cache. Named steps, not positions
 - **Three-way outcome** — `return nil` (complete), `return error` (retry), `Stop(WithError(err))` (permanent fail)
 - **Status vs Signal** — status = where workflow IS, signal = what you WANT it to do
 
 ## Design principles
 
 - Recovery points are internal to the workflow, not exposed to the runner
-- Workflow ID injected via `SetWorkflowID()` — explicit structural dependency
+- Workflow ID on struct (via WorkflowContext), not on context.Context
+- WorkflowContext exposes only Stop(), Log(), Time, ID — store is hidden
 - Cached vs fresh reads depend on workflow state (guard mode vs replay mode)
 - Compensation is the workflow's problem — framework surfaces failures generically
 - Optimistic concurrency control on all state transitions (`WHERE occ_version = $expected`)
 - Status and signals are separate concerns
 
-## Key interfaces
+## Writing a workflow
 
-Workflows implement `Workflow[R]` + `ExecuteJSON` (for engine dispatch) + embed `WorkflowContext`:
+Workflows embed `*flicker.WorkflowContext` and implement `flicker.Workflow[R]`:
 
 ```go
 type MyWorkflow struct {
-    flicker.WorkflowContext
-    store      durable.StepStore
-    workflowID string
+    *flicker.WorkflowContext
 }
 
-func (w *MyWorkflow) Execute(ctx context.Context, req MyRequest) error { ... }
-func (w *MyWorkflow) ExecuteJSON(ctx context.Context, payload []byte) error { ... }
-func (w *MyWorkflow) SetWorkflowID(id string) { w.workflowID = id }
-func (w *MyWorkflow) GetWorkflowContext() *flicker.WorkflowContext { return &w.WorkflowContext }
+var Definition = flicker.Define[MyRequest]("my-workflow", "v1",
+    func(wc *flicker.WorkflowContext) flicker.Workflow[MyRequest] {
+        return &MyWorkflow{WorkflowContext: wc}
+    },
+)
+
+func (w *MyWorkflow) Execute(ctx context.Context, req MyRequest) error {
+    var result string
+    if err := flicker.Run(ctx, w.WorkflowContext, "step_name", &result, func(ctx context.Context) (string, error) {
+        // This only runs on first execution. On replay, cached result is returned.
+        return callExternalAPI(ctx, req.ID)
+    }); err != nil {
+        return err
+    }
+    // use result...
+    return nil
+}
+```
+
+Register and submit:
+
+```go
+eng := flicker.NewEngine(store)
+factory := Definition.Register(eng)
+instance, err := factory.Submit(ctx, MyRequest{ID: "123"})
+eng.Start(ctx) // blocks, polls for work
 ```
 
 ## Make targets
@@ -62,16 +85,12 @@ func (w *MyWorkflow) GetWorkflowContext() *flicker.WorkflowContext { return &w.W
 | Target | Description |
 |---|---|
 | `make build` | Build all targets (includes `flicker` binary) |
-| `make flicker` | Build the flicker binary |
-| `make install` | Install the flicker binary |
 | `make test` | Run tests |
 | `make lint` | Lint code (auto-fixes via golangci-lint) |
 | `make format` | Format code |
 | `make tidy-go` | Tidy Go modules |
-| `make generate` | Run go generate |
 | `make verify` | Run all checks and record verified tree SHA for commit |
-| `make pr-ready` | Run comprehensive pre-commit checks (tidy, generate, format, build, lint, test, git-dirty) |
-| `make clean` | Clean build artifacts |
+| `make pr-ready` | Run comprehensive pre-commit checks |
 
 ## Commit workflow
 
