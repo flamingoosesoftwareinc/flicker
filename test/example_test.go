@@ -3,13 +3,13 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/flamingoosesoftwareinc/flicker/engine"
 	"github.com/flamingoosesoftwareinc/flicker/engine/sqlite"
-	"github.com/flamingoosesoftwareinc/flicker/internal/generate"
 	greeting "github.com/flamingoosesoftwareinc/flicker/workflows/greeting/v1"
 	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
@@ -23,12 +23,14 @@ func TestGreetingWorkflow_HappyPath(t *testing.T) {
 
 	defer func() { _ = store.Close() }()
 
-	fake := generate.NewFake("wf", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-
+	idCounter := 0
 	eng := engine.NewEngine(store,
 		engine.WithWorkers(1),
-		engine.WithIDFunc(fake.NewID),
-		engine.WithNowFunc(fake.Now),
+		engine.WithIDFunc(func() string {
+			idCounter++
+			return fmt.Sprintf("wf-%03d", idCounter)
+		}),
+		engine.WithNowFunc(fixedTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))),
 	)
 	greetings := greeting.Definition.Register(eng)
 
@@ -56,12 +58,14 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 
 	defer func() { _ = store.Close() }()
 
-	fake := generate.NewFake("wf", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-
+	idCounter := 0
 	eng := engine.NewEngine(store,
 		engine.WithWorkers(1),
-		engine.WithIDFunc(fake.NewID),
-		engine.WithNowFunc(fake.Now),
+		engine.WithIDFunc(func() string {
+			idCounter++
+			return fmt.Sprintf("wf-%03d", idCounter)
+		}),
+		engine.WithNowFunc(fixedTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))),
 	)
 	greetings := greeting.Definition.Register(eng)
 
@@ -94,6 +98,10 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 }
 
 // --- Helpers ---
+
+func fixedTime(t time.Time) func() time.Time {
+	return func() time.Time { return t }
+}
 
 type workflowSnapshot struct {
 	Workflow workflowState `json:"workflow"`
