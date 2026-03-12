@@ -17,13 +17,13 @@ type Provider[T any] struct {
 	wc      *WorkflowContext
 	prefix  string
 	counter int
-	gen     func() T
+	gen     func() (T, error)
 }
 
 // NewProvider creates a Provider bound to a WorkflowContext. The prefix
 // namespaces this provider's steps (e.g., "_time.now", "_id.new", "uuidv7").
 // The gen function produces the non-deterministic value on first execution.
-func NewProvider[T any](wc *WorkflowContext, prefix string, gen func() T) *Provider[T] {
+func NewProvider[T any](wc *WorkflowContext, prefix string, gen func() (T, error)) *Provider[T] {
 	return &Provider[T]{
 		wc:     wc,
 		prefix: prefix,
@@ -38,7 +38,11 @@ func (p *Provider[T]) Get(ctx context.Context) (T, error) {
 	stepName := fmt.Sprintf("%s:%d", p.prefix, p.counter)
 
 	result, err := Run(ctx, p.wc, stepName, func(_ context.Context) (*T, error) {
-		v := p.gen()
+		v, err := p.gen()
+		if err != nil {
+			return nil, err
+		}
+
 		return &v, nil
 	})
 	if err != nil {

@@ -13,7 +13,9 @@ type TimeProvider struct {
 
 // NewTimeProvider creates a TimeProvider backed by the given clock function.
 func NewTimeProvider(wc *WorkflowContext, nowFn func() time.Time) *TimeProvider {
-	return &TimeProvider{p: NewProvider(wc, "_time.now", nowFn)}
+	return &TimeProvider{p: NewProvider(wc, "_time.now", func() (time.Time, error) {
+		return nowFn(), nil
+	})}
 }
 
 // Now returns the current time. On first execution, the real time is captured
@@ -30,7 +32,9 @@ type IDProvider struct {
 
 // NewIDProvider creates an IDProvider backed by the given ID generator function.
 func NewIDProvider(wc *WorkflowContext, newFn func() string) *IDProvider {
-	return &IDProvider{p: NewProvider(wc, "_id.new", newFn)}
+	return &IDProvider{p: NewProvider(wc, "_id.new", func() (string, error) {
+		return newFn(), nil
+	})}
 }
 
 // New returns a new unique identifier. On first execution, a real ID is generated

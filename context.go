@@ -74,11 +74,15 @@ func (wc *WorkflowContext) Log(msg string, args ...any) {
 // the wall clock has passed the cached time, execution continues normally.
 func (wc *WorkflowContext) SleepUntil(ctx context.Context, resumeAt time.Time) error {
 	if wc.sleep == nil {
-		wc.sleep = NewProvider(wc, "_sleep.until", func() time.Time { return resumeAt })
+		wc.sleep = NewProvider(
+			wc,
+			"_sleep.until",
+			func() (time.Time, error) { return resumeAt, nil },
+		)
 	}
 
 	// Update the generator to capture the current resumeAt value.
-	wc.sleep.gen = func() time.Time { return resumeAt }
+	wc.sleep.gen = func() (time.Time, error) { return resumeAt, nil }
 
 	cached, err := wc.sleep.Get(ctx)
 	if err != nil {
