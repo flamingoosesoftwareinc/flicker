@@ -6,18 +6,30 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flamingoosesoftwareinc/flicker/engine"
+	"github.com/flamingoosesoftwareinc/flicker"
 	_ "modernc.org/sqlite"
 )
 
-// Store implements engine.WorkflowStore using modernc.org/sqlite (pure Go, no CGO).
+// StoreOption configures the SQLite store.
+type StoreOption func(*Store)
+
+// WithNowFunc sets a custom clock for timestamps. Defaults to time.Now().UTC().
+// Use this in tests for deterministic timestamps.
+func WithNowFunc(fn func() time.Time) StoreOption {
+	return func(s *Store) {
+		s.nowFn = fn
+	}
+}
+
+// Store implements flicker.WorkflowStore using modernc.org/sqlite (pure Go, no CGO).
 type Store struct {
-	db *sql.DB
+	db    *sql.DB
+	nowFn func() time.Time
 }
 
 // NewStore creates a new SQLite-backed workflow store. The DSN is a SQLite
 // connection string (e.g., "file:test.db" or ":memory:").
-func NewStore(ctx context.Context, dsn string) (*Store, error) {
+func NewStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, error) {
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -29,7 +41,15 @@ func NewStore(ctx context.Context, dsn string) (*Store, error) {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	s := &Store{db: db}
+	s := &Store{
+		db:    db,
+		nowFn: func() time.Time { return time.Now().UTC() },
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
 	if err := s.migrate(ctx); err != nil {
 		_ = db.Close()
 
@@ -77,14 +97,18 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func (s *Store) Create(ctx context.Context, record *engine.WorkflowRecord) error {
-	now := time.Now().UTC()
+func (s *Store) now() time.Time {
+	return s.nowFn()
+}
+
+func (s *Store) Create(ctx context.Context, record *flicker.WorkflowRecord) error {
+	now := s.now()
 	record.CreatedAt = now
 	record.UpdatedAt = now
 	record.OCCVersion = 1
 
 	if record.Status == "" {
-		record.Status = engine.StatusPending
+		record.Status = flicker.StatusPending
 	}
 
 	_, err := s.db.ExecContext(
@@ -111,7 +135,7 @@ func (s *Store) Create(ctx context.Context, record *engine.WorkflowRecord) error
 	return nil
 }
 
-func (s *Store) Get(ctx context.Context, id string) (*engine.WorkflowRecord, error) {
+func (s *Store) Get(ctx context.Context, id string) (*flicker.WorkflowRecord, error) {
 	row := s.db.QueryRowContext(
 		ctx,
 		`SELECT id, type, version, status, signal, payload, error, retry_after, attempts, occ_version, created_at, updated_at
@@ -125,13 +149,13 @@ func (s *Store) Get(ctx context.Context, id string) (*engine.WorkflowRecord, err
 func (s *Store) UpdateStatus(
 	ctx context.Context,
 	id string,
-	status engine.Status,
+	status flicker.Status,
 	occVersion int,
 ) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE workflows SET status = ?, occ_version = occ_version + 1, updated_at = ?
 		 WHERE id = ? AND occ_version = ?`,
-		status, formatTime(time.Now().UTC()), id, occVersion,
+		status, formatTime(s.now()), id, occVersion,
 	)
 	if err != nil {
 		return fmt.Errorf("update status: %w", err)
@@ -143,14 +167,14 @@ func (s *Store) UpdateStatus(
 func (s *Store) SetError(
 	ctx context.Context,
 	id string,
-	status engine.Status,
+	status flicker.Status,
 	errMsg string,
 	occVersion int,
 ) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE workflows SET status = ?, error = ?, occ_version = occ_version + 1, updated_at = ?
 		 WHERE id = ? AND occ_version = ?`,
-		status, errMsg, formatTime(time.Now().UTC()), id, occVersion,
+		status, errMsg, formatTime(s.now()), id, occVersion,
 	)
 	if err != nil {
 		return fmt.Errorf("set error: %w", err)
@@ -169,9 +193,9 @@ func (s *Store) SetRetry(
 		ctx,
 		`UPDATE workflows SET status = ?, retry_after = ?, attempts = attempts + 1, occ_version = occ_version + 1, updated_at = ?
 		 WHERE id = ? AND occ_version = ?`,
-		engine.StatusPending,
+		flicker.StatusPending,
 		formatTime(retryAfter),
-		formatTime(time.Now().UTC()),
+		formatTime(s.now()),
 		id,
 		occVersion,
 	)
@@ -182,7 +206,7 @@ func (s *Store) SetRetry(
 	return checkRowsAffected(res)
 }
 
-func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*engine.WorkflowRecord, error) {
+func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*flicker.WorkflowRecord, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT id, type, version, status, signal, payload, error, retry_after, attempts, occ_version, created_at, updated_at
@@ -190,8 +214,8 @@ func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*engine.Workf
 		 WHERE status = ? AND (retry_after = '' OR retry_after <= ?)
 		 ORDER BY created_at ASC
 		 LIMIT ?`,
-		engine.StatusPending,
-		formatTime(time.Now().UTC()),
+		flicker.StatusPending,
+		formatTime(s.now()),
 		limit,
 	)
 	if err != nil {
@@ -199,10 +223,10 @@ func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*engine.Workf
 	}
 	defer func() { _ = rows.Close() }()
 
-	var records []*engine.WorkflowRecord
+	var records []*flicker.WorkflowRecord
 
 	for rows.Next() {
-		r, err := scanWorkflowRows(rows)
+		r, err := scanWorkflow(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -213,8 +237,8 @@ func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*engine.Workf
 	return records, rows.Err()
 }
 
-func (s *Store) SaveStepResult(ctx context.Context, result *engine.StepResult) error {
-	result.CreatedAt = time.Now().UTC()
+func (s *Store) SaveStepResult(ctx context.Context, result *flicker.StepResult) error {
+	result.CreatedAt = s.now()
 
 	_, err := s.db.ExecContext(
 		ctx,
@@ -236,7 +260,7 @@ func (s *Store) SaveStepResult(ctx context.Context, result *engine.StepResult) e
 func (s *Store) GetStepResult(
 	ctx context.Context,
 	workflowID, stepName string,
-) (*engine.StepResult, error) {
+) (*flicker.StepResult, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT workflow_id, step_name, result, error, created_at FROM step_results
 		 WHERE workflow_id = ? AND step_name = ?`,
@@ -244,7 +268,7 @@ func (s *Store) GetStepResult(
 	)
 
 	var (
-		r         engine.StepResult
+		r         flicker.StepResult
 		createdAt string
 	)
 
@@ -261,7 +285,7 @@ func (s *Store) GetStepResult(
 func (s *Store) ListStepResults(
 	ctx context.Context,
 	workflowID string,
-) ([]*engine.StepResult, error) {
+) ([]*flicker.StepResult, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT workflow_id, step_name, result, error, created_at FROM step_results
 		 WHERE workflow_id = ? ORDER BY step_name ASC`,
@@ -272,11 +296,11 @@ func (s *Store) ListStepResults(
 	}
 	defer func() { _ = rows.Close() }()
 
-	var results []*engine.StepResult
+	var results []*flicker.StepResult
 
 	for rows.Next() {
 		var (
-			r         engine.StepResult
+			r         flicker.StepResult
 			createdAt string
 		)
 
@@ -313,43 +337,20 @@ func checkRowsAffected(res sql.Result) error {
 	return nil
 }
 
+// scannable abstracts *sql.Row and *sql.Rows for shared scan logic.
 type scannable interface {
 	Scan(dest ...any) error
 }
 
-func scanWorkflow(row scannable) (*engine.WorkflowRecord, error) {
+func scanWorkflow(row scannable) (*flicker.WorkflowRecord, error) {
 	var (
-		r          engine.WorkflowRecord
+		r          flicker.WorkflowRecord
 		retryAfter string
 		createdAt  string
 		updatedAt  string
 	)
 
 	err := row.Scan(
-		&r.ID, &r.Type, &r.Version, &r.Status, &r.Signal,
-		&r.Payload, &r.Error, &retryAfter, &r.Attempts,
-		&r.OCCVersion, &createdAt, &updatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("scan workflow: %w", err)
-	}
-
-	r.RetryAfter, _ = time.Parse(time.RFC3339Nano, retryAfter)
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	r.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
-
-	return &r, nil
-}
-
-func scanWorkflowRows(rows *sql.Rows) (*engine.WorkflowRecord, error) {
-	var (
-		r          engine.WorkflowRecord
-		retryAfter string
-		createdAt  string
-		updatedAt  string
-	)
-
-	err := rows.Scan(
 		&r.ID, &r.Type, &r.Version, &r.Status, &r.Signal,
 		&r.Payload, &r.Error, &retryAfter, &r.Attempts,
 		&r.OCCVersion, &createdAt, &updatedAt,

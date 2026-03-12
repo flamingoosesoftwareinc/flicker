@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/flamingoosesoftwareinc/flicker/engine"
-	"github.com/flamingoosesoftwareinc/flicker/engine/sqlite"
+	"github.com/flamingoosesoftwareinc/flicker"
+	"github.com/flamingoosesoftwareinc/flicker/sqlite"
 	greeting "github.com/flamingoosesoftwareinc/flicker/workflows/greeting/v1"
 	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
@@ -24,13 +25,13 @@ func TestGreetingWorkflow_HappyPath(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	idCounter := 0
-	eng := engine.NewEngine(store,
-		engine.WithWorkers(1),
-		engine.WithIDFunc(func() string {
+	eng := flicker.NewEngine(store,
+		flicker.WithWorkers(1),
+		flicker.WithIDFunc(func() string {
 			idCounter++
 			return fmt.Sprintf("wf-%03d", idCounter)
 		}),
-		engine.WithNowFunc(fixedTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))),
+		flicker.WithNowFunc(fixedTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))),
 	)
 	greetings := greeting.Definition.Register(eng)
 
@@ -42,7 +43,12 @@ func TestGreetingWorkflow_HappyPath(t *testing.T) {
 
 	status, err := wf.Status(ctx)
 	require.NoError(t, err)
-	require.Equal(t, engine.StatusCompleted, status)
+	require.Equal(t, flicker.StatusCompleted, status)
+
+	// Verify version was persisted.
+	record, err := store.Get(ctx, wf.ID())
+	require.NoError(t, err)
+	require.Equal(t, "v1", record.Version)
 
 	snapshot := buildSnapshot(t, ctx, store, wf.ID())
 
@@ -58,38 +64,59 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 
 	defer func() { _ = store.Close() }()
 
+	// Incrementing time — if steps re-execute on retry, the timestamp changes.
+	var timeCall atomic.Int64
+
 	idCounter := 0
-	eng := engine.NewEngine(store,
-		engine.WithWorkers(1),
-		engine.WithIDFunc(func() string {
+	eng := flicker.NewEngine(store,
+		flicker.WithWorkers(1),
+		flicker.WithIDFunc(func() string {
 			idCounter++
 			return fmt.Sprintf("wf-%03d", idCounter)
 		}),
-		engine.WithNowFunc(fixedTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))),
+		flicker.WithNowFunc(func() time.Time {
+			n := timeCall.Add(1)
+			return time.Date(2026, 1, 1, int(n), 0, 0, 0, time.UTC)
+		}),
 	)
 	greetings := greeting.Definition.Register(eng)
 
 	wf, err := greetings.Submit(ctx, greeting.Request{UserID: "user-42"})
 	require.NoError(t, err)
 
-	// First run — executes both steps, caches results.
+	// First run — executes all steps, caches results.
 	err = eng.RunOnce(ctx)
+	require.NoError(t, err)
+
+	// Capture step results after first run.
+	stepsAfterFirst, err := store.ListStepResults(ctx, wf.ID())
 	require.NoError(t, err)
 
 	// Force back to pending to simulate retry.
 	record, err := store.Get(ctx, wf.ID())
 	require.NoError(t, err)
 
-	err = store.UpdateStatus(ctx, wf.ID(), engine.StatusPending, record.OCCVersion)
+	err = store.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, record.OCCVersion)
 	require.NoError(t, err)
 
-	// Second run — steps return cached results.
+	// Second run — steps should return cached results despite time advancing.
 	err = eng.RunOnce(ctx)
 	require.NoError(t, err)
 
 	status, err := wf.Status(ctx)
 	require.NoError(t, err)
-	require.Equal(t, engine.StatusCompleted, status)
+	require.Equal(t, flicker.StatusCompleted, status)
+
+	// Step results must be identical — proves caching, not re-execution.
+	stepsAfterSecond, err := store.ListStepResults(ctx, wf.ID())
+	require.NoError(t, err)
+	require.Equal(t, len(stepsAfterFirst), len(stepsAfterSecond))
+
+	for i := range stepsAfterFirst {
+		require.Equal(t, stepsAfterFirst[i].StepName, stepsAfterSecond[i].StepName)
+		require.Equal(t, string(stepsAfterFirst[i].Result), string(stepsAfterSecond[i].Result),
+			"step %q result changed on replay — caching broken", stepsAfterFirst[i].StepName)
+	}
 
 	snapshot := buildSnapshot(t, ctx, store, wf.ID())
 
@@ -109,11 +136,12 @@ type workflowSnapshot struct {
 }
 
 type workflowState struct {
-	ID       string        `json:"id"`
-	Type     string        `json:"type"`
-	Status   engine.Status `json:"status"`
-	Error    string        `json:"error,omitempty"`
-	Attempts int           `json:"attempts"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Version  string         `json:"version"`
+	Status   flicker.Status `json:"status"`
+	Error    string         `json:"error,omitempty"`
+	Attempts int            `json:"attempts"`
 }
 
 type stepState struct {
@@ -140,6 +168,7 @@ func buildSnapshot(
 		Workflow: workflowState{
 			ID:       record.ID,
 			Type:     record.Type,
+			Version:  record.Version,
 			Status:   record.Status,
 			Error:    record.Error,
 			Attempts: record.Attempts,

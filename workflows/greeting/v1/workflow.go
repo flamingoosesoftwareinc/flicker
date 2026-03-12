@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flamingoosesoftwareinc/flicker/engine"
+	"github.com/flamingoosesoftwareinc/flicker"
 )
 
 // Request is the input to the greeting workflow.
@@ -15,12 +15,12 @@ type Request struct {
 // Workflow is a minimal two-step durable workflow that fetches a name
 // and sends a greeting.
 type Workflow struct {
-	*engine.WorkflowContext
+	*flicker.WorkflowContext
 }
 
 // Definition is the workflow's identity and constructor.
-var Definition = engine.Define[Request]("greeting", "v1",
-	func(wc *engine.WorkflowContext) engine.Workflow[Request] {
+var Definition = flicker.Define[Request]("greeting", "v1",
+	func(wc *flicker.WorkflowContext) flicker.Workflow[Request] {
 		return &Workflow{WorkflowContext: wc}
 	},
 )
@@ -29,12 +29,12 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 	// Step 1: fetch name (durable read).
 	var name string
 
-	if err := engine.Run(
+	if err := flicker.Run(
 		ctx,
 		w.WorkflowContext,
 		"fetch_name",
 		&name,
-		func(ctx context.Context) (string, error) {
+		func(_ context.Context) (string, error) {
 			w.Log("fetching name", "user_id", req.UserID)
 
 			return "Alice", nil
@@ -52,12 +52,12 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 	// Step 3: send greeting (durable write).
 	var greeting string
 
-	if err := engine.Run(
+	if err := flicker.Run(
 		ctx,
 		w.WorkflowContext,
 		"send_greeting",
 		&greeting,
-		func(ctx context.Context) (string, error) {
+		func(_ context.Context) (string, error) {
 			msg := fmt.Sprintf("Hello, %s! (%s)", name, now.Format("2006-01-02T15:04:05Z"))
 			w.Log("sending greeting", "greeting", msg)
 

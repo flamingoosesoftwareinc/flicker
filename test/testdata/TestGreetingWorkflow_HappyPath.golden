@@ -2,6 +2,7 @@
   "workflow": {
     "id": "wf-001",
     "type": "greeting:v1",
+    "version": "v1",
     "status": "completed",
     "attempts": 0
   },

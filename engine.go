@@ -1,4 +1,4 @@
-package engine
+package flicker
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flamingoosesoftwareinc/flicker/internal/generate"
+	"github.com/google/uuid"
 )
 
 // EngineOption configures the engine.
@@ -76,8 +76,8 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		workers:      1,
 		pollInterval: time.Second,
 		logger:       slog.Default(),
-		idFunc:       generate.ID,
-		nowFunc:      generate.Now,
+		idFunc:       func() string { return uuid.New().String() },
+		nowFunc:      func() time.Time { return time.Now().UTC() },
 	}
 
 	for _, opt := range opts {
