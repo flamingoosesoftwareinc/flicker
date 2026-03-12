@@ -136,12 +136,6 @@ func (e *Engine) Start(ctx context.Context) error {
 	return nil
 }
 
-// PromoteSuspended promotes suspended workflows whose resume time has arrived.
-// This is a convenience for tests — in production, use a TimeTrigger.
-func (e *Engine) PromoteSuspended(ctx context.Context) (int, error) {
-	return e.store.PromoteSuspended(ctx, e.now())
-}
-
 // RunOnce executes a single poll cycle — useful for testing.
 func (e *Engine) RunOnce(ctx context.Context) error {
 	records, err := e.store.ListSchedulable(ctx, e.workers)

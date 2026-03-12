@@ -27,19 +27,13 @@ type TimeTrigger struct {
 }
 
 // NewTimeTrigger creates a TimeTrigger with the given poll interval.
-// If interval is zero, it defaults to the engine's poll interval.
 func NewTimeTrigger(interval time.Duration) *TimeTrigger {
 	return &TimeTrigger{interval: interval}
 }
 
 // Start runs the trigger loop until ctx is cancelled.
 func (t *TimeTrigger) Start(ctx context.Context, deps TriggerDeps) error {
-	interval := t.interval
-	if interval == 0 {
-		interval = time.Second
-	}
-
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(t.interval)
 	defer ticker.Stop()
 
 	for {
@@ -47,16 +41,51 @@ func (t *TimeTrigger) Start(ctx context.Context, deps TriggerDeps) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			n, err := deps.Store.PromoteSuspended(ctx, deps.NowFn())
-			if err != nil {
-				deps.Logger.Info("time trigger: promote failed", "error", err)
-
-				continue
-			}
-
-			if n > 0 {
-				deps.Logger.Info("time trigger: promoted suspended workflows", "count", n)
-			}
+			_, _ = promote(ctx, deps)
 		}
 	}
+}
+
+// ManualTimeTrigger is a TimeTrigger for tests. Instead of a ticker loop,
+// call Promote() to promote suspended workflows on demand.
+type ManualTimeTrigger struct {
+	deps TriggerDeps
+}
+
+// NewManualTimeTrigger creates a trigger that promotes only when Promote() is called.
+func NewManualTimeTrigger() *ManualTimeTrigger {
+	return &ManualTimeTrigger{}
+}
+
+// Start captures the deps but does not loop — returns immediately.
+// The engine calls this in Start(), but for tests with RunOnce you can
+// skip it and just call Promote() after setting deps via SetDeps().
+func (t *ManualTimeTrigger) Start(_ context.Context, deps TriggerDeps) error {
+	t.deps = deps
+	return nil
+}
+
+// SetDeps sets the trigger deps directly, for use with RunOnce-based tests
+// where Start() is never called.
+func (t *ManualTimeTrigger) SetDeps(deps TriggerDeps) {
+	t.deps = deps
+}
+
+// Promote runs one promotion cycle, returning the number of workflows promoted.
+func (t *ManualTimeTrigger) Promote(ctx context.Context) (int, error) {
+	return promote(ctx, t.deps)
+}
+
+func promote(ctx context.Context, deps TriggerDeps) (int, error) {
+	n, err := deps.Store.PromoteSuspended(ctx, deps.NowFn())
+	if err != nil {
+		deps.Logger.Info("time trigger: promote failed", "error", err)
+		return 0, err
+	}
+
+	if n > 0 {
+		deps.Logger.Info("time trigger: promoted suspended workflows", "count", n)
+	}
+
+	return n, nil
 }
