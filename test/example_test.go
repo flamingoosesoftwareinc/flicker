@@ -89,7 +89,7 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 	require.NoError(t, err)
 
 	// Capture step results after first run.
-	stepsAfterFirst, err := store.ListStepResults(ctx, wf.ID())
+	stepsAfterFirst, err := store.ListStepResults(ctx, "greeting:v1", "v1", wf.ID())
 	require.NoError(t, err)
 
 	// Force back to pending to simulate retry.
@@ -108,7 +108,7 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 	require.Equal(t, flicker.StatusCompleted, status)
 
 	// Step results must be identical — proves caching, not re-execution.
-	stepsAfterSecond, err := store.ListStepResults(ctx, wf.ID())
+	stepsAfterSecond, err := store.ListStepResults(ctx, "greeting:v1", "v1", wf.ID())
 	require.NoError(t, err)
 	require.Equal(t, len(stepsAfterFirst), len(stepsAfterSecond))
 
@@ -145,9 +145,10 @@ type workflowState struct {
 }
 
 type stepState struct {
-	StepName string          `json:"step_name"`
-	Result   json.RawMessage `json:"result,omitempty"`
-	Error    string          `json:"error,omitempty"`
+	StepName  string          `json:"step_name"`
+	Result    json.RawMessage `json:"result,omitempty"`
+	Error     string          `json:"error,omitempty"`
+	CreatedAt string          `json:"created_at"`
 }
 
 func buildSnapshot(
@@ -161,7 +162,7 @@ func buildSnapshot(
 	record, err := store.Get(ctx, workflowID)
 	require.NoError(t, err)
 
-	steps, err := store.ListStepResults(ctx, workflowID)
+	steps, err := store.ListStepResults(ctx, record.Type, record.Version, workflowID)
 	require.NoError(t, err)
 
 	snap := workflowSnapshot{
@@ -177,9 +178,10 @@ func buildSnapshot(
 
 	for _, s := range steps {
 		snap.Steps = append(snap.Steps, stepState{
-			StepName: s.StepName,
-			Result:   s.Result,
-			Error:    s.Error,
+			StepName:  s.StepName,
+			Result:    s.Result,
+			Error:     s.Error,
+			CreatedAt: s.CreatedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}
 

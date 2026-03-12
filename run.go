@@ -26,7 +26,7 @@ func Run[T any](
 	wc.seenSteps[stepName] = struct{}{}
 
 	// Read-through: check cache.
-	cached, err := wc.store.GetStepResult(ctx, wc.id, stepName)
+	cached, err := wc.store.GetStepResult(ctx, wc.wfType, wc.version, wc.id, stepName)
 	if err == nil && cached != nil {
 		var dest T
 		jerr := json.Unmarshal(cached.Result, &dest)
@@ -49,9 +49,12 @@ func Run[T any](
 	}
 
 	if err := wc.store.SaveStepResult(ctx, &StepResult{
+		Type:       wc.wfType,
+		Version:    wc.version,
 		WorkflowID: wc.id,
 		StepName:   stepName,
 		Result:     data,
+		CreatedAt:  wc.nowFn(),
 	}); err != nil {
 		return nil, fmt.Errorf("save step %q result: %w", stepName, err)
 	}

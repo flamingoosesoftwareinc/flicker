@@ -9,15 +9,18 @@
   "steps": [
     {
       "step_name": "sha256:1",
-      "result": "0eb026731d9ea3f870511f8c18daeb814eaa2c9e276082b204f2a962212fb5bd"
+      "result": "0eb026731d9ea3f870511f8c18daeb814eaa2c9e276082b204f2a962212fb5bd",
+      "created_at": "2026-01-01T00:00:00Z"
     },
     {
       "step_name": "sha256:2",
-      "result": "532b20b0105c9883348558ed2711c7d23ea6b4ee718364a87e16fad4b3c3a029"
+      "result": "532b20b0105c9883348558ed2711c7d23ea6b4ee718364a87e16fad4b3c3a029",
+      "created_at": "2026-01-01T00:00:00Z"
     },
     {
       "step_name": "use_hashes",
-      "result": "0eb026731d9ea3f870511f8c18daeb814eaa2c9e276082b204f2a962212fb5bd:532b20b0105c9883348558ed2711c7d23ea6b4ee718364a87e16fad4b3c3a029"
+      "result": "0eb026731d9ea3f870511f8c18daeb814eaa2c9e276082b204f2a962212fb5bd:532b20b0105c9883348558ed2711c7d23ea6b4ee718364a87e16fad4b3c3a029",
+      "created_at": "2026-01-01T00:00:00Z"
     }
   ]
 }

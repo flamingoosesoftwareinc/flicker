@@ -91,7 +91,7 @@ func TestCustomProvider_SHA256(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, flicker.StatusCompleted, status)
 
-	stepsAfterFirst, err := store.ListStepResults(ctx, wf.ID())
+	stepsAfterFirst, err := store.ListStepResults(ctx, "hash_test:v1", "v1", wf.ID())
 	require.NoError(t, err)
 
 	// Force back to pending to simulate retry.
@@ -105,7 +105,7 @@ func TestCustomProvider_SHA256(t *testing.T) {
 	err = eng.RunOnce(ctx)
 	require.NoError(t, err)
 
-	stepsAfterSecond, err := store.ListStepResults(ctx, wf.ID())
+	stepsAfterSecond, err := store.ListStepResults(ctx, "hash_test:v1", "v1", wf.ID())
 	require.NoError(t, err)
 
 	for i := range stepsAfterFirst {

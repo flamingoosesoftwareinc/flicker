@@ -23,6 +23,8 @@ type WorkflowRecord struct {
 
 // StepResult is the cached result of a durable step.
 type StepResult struct {
+	Type       string
+	Version    string
 	WorkflowID string
 	StepName   string
 	Result     []byte
@@ -41,6 +43,9 @@ type WorkflowStore interface {
 	PromoteSuspended(ctx context.Context, now time.Time) (int, error)
 	ListSchedulable(ctx context.Context, limit int) ([]*WorkflowRecord, error)
 	SaveStepResult(ctx context.Context, result *StepResult) error
-	GetStepResult(ctx context.Context, workflowID, stepName string) (*StepResult, error)
-	ListStepResults(ctx context.Context, workflowID string) ([]*StepResult, error)
+	GetStepResult(
+		ctx context.Context,
+		wfType, version, workflowID, stepName string,
+	) (*StepResult, error)
+	ListStepResults(ctx context.Context, wfType, version, workflowID string) ([]*StepResult, error)
 }

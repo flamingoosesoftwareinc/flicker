@@ -198,6 +198,8 @@ func (e *Engine) executeWorkflow(ctx context.Context, record *WorkflowRecord) er
 	// Create the workflow context — fully initialized before the factory sees it.
 	wc := &WorkflowContext{
 		id:        record.ID,
+		wfType:    record.Type,
+		version:   record.Version,
 		store:     e.store,
 		logger:    e.logger,
 		nowFn:     e.nowFunc,

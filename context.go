@@ -25,6 +25,8 @@ func WithError(err error) StopOption {
 // Workflows see Stop(), Log(), Time, ID, and SleepUntil — nothing else.
 type WorkflowContext struct {
 	id        string
+	wfType    string
+	version   string
 	store     WorkflowStore
 	logger    *slog.Logger
 	stopped   atomic.Bool

@@ -77,12 +77,14 @@ func (s *Store) migrate(ctx context.Context) error {
 		);
 
 		CREATE TABLE IF NOT EXISTS step_results (
+			type        TEXT NOT NULL,
+			version     TEXT NOT NULL,
 			workflow_id TEXT NOT NULL,
 			step_name   TEXT NOT NULL,
 			result      BLOB,
 			error       TEXT NOT NULL DEFAULT '',
 			created_at  TEXT NOT NULL,
-			PRIMARY KEY (workflow_id, step_name)
+			PRIMARY KEY (type, version, workflow_id, step_name)
 		);
 	`)
 	if err != nil {
@@ -279,12 +281,12 @@ func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*flicker.Work
 }
 
 func (s *Store) SaveStepResult(ctx context.Context, result *flicker.StepResult) error {
-	result.CreatedAt = s.now()
-
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT OR REPLACE INTO step_results (workflow_id, step_name, result, error, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
+		`INSERT OR REPLACE INTO step_results (type, version, workflow_id, step_name, result, error, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		result.Type,
+		result.Version,
 		result.WorkflowID,
 		result.StepName,
 		result.Result,
@@ -300,37 +302,26 @@ func (s *Store) SaveStepResult(ctx context.Context, result *flicker.StepResult) 
 
 func (s *Store) GetStepResult(
 	ctx context.Context,
-	workflowID, stepName string,
+	wfType, version, workflowID, stepName string,
 ) (*flicker.StepResult, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT workflow_id, step_name, result, error, created_at FROM step_results
-		 WHERE workflow_id = ? AND step_name = ?`,
-		workflowID, stepName,
+		`SELECT type, version, workflow_id, step_name, result, error, created_at FROM step_results
+		 WHERE type = ? AND version = ? AND workflow_id = ? AND step_name = ?`,
+		wfType, version, workflowID, stepName,
 	)
 
-	var (
-		r         flicker.StepResult
-		createdAt string
-	)
-
-	err := row.Scan(&r.WorkflowID, &r.StepName, &r.Result, &r.Error, &createdAt)
-	if err != nil {
-		return nil, fmt.Errorf("get step result: %w", err)
-	}
-
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-
-	return &r, nil
+	return scanStepResult(row)
 }
 
 func (s *Store) ListStepResults(
 	ctx context.Context,
-	workflowID string,
+	wfType, version, workflowID string,
 ) ([]*flicker.StepResult, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT workflow_id, step_name, result, error, created_at FROM step_results
-		 WHERE workflow_id = ? ORDER BY step_name ASC`,
-		workflowID,
+		`SELECT type, version, workflow_id, step_name, result, error, created_at FROM step_results
+		 WHERE type = ? AND version = ? AND workflow_id = ?
+		 ORDER BY created_at ASC`,
+		wfType, version, workflowID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list step results: %w", err)
@@ -340,26 +331,39 @@ func (s *Store) ListStepResults(
 	var results []*flicker.StepResult
 
 	for rows.Next() {
-		var (
-			r         flicker.StepResult
-			createdAt string
-		)
-
-		if err := rows.Scan(
-			&r.WorkflowID,
-			&r.StepName,
-			&r.Result,
-			&r.Error,
-			&createdAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan step result: %w", err)
+		r, err := scanStepResult(rows)
+		if err != nil {
+			return nil, err
 		}
 
-		r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-		results = append(results, &r)
+		results = append(results, r)
 	}
 
 	return results, rows.Err()
+}
+
+func scanStepResult(row scannable) (*flicker.StepResult, error) {
+	var (
+		r         flicker.StepResult
+		createdAt string
+	)
+
+	err := row.Scan(
+		&r.Type,
+		&r.Version,
+		&r.WorkflowID,
+		&r.StepName,
+		&r.Result,
+		&r.Error,
+		&createdAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("scan step result: %w", err)
+	}
+
+	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+
+	return &r, nil
 }
 
 // ErrOCCConflict is returned when an optimistic concurrency check fails.
