@@ -2,90 +2,103 @@ package flicker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 )
 
-// Trigger evaluates conditions and promotes workflows. Triggers run
-// alongside the scheduler — they don't execute workflows, they make
-// suspended workflows schedulable.
-type Trigger interface {
-	Start(ctx context.Context, deps TriggerDeps) error
+// promote runs one time-based promotion cycle, moving suspended workflows
+// whose resume time has passed back to pending.
+func promote(
+	ctx context.Context,
+	store WorkflowStore,
+	nowFn func() time.Time,
+	logger *slog.Logger,
+) (int, error) {
+	n, err := store.PromoteSuspended(ctx, nowFn())
+	if err != nil {
+		logger.Info("time promotion: failed", "error", err)
+		return 0, err
+	}
+
+	if n > 0 {
+		logger.Info("time promotion: promoted suspended workflows", "count", n)
+	}
+
+	return n, nil
 }
 
-// TriggerDeps is the set of dependencies provided to triggers by the engine.
-type TriggerDeps struct {
-	Store  WorkflowStore
-	NowFn  func() time.Time
-	Logger *slog.Logger
-}
-
-// TimeTrigger promotes suspended workflows whose resume time has arrived.
-// It runs a ticker loop at the configured interval.
-type TimeTrigger struct {
-	interval time.Duration
-}
-
-// NewTimeTrigger creates a TimeTrigger with the given poll interval.
-func NewTimeTrigger(interval time.Duration) *TimeTrigger {
-	return &TimeTrigger{interval: interval}
-}
-
-// Start runs the trigger loop until ctx is cancelled.
-func (t *TimeTrigger) Start(ctx context.Context, deps TriggerDeps) error {
-	ticker := time.NewTicker(t.interval)
+// promotionLoop runs a ticker that promotes suspended workflows at the
+// configured interval. Built into the engine — not a pluggable interface.
+func promotionLoop(
+	ctx context.Context,
+	interval time.Duration,
+	store WorkflowStore,
+	nowFn func() time.Time,
+	logger *slog.Logger,
+) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-ticker.C:
-			_, _ = promote(ctx, deps)
+			if _, err := promote(ctx, store, nowFn, logger); err != nil {
+				logger.Info("promotion loop: cycle failed", "error", err)
+			}
 		}
 	}
 }
 
-// ManualTimeTrigger is a TimeTrigger for tests. Instead of a ticker loop,
-// call Promote() to promote suspended workflows on demand.
-type ManualTimeTrigger struct {
-	deps TriggerDeps
+// subscriptionTimeoutLoop runs a ticker that times out expired event
+// subscriptions at the configured interval.
+func subscriptionTimeoutLoop(
+	ctx context.Context,
+	interval time.Duration,
+	store WorkflowStore,
+	nowFn func() time.Time,
+	logger *slog.Logger,
+) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := timeOutSubscriptions(ctx, store, nowFn, logger); err != nil {
+				logger.Info("subscription timeout loop: cycle failed", "error", err)
+			}
+		}
+	}
 }
 
-// NewManualTimeTrigger creates a trigger that promotes only when Promote() is called.
-func NewManualTimeTrigger() *ManualTimeTrigger {
-	return &ManualTimeTrigger{}
-}
-
-// Start captures the deps but does not loop — returns immediately.
-// The engine calls this in Start(), but for tests with RunOnce you can
-// skip it and just call Promote() after setting deps via SetDeps().
-func (t *ManualTimeTrigger) Start(_ context.Context, deps TriggerDeps) error {
-	t.deps = deps
-	return nil
-}
-
-// SetDeps sets the trigger deps directly, for use with RunOnce-based tests
-// where Start() is never called.
-func (t *ManualTimeTrigger) SetDeps(deps TriggerDeps) {
-	t.deps = deps
-}
-
-// Promote runs one promotion cycle, returning the number of workflows promoted.
-func (t *ManualTimeTrigger) Promote(ctx context.Context) (int, error) {
-	return promote(ctx, t.deps)
-}
-
-func promote(ctx context.Context, deps TriggerDeps) (int, error) {
-	n, err := deps.Store.PromoteSuspended(ctx, deps.NowFn())
+// timeOutSubscriptions runs one cycle of timing out expired event
+// subscriptions. Expired subscriptions get a timeout marker saved as
+// their step result and the workflow is promoted back to pending.
+func timeOutSubscriptions(
+	ctx context.Context,
+	store WorkflowStore,
+	nowFn func() time.Time,
+	logger *slog.Logger,
+) (int, error) {
+	n, err := store.TimeOutSubscriptions(ctx, nowFn())
 	if err != nil {
-		deps.Logger.Info("time trigger: promote failed", "error", err)
+		logger.Info("subscription timeout: failed", "error", err)
 		return 0, err
 	}
 
 	if n > 0 {
-		deps.Logger.Info("time trigger: promoted suspended workflows", "count", n)
+		logger.Info("subscription timeout: timed out subscriptions", "count", n)
 	}
 
 	return n, nil
 }
+
+// ErrEventTimeout is returned by WaitForEvent when the event did not arrive
+// before the deadline. Workflows should handle this as a permanent decision
+// point — the event is not coming.
+var ErrEventTimeout = fmt.Errorf("event wait timed out")

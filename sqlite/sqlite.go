@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,6 +86,16 @@ func (s *Store) migrate(ctx context.Context) error {
 			error       TEXT NOT NULL DEFAULT '',
 			created_at  TEXT NOT NULL,
 			PRIMARY KEY (type, version, workflow_id, step_name)
+		);
+
+		CREATE TABLE IF NOT EXISTS subscriptions (
+			correlation_key TEXT PRIMARY KEY,
+			workflow_id     TEXT NOT NULL,
+			type            TEXT NOT NULL,
+			version         TEXT NOT NULL,
+			step_name       TEXT NOT NULL,
+			deadline        TEXT NOT NULL,
+			created_at      TEXT NOT NULL
 		);
 	`)
 	if err != nil {
@@ -342,6 +353,190 @@ func (s *Store) ListStepResults(
 	return results, rows.Err()
 }
 
+// --- Event subscriptions ---
+
+// ErrSubscriptionNotFound is returned when no subscription exists for a
+// correlation key.
+var ErrSubscriptionNotFound = fmt.Errorf("subscription not found")
+
+func (s *Store) SaveSubscription(ctx context.Context, sub *flicker.Subscription) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO subscriptions (correlation_key, workflow_id, type, version, step_name, deadline, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		sub.CorrelationKey,
+		sub.WorkflowID,
+		sub.Type,
+		sub.Version,
+		sub.StepName,
+		formatTime(sub.Deadline),
+		formatTime(sub.CreatedAt),
+	)
+	if err != nil {
+		return fmt.Errorf("save subscription: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) ResumeSubscription(
+	ctx context.Context,
+	correlationKey string,
+	payload []byte,
+) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Find the subscription.
+	var sub flicker.Subscription
+	var deadline, createdAt string
+	err = tx.QueryRowContext(ctx,
+		`SELECT workflow_id, type, version, step_name, deadline, created_at
+		 FROM subscriptions WHERE correlation_key = ?`,
+		correlationKey,
+	).Scan(&sub.WorkflowID, &sub.Type, &sub.Version, &sub.StepName, &deadline, &createdAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrSubscriptionNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("find subscription: %w", err)
+	}
+
+	// Save the event payload as the step result.
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT OR REPLACE INTO step_results (type, version, workflow_id, step_name, result, error, created_at)
+		 VALUES (?, ?, ?, ?, ?, '', ?)`,
+		sub.Type,
+		sub.Version,
+		sub.WorkflowID,
+		sub.StepName,
+		payload,
+		formatTime(s.now()),
+	)
+	if err != nil {
+		return fmt.Errorf("save event step result: %w", err)
+	}
+
+	// Delete the subscription.
+	_, err = tx.ExecContext(ctx,
+		`DELETE FROM subscriptions WHERE correlation_key = ?`,
+		correlationKey,
+	)
+	if err != nil {
+		return fmt.Errorf("delete subscription: %w", err)
+	}
+
+	// Promote the workflow to pending and clear retry_after so it's
+	// immediately schedulable.
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE workflows SET status = ?, retry_after = '', occ_version = occ_version + 1, updated_at = ?
+		 WHERE id = ? AND status = ?`,
+		flicker.StatusPending,
+		formatTime(s.now()),
+		sub.WorkflowID,
+		flicker.StatusSuspended,
+	)
+	if err != nil {
+		return fmt.Errorf("promote workflow: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+func (s *Store) TimeOutSubscriptions(ctx context.Context, now time.Time) (int, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Find expired subscriptions.
+	rows, err := tx.QueryContext(ctx,
+		`SELECT correlation_key, workflow_id, type, version, step_name
+		 FROM subscriptions WHERE deadline != '' AND deadline <= ?`,
+		formatTime(now),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("query expired subscriptions: %w", err)
+	}
+
+	type expired struct {
+		correlationKey, workflowID, wfType, version, stepName string
+	}
+	var subs []expired
+
+	for rows.Next() {
+		var e expired
+		if err := rows.Scan(
+			&e.correlationKey,
+			&e.workflowID,
+			&e.wfType,
+			&e.version,
+			&e.stepName,
+		); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("scan expired subscription: %w", err)
+		}
+		subs = append(subs, e)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate expired subscriptions: %w", err)
+	}
+	_ = rows.Close()
+
+	for _, sub := range subs {
+		// Save timeout marker as step result.
+		_, err = tx.ExecContext(
+			ctx,
+			`INSERT OR REPLACE INTO step_results (type, version, workflow_id, step_name, result, error, created_at)
+			 VALUES (?, ?, ?, ?, NULL, ?, ?)`,
+			sub.wfType,
+			sub.version,
+			sub.workflowID,
+			sub.stepName,
+			"event_timeout",
+			formatTime(s.now()),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("save timeout marker: %w", err)
+		}
+
+		// Delete the subscription.
+		_, err = tx.ExecContext(ctx,
+			`DELETE FROM subscriptions WHERE correlation_key = ?`,
+			sub.correlationKey,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("delete expired subscription: %w", err)
+		}
+
+		// Promote the workflow and clear retry_after.
+		_, err = tx.ExecContext(
+			ctx,
+			`UPDATE workflows SET status = ?, retry_after = '', occ_version = occ_version + 1, updated_at = ?
+			 WHERE id = ? AND status = ?`,
+			flicker.StatusPending,
+			formatTime(s.now()),
+			sub.workflowID,
+			flicker.StatusSuspended,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("promote timed out workflow: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit: %w", err)
+	}
+
+	return len(subs), nil
+}
+
 func scanStepResult(row scannable) (*flicker.StepResult, error) {
 	var (
 		r         flicker.StepResult
@@ -357,11 +552,18 @@ func scanStepResult(row scannable) (*flicker.StepResult, error) {
 		&r.Error,
 		&createdAt,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, flicker.ErrStepNotFound
+	}
 	if err != nil {
 		return nil, fmt.Errorf("scan step result: %w", err)
 	}
 
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	var parseErr error
+	r.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parse step result created_at %q: %w", createdAt, parseErr)
+	}
 
 	return &r, nil
 }
@@ -404,9 +606,24 @@ func scanWorkflow(row scannable) (*flicker.WorkflowRecord, error) {
 		return nil, fmt.Errorf("scan workflow: %w", err)
 	}
 
-	r.RetryAfter, _ = time.Parse(time.RFC3339Nano, retryAfter)
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	r.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+	for _, p := range []struct {
+		dest *time.Time
+		raw  string
+		name string
+	}{
+		{&r.RetryAfter, retryAfter, "retry_after"},
+		{&r.CreatedAt, createdAt, "created_at"},
+		{&r.UpdatedAt, updatedAt, "updated_at"},
+	} {
+		if p.raw == "" {
+			continue
+		}
+		t, parseErr := time.Parse(time.RFC3339Nano, p.raw)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse workflow %s %q: %w", p.name, p.raw, parseErr)
+		}
+		*p.dest = t
+	}
 
 	return &r, nil
 }

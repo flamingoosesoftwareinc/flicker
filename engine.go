@@ -2,6 +2,7 @@ package flicker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -24,6 +25,15 @@ func WithWorkers(n int) EngineOption {
 func WithPollInterval(d time.Duration) EngineOption {
 	return func(e *Engine) {
 		e.pollInterval = d
+	}
+}
+
+// WithPromoteInterval sets how often the engine promotes suspended workflows
+// whose resume time has passed and times out expired event subscriptions.
+// If not set, time-based promotion must be triggered manually via Promote().
+func WithPromoteInterval(d time.Duration) EngineOption {
+	return func(e *Engine) {
+		e.promoteInterval = d
 	}
 }
 
@@ -51,25 +61,17 @@ func WithNowFunc(fn func() time.Time) EngineOption {
 	}
 }
 
-// WithTrigger adds a trigger to the engine. Triggers are started alongside
-// the scheduler when Start() is called.
-func WithTrigger(t Trigger) EngineOption {
-	return func(e *Engine) {
-		e.triggers = append(e.triggers, t)
-	}
-}
-
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
-	store        WorkflowStore
-	registry     map[string]registryEntry
-	workers      int
-	pollInterval time.Duration
-	logger       *slog.Logger
-	idFunc       func() string
-	nowFunc      func() time.Time
-	triggers     []Trigger
+	store           WorkflowStore
+	registry        map[string]registryEntry
+	workers         int
+	pollInterval    time.Duration
+	promoteInterval time.Duration
+	logger          *slog.Logger
+	idFunc          func() string
+	nowFunc         func() time.Time
 }
 
 type registryEntry struct {
@@ -115,23 +117,43 @@ func (e *Engine) register(def definition, policy RetryPolicy) {
 func (e *Engine) Start(ctx context.Context) error {
 	pool := pond.NewPool(e.workers)
 
-	// Launch triggers.
-	deps := TriggerDeps{
-		Store:  e.store,
-		NowFn:  e.nowFunc,
-		Logger: e.logger,
-	}
-
-	for _, t := range e.triggers {
-		pool.Submit(func() {
-			if err := t.Start(ctx, deps); err != nil {
-				e.logger.Info("trigger stopped", "error", err)
-			}
-		})
+	// Launch built-in promotion loops as separate goroutines — they must
+	// not consume worker pool slots.
+	if e.promoteInterval > 0 {
+		go promotionLoop(ctx, e.promoteInterval, e.store, e.nowFunc, e.logger)
+		go subscriptionTimeoutLoop(ctx, e.promoteInterval, e.store, e.nowFunc, e.logger)
 	}
 
 	e.scheduler(ctx, pool)
 	pool.StopAndWait()
+
+	return nil
+}
+
+// Promote runs one time-based promotion cycle. Use in tests with RunOnce
+// for explicit control over when suspended workflows get promoted.
+func (e *Engine) Promote(ctx context.Context) (int, error) {
+	return promote(ctx, e.store, e.nowFunc, e.logger)
+}
+
+// TimeOutSubscriptions runs one subscription timeout cycle. Use in tests
+// with RunOnce for explicit control over when event subscriptions time out.
+func (e *Engine) TimeOutSubscriptions(ctx context.Context) (int, error) {
+	return timeOutSubscriptions(ctx, e.store, e.nowFunc, e.logger)
+}
+
+// SendEvent delivers an event payload to a workflow waiting on the given
+// correlation key. The payload is saved as the step result, the subscription
+// is deleted, and the workflow is promoted to pending.
+func (e *Engine) SendEvent(ctx context.Context, correlationKey string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal event payload: %w", err)
+	}
+
+	if err := e.store.ResumeSubscription(ctx, correlationKey, data); err != nil {
+		return fmt.Errorf("resume subscription: %w", err)
+	}
 
 	return nil
 }
@@ -168,9 +190,7 @@ func (e *Engine) scheduler(ctx context.Context, pool pond.Pool) {
 				continue
 			}
 
-			for _, r := range records {
-				record := r
-
+			for _, record := range records {
 				pool.Submit(func() {
 					if err := e.executeWorkflow(ctx, record); err != nil {
 						e.logger.Info("workflow execution failed",

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -59,14 +58,6 @@ func TestOrderWorkflow_SuspendResume(t *testing.T) {
 	// In-memory repository.
 	repo := &memRepo{}
 
-	// Manual trigger for test-controlled promotion.
-	trigger := flicker.NewManualTimeTrigger()
-	trigger.SetDeps(flicker.TriggerDeps{
-		Store:  store,
-		NowFn:  clock.Now,
-		Logger: slog.Default(),
-	})
-
 	idCounter := 0
 	eng := flicker.NewEngine(store,
 		flicker.WithWorkers(1),
@@ -113,8 +104,8 @@ func TestOrderWorkflow_SuspendResume(t *testing.T) {
 	// --- Advance clock past the reservation expiry ---
 	clock.Advance(2 * time.Hour)
 
-	// Promote suspended → pending via manual trigger.
-	promoted, err := trigger.Promote(ctx)
+	// Promote suspended → pending via engine.
+	promoted, err := eng.Promote(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, promoted, "should promote exactly 1 workflow")
 

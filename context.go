@@ -2,6 +2,8 @@ package flicker
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -96,4 +98,59 @@ func (wc *WorkflowContext) SleepUntil(ctx context.Context, resumeAt time.Time) e
 	}
 
 	return nil
+}
+
+// WaitForEvent suspends the workflow until an external event with the given
+// correlation key arrives via Engine.SendEvent, or until the timeout elapses.
+//
+// On first execution: saves a subscription and suspends.
+// On replay after event delivery: returns the deserialized event payload.
+// On replay after timeout: returns ErrEventTimeout.
+//
+// T is the expected event payload type (must be JSON-deserializable).
+func WaitForEvent[T any](
+	ctx context.Context,
+	wc *WorkflowContext,
+	stepName string,
+	correlationKey string,
+	timeout time.Duration,
+) (*T, error) {
+	// Check if a result already exists (event delivered or timeout marker).
+	result, err := Run(ctx, wc, stepName, func(ctx context.Context) (*T, error) {
+		// No cached result — this is the first execution. Save a subscription
+		// and suspend the workflow. The step function itself never completes
+		// successfully on first run; instead we save the subscription and
+		// return an error that causes suspension.
+		deadline := wc.nowFn().Add(timeout)
+
+		if subErr := wc.store.SaveSubscription(ctx, &Subscription{
+			WorkflowID:     wc.id,
+			Type:           wc.wfType,
+			Version:        wc.version,
+			StepName:       stepName,
+			CorrelationKey: correlationKey,
+			Deadline:       deadline,
+			CreatedAt:      wc.nowFn(),
+		}); subErr != nil {
+			return nil, fmt.Errorf("save subscription: %w", subErr)
+		}
+
+		return nil, &SuspendError{ResumeAt: deadline}
+	})
+	// If the step function returned a SuspendError, propagate it so the
+	// engine suspends the workflow.
+	if err != nil {
+		if _, ok := IsSuspend(err); ok {
+			return nil, err
+		}
+
+		// Check if the cached result is a timeout marker.
+		if errors.Is(err, ErrEventTimeout) {
+			return nil, ErrEventTimeout
+		}
+
+		return nil, err
+	}
+
+	return result, nil
 }

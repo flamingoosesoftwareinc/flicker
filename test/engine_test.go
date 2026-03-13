@@ -62,7 +62,7 @@ func TestEngine_StartWithPoolAndTrigger(t *testing.T) {
 			return fmt.Sprintf("wf-%03d", idCounter)
 		}),
 		flicker.WithNowFunc(clock.Now),
-		flicker.WithTrigger(flicker.NewTimeTrigger(10*time.Millisecond)),
+		flicker.WithPromoteInterval(10*time.Millisecond),
 	)
 
 	def := order.NewDefinition(srv.Client(), srv.URL, repo)

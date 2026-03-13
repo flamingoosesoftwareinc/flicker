@@ -3,6 +3,7 @@ package flicker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -27,11 +28,18 @@ func Run[T any](
 
 	// Read-through: check cache.
 	cached, err := wc.store.GetStepResult(ctx, wc.wfType, wc.version, wc.id, stepName)
-	if err == nil && cached != nil {
+	if err != nil && !errors.Is(err, ErrStepNotFound) {
+		return nil, fmt.Errorf("get step %q result: %w", stepName, err)
+	}
+	if cached != nil {
+		// Check for cached errors (e.g., event timeout markers).
+		if cached.Error != "" {
+			return nil, cachedStepError(cached.Error)
+		}
+
 		var dest T
-		jerr := json.Unmarshal(cached.Result, &dest)
-		if jerr != nil {
-			return nil, jerr
+		if jerr := json.Unmarshal(cached.Result, &dest); jerr != nil {
+			return nil, fmt.Errorf("unmarshal step %q cached result: %w", stepName, jerr)
 		}
 		return &dest, nil
 	}
@@ -60,4 +68,18 @@ func Run[T any](
 	}
 
 	return result, nil
+}
+
+// stepErrorTimeout is the sentinel string stored in StepResult.Error
+// when an event subscription times out.
+const stepErrorTimeout = "event_timeout"
+
+// cachedStepError maps a stored error string back to a semantic error.
+func cachedStepError(errStr string) error {
+	switch errStr {
+	case stepErrorTimeout:
+		return ErrEventTimeout
+	default:
+		return fmt.Errorf("cached step error: %s", errStr)
+	}
 }

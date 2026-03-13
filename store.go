@@ -2,8 +2,13 @@ package flicker
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrStepNotFound is returned by GetStepResult when no cached result exists
+// for the given step. Callers must distinguish this from real storage errors.
+var ErrStepNotFound = errors.New("step result not found")
 
 // WorkflowRecord is the persisted state of a workflow instance.
 type WorkflowRecord struct {
@@ -32,6 +37,18 @@ type StepResult struct {
 	CreatedAt  time.Time
 }
 
+// Subscription records a workflow waiting for an external event.
+// The correlation key is the lookup key for SendEvent.
+type Subscription struct {
+	WorkflowID     string
+	Type           string
+	Version        string
+	StepName       string
+	CorrelationKey string
+	Deadline       time.Time
+	CreatedAt      time.Time
+}
+
 // WorkflowStore is the interface for workflow persistence.
 type WorkflowStore interface {
 	Create(ctx context.Context, record *WorkflowRecord) error
@@ -48,4 +65,15 @@ type WorkflowStore interface {
 		wfType, version, workflowID, stepName string,
 	) (*StepResult, error)
 	ListStepResults(ctx context.Context, wfType, version, workflowID string) ([]*StepResult, error)
+
+	// Event subscriptions.
+	SaveSubscription(ctx context.Context, sub *Subscription) error
+	// ResumeSubscription delivers an event payload to the workflow waiting on
+	// the given correlation key. It saves the payload as the step result,
+	// deletes the subscription, and promotes the workflow to pending.
+	ResumeSubscription(ctx context.Context, correlationKey string, payload []byte) error
+	// TimeOutSubscriptions finds subscriptions past their deadline, saves a
+	// timeout marker as the step result, deletes the subscription, and
+	// promotes the workflow to pending. Returns the number timed out.
+	TimeOutSubscriptions(ctx context.Context, now time.Time) (int, error)
 }

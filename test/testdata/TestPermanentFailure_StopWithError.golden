@@ -1,0 +1,11 @@
+{
+  "workflow": {
+    "id": "wf-001",
+    "type": "perm_fail:v1",
+    "version": "v1",
+    "status": "failed",
+    "error": "validation failed: invalid input",
+    "attempts": 0
+  },
+  "steps": null
+}
