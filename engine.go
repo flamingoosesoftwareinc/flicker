@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alitto/pond/v2"
 	"github.com/google/uuid"
 )
 
@@ -86,6 +85,14 @@ func WithDrainTimeout(d time.Duration) EngineOption {
 	}
 }
 
+// WithPool sets a custom WorkerPool. Defaults to a PondPool.
+// Use this to swap in ants, tunny, or a stdlib semaphore.
+func WithPool(p WorkerPool) EngineOption {
+	return func(e *Engine) {
+		e.pool = p
+	}
+}
+
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
@@ -100,6 +107,7 @@ type Engine struct {
 	nowFunc         func() time.Time
 	runner          Runner
 	scheduler       Scheduler
+	pool            WorkerPool
 	wg              sync.WaitGroup
 }
 
@@ -157,7 +165,10 @@ func (e *Engine) getRunner() Runner {
 // Start begins the scheduler + worker pool. It blocks until ctx is cancelled.
 // On cancellation, it waits for in-flight workflows to finish (up to drain timeout).
 func (e *Engine) Start(ctx context.Context) error {
-	pool := pond.NewPool(e.workers)
+	pool := e.pool
+	if pool == nil {
+		pool = NewPondPool(e.workers)
+	}
 	runner := e.getRunner()
 
 	// Launch built-in promotion loops as separate goroutines — they must
