@@ -27,7 +27,11 @@ func TestShutdown_InFlightWorkflowCompletes(t *testing.T) {
 
 	eng := flicker.NewEngine(store,
 		flicker.WithWorkers(2),
-		flicker.WithPollInterval(10*time.Millisecond),
+		flicker.WithScheduler(&flicker.PollingScheduler{
+			Store:    store,
+			Limit:    2,
+			Interval: 10 * time.Millisecond,
+		}),
 		flicker.WithIDFunc(func() string {
 			idCounter++
 			return fmt.Sprintf("wf-%03d", idCounter)
@@ -95,7 +99,11 @@ func TestShutdown_DrainTimeoutForceKillsInFlight(t *testing.T) {
 
 	eng := flicker.NewEngine(store,
 		flicker.WithWorkers(2),
-		flicker.WithPollInterval(10*time.Millisecond),
+		flicker.WithScheduler(&flicker.PollingScheduler{
+			Store:    store,
+			Limit:    2,
+			Interval: 10 * time.Millisecond,
+		}),
 		flicker.WithIDFunc(func() string {
 			idCounter++
 			return fmt.Sprintf("wf-%03d", idCounter)

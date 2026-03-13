@@ -21,13 +21,6 @@ func WithWorkers(n int) EngineOption {
 	}
 }
 
-// WithPollInterval sets how often the scheduler polls for schedulable work.
-func WithPollInterval(d time.Duration) EngineOption {
-	return func(e *Engine) {
-		e.pollInterval = d
-	}
-}
-
 // WithTimePromoter sets the time-based promoter that handles SleepUntil
 // deadlines and subscription timeouts. Defaults to a PollingTimePromoter
 // with a 1-second interval. Cannot be nil.
@@ -108,7 +101,6 @@ type Engine struct {
 	store        WorkflowStore
 	registry     map[string]registryEntry
 	workers      int
-	pollInterval time.Duration
 	drainTimeout time.Duration
 	logger       *slog.Logger
 	idFunc       func() string
@@ -132,7 +124,6 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		store:        store,
 		registry:     make(map[string]registryEntry),
 		workers:      1,
-		pollInterval: time.Second,
 		drainTimeout: 30 * time.Second,
 		logger:       slog.Default(),
 		idFunc:       func() string { return uuid.New().String() },
@@ -218,10 +209,9 @@ func (e *Engine) Start(ctx context.Context) error {
 	sched := e.scheduler
 	if sched == nil {
 		sched = &PollingScheduler{
-			store:    e.store,
-			limit:    e.workers,
-			interval: e.pollInterval,
-			nudge:    nudge,
+			Store: e.store,
+			Limit: e.workers,
+			Nudge: nudge,
 		}
 	}
 

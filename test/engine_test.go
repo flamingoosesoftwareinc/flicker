@@ -56,7 +56,11 @@ func TestEngine_StartWithPoolAndTrigger(t *testing.T) {
 	idCounter := 0
 	eng := flicker.NewEngine(store,
 		flicker.WithWorkers(2),
-		flicker.WithPollInterval(10*time.Millisecond),
+		flicker.WithScheduler(&flicker.PollingScheduler{
+			Store:    store,
+			Limit:    2,
+			Interval: 10 * time.Millisecond,
+		}),
 		flicker.WithIDFunc(func() string {
 			idCounter++
 			return fmt.Sprintf("wf-%03d", idCounter)
