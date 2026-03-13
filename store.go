@@ -2,13 +2,8 @@ package flicker
 
 import (
 	"context"
-	"errors"
 	"time"
 )
-
-// ErrStepNotFound is returned by GetStepResult when no cached result exists
-// for the given step. Callers must distinguish this from real storage errors.
-var ErrStepNotFound = errors.New("step result not found")
 
 // WorkflowRecord is the persisted state of a workflow instance.
 type WorkflowRecord struct {

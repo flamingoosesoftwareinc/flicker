@@ -2,7 +2,6 @@ package flicker
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 )
@@ -17,7 +16,7 @@ func promote(
 ) (int, error) {
 	n, err := store.PromoteSuspended(ctx, nowFn())
 	if err != nil {
-		logger.Info("time promotion: failed", "error", err)
+		logger.Error("time promotion failed", "error", err)
 		return 0, err
 	}
 
@@ -39,7 +38,7 @@ func timeOutSubscriptions(
 ) (int, error) {
 	n, err := store.TimeOutSubscriptions(ctx, nowFn())
 	if err != nil {
-		logger.Info("subscription timeout: failed", "error", err)
+		logger.Error("subscription timeout failed", "error", err)
 		return 0, err
 	}
 
@@ -49,8 +48,3 @@ func timeOutSubscriptions(
 
 	return n, nil
 }
-
-// ErrEventTimeout is returned by WaitForEvent when the event did not arrive
-// before the deadline. Workflows should handle this as a permanent decision
-// point — the event is not coming.
-var ErrEventTimeout = fmt.Errorf("event wait timed out")

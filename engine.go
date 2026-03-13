@@ -200,13 +200,13 @@ func (e *Engine) Start(ctx context.Context) error {
 	// Start all promoters in separate goroutines.
 	go func() {
 		if err := e.timePromoter.Start(ctx, e.store, ready); err != nil {
-			e.logger.Info("time promoter exited with error", "error", err)
+			e.logger.Error("time promoter exited with error", "error", err)
 		}
 	}()
 	for _, p := range e.promoters {
 		go func() {
 			if err := p.Start(ctx, e.store, ready); err != nil {
-				e.logger.Info("promoter exited with error", "error", err)
+				e.logger.Error("promoter exited with error", "error", err)
 			}
 		}()
 	}
@@ -223,7 +223,7 @@ func (e *Engine) Start(ctx context.Context) error {
 			e.pool.Submit(func() {
 				defer e.wg.Done()
 				if err := e.runner.Run(drainCtx, record); err != nil {
-					e.logger.Info("workflow execution failed",
+					e.logger.Error("workflow execution failed",
 						"workflow_id", record.ID, "error", err)
 				}
 			})
@@ -282,17 +282,23 @@ func (e *Engine) SendEvent(ctx context.Context, correlationKey string, payload a
 }
 
 // RunOnce executes a single poll cycle — useful for testing.
+// Returns the first workflow execution error encountered, wrapped as
+// *WorkflowExecutionError. Subsequent workflows still execute.
 func (e *Engine) RunOnce(ctx context.Context) error {
 	records, err := e.store.ListSchedulable(ctx, e.workers)
 	if err != nil {
 		return fmt.Errorf("list schedulable: %w", err)
 	}
 
+	var firstErr error
 	for _, record := range records {
-		if err := e.runner.Run(ctx, record); err != nil {
-			e.logger.Info("workflow execution failed", "workflow_id", record.ID, "error", err)
+		if runErr := e.runner.Run(ctx, record); runErr != nil {
+			e.logger.Error("workflow execution failed", "workflow_id", record.ID, "error", runErr)
+			if firstErr == nil {
+				firstErr = &WorkflowExecutionError{WorkflowID: record.ID, Err: runErr}
+			}
 		}
 	}
 
-	return nil
+	return firstErr
 }

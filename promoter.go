@@ -49,8 +49,15 @@ func (p *PollingTimePromoter) Start(ctx context.Context, store WorkflowStore, re
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			promoted, _ := promote(ctx, store, nowFn, logger)
-			timedOut, _ := timeOutSubscriptions(ctx, store, nowFn, logger)
+			promoted, err := promote(ctx, store, nowFn, logger)
+			if err != nil {
+				logger.Error("promotion cycle failed", "error", err)
+			}
+
+			timedOut, err := timeOutSubscriptions(ctx, store, nowFn, logger)
+			if err != nil {
+				logger.Error("subscription timeout cycle failed", "error", err)
+			}
 
 			if promoted > 0 || timedOut > 0 {
 				ready()

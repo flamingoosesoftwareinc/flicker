@@ -394,9 +394,14 @@ func (s *Store) SetSignal(ctx context.Context, id string, signal flicker.Signal)
 
 // --- Event subscriptions ---
 
-// ErrSubscriptionNotFound is returned when no subscription exists for a
+// SubscriptionNotFoundError is returned when no subscription exists for a
 // correlation key.
-var ErrSubscriptionNotFound = fmt.Errorf("subscription not found")
+type SubscriptionNotFoundError struct{}
+
+func (e *SubscriptionNotFoundError) Error() string { return "subscription not found" }
+
+// ErrSubscriptionNotFound is the singleton for convenience.
+var ErrSubscriptionNotFound error = &SubscriptionNotFoundError{}
 
 func (s *Store) SaveSubscription(ctx context.Context, sub *flicker.Subscription) error {
 	_, err := s.db.ExecContext(
@@ -607,8 +612,16 @@ func scanStepResult(row scannable) (*flicker.StepResult, error) {
 	return &r, nil
 }
 
-// ErrOCCConflict is returned when an optimistic concurrency check fails.
-var ErrOCCConflict = fmt.Errorf("optimistic concurrency conflict: row not updated")
+// OCCConflictError is returned when an optimistic concurrency check fails —
+// the row was modified by another process between read and write.
+type OCCConflictError struct{}
+
+func (e *OCCConflictError) Error() string {
+	return "optimistic concurrency conflict: row not updated"
+}
+
+// ErrOCCConflict is the singleton for convenience.
+var ErrOCCConflict error = &OCCConflictError{}
 
 func checkRowsAffected(res sql.Result) error {
 	n, err := res.RowsAffected()

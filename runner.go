@@ -2,6 +2,7 @@ package flicker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -27,7 +28,7 @@ type LocalRunner struct {
 func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 	entry, ok := r.registry[record.Type]
 	if !ok {
-		return fmt.Errorf("no definition registered for %q", record.Type)
+		return &DefinitionNotFoundError{Type: record.Type}
 	}
 
 	// Transition to running.
@@ -101,7 +102,8 @@ func (r *LocalRunner) resolveOutcome(
 
 	if execErr != nil {
 		// Cancellation is terminal — no retry.
-		if execErr == ErrCancelled {
+		var cancelledErr *CancelledError
+		if errors.As(execErr, &cancelledErr) {
 			return r.store.UpdateStatus(ctx, record.ID, StatusCancelled, occVersion)
 		}
 
