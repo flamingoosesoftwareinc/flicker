@@ -441,19 +441,8 @@ func TestIntegration_OrderFulfillment(t *testing.T) {
 	require.Equal(t, int32(1), counts.getInventory.Load(), "get-inventory total calls")
 	require.Equal(t, int32(1), counts.confirmOrder.Load(), "confirm-order total calls")
 
-	// --- Verify step results are all cached ---
-	steps, err := store.ListStepResults(ctx, "order-fulfillment:v1", "v1", "wf-001")
-	require.NoError(t, err)
-
-	stepNames := make([]string, len(steps))
-	for i, s := range steps {
-		stepNames[i] = s.StepName
-	}
-
-	require.Contains(t, stepNames, "create-order")
-	require.Contains(t, stepNames, "fetch-user/call")
-	require.Contains(t, stepNames, "check-inventory/call")
-	require.Contains(t, stepNames, "validate-inventory")
-	require.Contains(t, stepNames, "confirm-order")
-	require.Contains(t, stepNames, "await-payment")
+	// --- Golden snapshot of final workflow state + all cached step results ---
+	g := newGoldie(t)
+	snap := buildSnapshot(t, ctx, store, "wf-001")
+	assertGolden(t, g, snap)
 }
