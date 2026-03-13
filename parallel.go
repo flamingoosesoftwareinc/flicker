@@ -7,12 +7,26 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Branch is a named parallel execution path within a workflow. The Name is
+// Branch is a named parallel execution path within a workflow. The name is
 // used as the scope prefix for all step names within the branch, ensuring
 // deterministic replay regardless of goroutine scheduling order.
+//
+// Construct via NewBranch — the zero value is not usable.
 type Branch struct {
-	Name string
-	Run  func(ctx context.Context, wc *WorkflowContext) error
+	name string
+	run  func(ctx context.Context, wc *WorkflowContext) error
+}
+
+// NewBranch creates a named parallel branch. Panics if name is empty or run is nil
+// — these are programmer errors that must be caught at init time.
+func NewBranch(name string, run func(ctx context.Context, wc *WorkflowContext) error) Branch {
+	if name == "" {
+		panic("flicker: branch name must not be empty")
+	}
+	if run == nil {
+		panic("flicker: branch run function must not be nil")
+	}
+	return Branch{name: name, run: run}
 }
 
 // Parallel executes branches concurrently, each in its own named scope.
@@ -37,12 +51,12 @@ func Parallel(ctx context.Context, wc *WorkflowContext, branches ...Branch) erro
 			branchCtx := ctx
 			var branchSpan trace.Span
 			if wc.tel != nil {
-				branchCtx, branchSpan = wc.tel.startBranchSpan(ctx, branch.Name)
+				branchCtx, branchSpan = wc.tel.startBranchSpan(ctx, branch.name)
 			}
 
-			scope := wc.Scope(branch.Name)
+			scope := wc.Scope(branch.name)
 			errs[idx] = panicToError(func() error {
-				return branch.Run(branchCtx, scope)
+				return branch.run(branchCtx, scope)
 			})
 
 			if branchSpan != nil {

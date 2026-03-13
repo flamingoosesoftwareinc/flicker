@@ -163,10 +163,12 @@ func (w *orderFulfillmentWorkflow) Execute(
 	var user *User
 	var inventory *Inventory
 
-	err = flicker.Parallel(ctx, w.wc,
-		flicker.Branch{
-			Name: "fetch-user",
-			Run: func(ctx context.Context, wc *flicker.WorkflowContext) error {
+	err = flicker.Parallel(
+		ctx,
+		w.wc,
+		flicker.NewBranch(
+			"fetch-user",
+			func(ctx context.Context, wc *flicker.WorkflowContext) error {
 				u, runErr := flicker.Run(ctx, wc, "call", func(ctx context.Context) (*User, error) {
 					return httpGet[User](ctx, w.httpClient, w.apiURL+"/api/users/"+req.UserID)
 				})
@@ -176,10 +178,10 @@ func (w *orderFulfillmentWorkflow) Execute(
 				user = u
 				return nil
 			},
-		},
-		flicker.Branch{
-			Name: "check-inventory",
-			Run: func(ctx context.Context, wc *flicker.WorkflowContext) error {
+		),
+		flicker.NewBranch(
+			"check-inventory",
+			func(ctx context.Context, wc *flicker.WorkflowContext) error {
 				inv, runErr := flicker.Run(
 					ctx,
 					wc,
@@ -198,7 +200,7 @@ func (w *orderFulfillmentWorkflow) Execute(
 				inventory = inv
 				return nil
 			},
-		},
+		),
 	)
 	if err != nil {
 		return zero, err
