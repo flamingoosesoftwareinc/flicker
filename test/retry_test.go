@@ -22,7 +22,9 @@ type failWorkflow struct {
 	wc *flicker.WorkflowContext
 }
 
-func (w *failWorkflow) Execute(ctx context.Context, req failRequest) error {
+func (w *failWorkflow) Execute(ctx context.Context, req failRequest) (struct{}, error) {
+	var zero struct{}
+
 	// Track attempts via a durable step.
 	attempt, err := flicker.Run(
 		ctx,
@@ -33,7 +35,7 @@ func (w *failWorkflow) Execute(ctx context.Context, req failRequest) error {
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 	_ = attempt
 
@@ -42,16 +44,16 @@ func (w *failWorkflow) Execute(ctx context.Context, req failRequest) error {
 	// from the request and a non-durable counter via the store.
 	// Simpler: just always fail if failCount > 0, and the engine handles retries.
 	if req.FailCount > 0 {
-		return fmt.Errorf("transient failure (configured to fail %d times)", req.FailCount)
+		return zero, fmt.Errorf("transient failure (configured to fail %d times)", req.FailCount)
 	}
 
-	return nil
+	return zero, nil
 }
 
 var failDef = flicker.Define(
 	"fail",
 	"v1",
-	func(wc *flicker.WorkflowContext) flicker.Workflow[failRequest] {
+	func(wc *flicker.WorkflowContext) flicker.Workflow[failRequest, struct{}] {
 		return &failWorkflow{wc: wc}
 	},
 )
@@ -278,7 +280,7 @@ func TestSuspend_SleepUntil(t *testing.T) {
 	sleepDef := flicker.Define(
 		"sleep",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &sleepWorkflow{wc: wc, until: sleepTime}
 		},
 	)
@@ -330,9 +332,11 @@ type sleepWorkflow struct {
 	until time.Time
 }
 
-func (w *sleepWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *sleepWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	if err := w.wc.SleepUntil(ctx, w.until); err != nil {
-		return err
+		return zero, err
 	}
 
 	// After waking up, do a durable step to prove we resumed.
@@ -340,7 +344,7 @@ func (w *sleepWorkflow) Execute(ctx context.Context, _ struct{}) error {
 		return flicker.Val("awake"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 func TestWaitForEvent_EventDelivered(t *testing.T) {
@@ -372,7 +376,7 @@ func TestWaitForEvent_EventDelivered(t *testing.T) {
 	eventDef := flicker.Define(
 		"event_wait",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[string] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[string, struct{}] {
 			return &eventWorkflow[PaymentEvent]{
 				wc:             wc,
 				correlationKey: "", // set from request
@@ -453,7 +457,7 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 	timeoutDef := flicker.Define(
 		"event_timeout",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[string] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[string, struct{}] {
 			return &eventWorkflow[DummyEvent]{
 				wc:             wc,
 				correlationKey: "",
@@ -521,7 +525,8 @@ type eventWorkflow[T any] struct {
 	onTimeout      func()
 }
 
-func (w *eventWorkflow[T]) Execute(ctx context.Context, orderID string) error {
+func (w *eventWorkflow[T]) Execute(ctx context.Context, orderID string) (struct{}, error) {
+	var zero struct{}
 	key := "payment:" + orderID
 
 	event, err := flicker.WaitForEvent[T](ctx, w.wc, "await_event", key, w.timeout)
@@ -540,11 +545,11 @@ func (w *eventWorkflow[T]) Execute(ctx context.Context, orderID string) error {
 			},
 		)
 
-		return runErr
+		return zero, runErr
 	}
 
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	if w.onEvent != nil {
@@ -556,7 +561,7 @@ func (w *eventWorkflow[T]) Execute(ctx context.Context, orderID string) error {
 		return flicker.Val("processed"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 func TestPermanentFailure_StopWithError(t *testing.T) {
@@ -581,7 +586,7 @@ func TestPermanentFailure_StopWithError(t *testing.T) {
 	permFailDef := flicker.Define(
 		"perm_fail",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &permFailWorkflow{wc: wc}
 		},
 	)
@@ -608,7 +613,6 @@ type permFailWorkflow struct {
 	wc *flicker.WorkflowContext
 }
 
-func (w *permFailWorkflow) Execute(ctx context.Context, _ struct{}) error {
-	w.wc.Stop(flicker.WithError(fmt.Errorf("validation failed: invalid input")))
-	return nil
+func (w *permFailWorkflow) Execute(_ context.Context, _ struct{}) (struct{}, error) {
+	return struct{}{}, flicker.Permanent(fmt.Errorf("validation failed: invalid input"))
 }

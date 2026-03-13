@@ -24,9 +24,9 @@ func NewDefinition(
 	client *http.Client,
 	baseURL string,
 	repo Repository,
-) *flicker.WorkflowDef[Request] {
-	return flicker.Define[Request]("order", "v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[Request] {
+) *flicker.WorkflowDef[Request, OrderResult] {
+	return flicker.Define[Request, OrderResult]("order", "v1",
+		func(wc *flicker.WorkflowContext) flicker.Workflow[Request, OrderResult] {
 			return &Workflow{
 				WorkflowContext: wc,
 				client:          client,
@@ -37,7 +37,9 @@ func NewDefinition(
 	)
 }
 
-func (w *Workflow) Execute(ctx context.Context, req Request) error {
+func (w *Workflow) Execute(ctx context.Context, req Request) (OrderResult, error) {
+	var zero OrderResult
+
 	// Step 1: fetch user.
 	user, err := flicker.Run(ctx, w.WorkflowContext, "fetch_user",
 		func(ctx context.Context) (*User, error) {
@@ -58,7 +60,7 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Step 2: reserve inventory.
@@ -85,14 +87,14 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Between steps: sleep until reservation deadline approaches.
 	w.Log("sleeping until reservation deadline", "expires_at", reservation.ExpiresAt)
 
 	if err := w.SleepUntil(ctx, reservation.ExpiresAt); err != nil {
-		return err
+		return zero, err
 	}
 
 	// Step 3: check payment status.
@@ -115,7 +117,7 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Between steps: decide outcome based on payment status.
@@ -125,9 +127,9 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 	}
 
 	// Step 4: save final result.
-	_, err = flicker.Run(ctx, w.WorkflowContext, "save_result",
+	result, err := flicker.Run(ctx, w.WorkflowContext, "save_result",
 		func(ctx context.Context) (*OrderResult, error) {
-			result := &OrderResult{
+			r := &OrderResult{
 				OrderID:       req.OrderID,
 				Status:        status,
 				PaymentRef:    payment.Reference,
@@ -136,13 +138,16 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 
 			w.Log("saving order result", "status", status)
 
-			if err := w.repo.SaveOrder(ctx, result); err != nil {
+			if err := w.repo.SaveOrder(ctx, r); err != nil {
 				return nil, fmt.Errorf("save order: %w", err)
 			}
 
-			return result, nil
+			return r, nil
 		},
 	)
+	if err != nil {
+		return zero, err
+	}
 
-	return err
+	return *result, nil
 }

@@ -5,13 +5,16 @@ import (
 	"time"
 )
 
-// Workflow is the core interface. R is the request/input type.
+// Workflow is the core interface. R is the request type, Resp is the response type.
 // Execute runs the workflow logic. The return value determines the outcome:
-//   - return nil → completed successfully
-//   - return error → transient failure, retry per RetryPolicy
-//   - Stop(WithError(err)) then return nil → permanent failure, don't retry
-type Workflow[R any] interface {
-	Execute(ctx context.Context, request R) error
+//   - return resp, nil → completed successfully with result
+//   - return zero, err → transient failure, retry per RetryPolicy
+//   - return zero, Permanent(err) → permanent failure, don't retry
+//   - return zero, &SuspendError{} → suspend until ResumeAt
+//
+// Use struct{} as Resp for fire-and-forget workflows with no meaningful result.
+type Workflow[R, Resp any] interface {
+	Execute(ctx context.Context, request R) (Resp, error)
 }
 
 // Status represents where the workflow currently is.

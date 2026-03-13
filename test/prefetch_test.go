@@ -51,7 +51,7 @@ func TestPrefetch_ReducesStoreCalls(t *testing.T) {
 	multiDef := flicker.Define(
 		"prefetch_multi",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &threeStepWorkflow{wc: wc}
 		},
 	)
@@ -76,7 +76,7 @@ func TestPrefetch_ReducesStoreCalls(t *testing.T) {
 	// Force back to pending to simulate replay.
 	record, err := realStore.Get(ctx, wf.ID())
 	require.NoError(t, err)
-	err = realStore.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, record.OCCVersion)
+	err = realStore.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, nil, record.OCCVersion)
 	require.NoError(t, err)
 
 	// Reset counter.
@@ -124,7 +124,7 @@ func TestPrefetch_CacheMissFallback(t *testing.T) {
 	suspendResumeDef := flicker.Define(
 		"prefetch_suspend",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &prefetchSuspendWorkflow{wc: wc, clock: clock}
 		},
 	)
@@ -172,26 +172,28 @@ type threeStepWorkflow struct {
 	wc *flicker.WorkflowContext
 }
 
-func (w *threeStepWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *threeStepWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "step_one", func(ctx context.Context) (*string, error) {
 		return flicker.Val("one"), nil
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	_, err = flicker.Run(ctx, w.wc, "step_two", func(ctx context.Context) (*string, error) {
 		return flicker.Val("two"), nil
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	_, err = flicker.Run(ctx, w.wc, "step_three", func(ctx context.Context) (*string, error) {
 		return flicker.Val("three"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 type prefetchSuspendWorkflow struct {
@@ -199,17 +201,19 @@ type prefetchSuspendWorkflow struct {
 	clock *testClock
 }
 
-func (w *prefetchSuspendWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *prefetchSuspendWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "step_one", func(ctx context.Context) (*string, error) {
 		return flicker.Val("one"), nil
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	sleepTime := time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)
 	if err := w.wc.SleepUntil(ctx, sleepTime); err != nil {
-		return err
+		return zero, err
 	}
 
 	// This step only runs after resume — not in prefetch cache on second run.
@@ -217,5 +221,5 @@ func (w *prefetchSuspendWorkflow) Execute(ctx context.Context, _ struct{}) error
 		return flicker.Val("two"), nil
 	})
 
-	return err
+	return zero, err
 }

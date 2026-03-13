@@ -143,13 +143,18 @@ type orderFulfillmentWorkflow struct {
 	apiURL     string
 }
 
-func (w *orderFulfillmentWorkflow) Execute(ctx context.Context, req OrderRequest) error {
+func (w *orderFulfillmentWorkflow) Execute(
+	ctx context.Context,
+	req OrderRequest,
+) (Confirmation, error) {
+	var zero Confirmation
+
 	// Step 1: Create the order.
 	order, err := flicker.Run(ctx, w.wc, "create-order", func(ctx context.Context) (*Order, error) {
 		return httpPost[Order](ctx, w.httpClient, w.apiURL+"/api/orders", req)
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	w.wc.Log("order created", "order_id", order.ID)
@@ -196,7 +201,7 @@ func (w *orderFulfillmentWorkflow) Execute(ctx context.Context, req OrderRequest
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	w.wc.Log("enrichment complete",
@@ -212,18 +217,18 @@ func (w *orderFulfillmentWorkflow) Execute(ctx context.Context, req OrderRequest
 		return flicker.Val(true), nil
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Step 4: Sleep until processing window (simulates batch processing time).
 	now, err := w.wc.Time.Now(ctx)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	err = w.wc.SleepUntil(ctx, now.Add(1*time.Hour))
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Step 5: Wait for payment confirmation webhook.
@@ -233,7 +238,7 @@ func (w *orderFulfillmentWorkflow) Execute(ctx context.Context, req OrderRequest
 		24*time.Hour,
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	w.wc.Log("payment received", "transaction_id", payment.TransactionID)
@@ -253,13 +258,12 @@ func (w *orderFulfillmentWorkflow) Execute(ctx context.Context, req OrderRequest
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	w.wc.Log("order confirmed", "status", confirmation.Status)
-	w.wc.Stop()
 
-	return nil
+	return *confirmation, nil
 }
 
 // --- HTTP helpers ---
@@ -359,7 +363,7 @@ func TestIntegration_OrderFulfillment(t *testing.T) {
 	factory := flicker.Define(
 		"order-fulfillment",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[OrderRequest] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[OrderRequest, Confirmation] {
 			return &orderFulfillmentWorkflow{
 				wc:         wc,
 				httpClient: server.Client(),

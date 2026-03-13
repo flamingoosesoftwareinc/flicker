@@ -19,14 +19,19 @@ type duplicateStepWorkflow struct {
 	*flicker.WorkflowContext
 }
 
-func (w *duplicateStepWorkflow) Execute(ctx context.Context, req duplicateStepRequest) error {
+func (w *duplicateStepWorkflow) Execute(
+	ctx context.Context,
+	req duplicateStepRequest,
+) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.WorkflowContext, "same_name",
 		func(_ context.Context) (*string, error) {
 			return flicker.Val("first"), nil
 		},
 	)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	_, err = flicker.Run(ctx, w.WorkflowContext, "same_name",
@@ -35,7 +40,7 @@ func (w *duplicateStepWorkflow) Execute(ctx context.Context, req duplicateStepRe
 		},
 	)
 
-	return err
+	return zero, err
 }
 
 func TestDuplicateStepName_Errors(t *testing.T) {
@@ -46,8 +51,8 @@ func TestDuplicateStepName_Errors(t *testing.T) {
 
 	defer func() { _ = store.Close() }()
 
-	def := flicker.Define[duplicateStepRequest]("duplicate_test", "v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[duplicateStepRequest] {
+	def := flicker.Define[duplicateStepRequest, struct{}]("duplicate_test", "v1",
+		func(wc *flicker.WorkflowContext) flicker.Workflow[duplicateStepRequest, struct{}] {
 			return &duplicateStepWorkflow{WorkflowContext: wc}
 		},
 	)

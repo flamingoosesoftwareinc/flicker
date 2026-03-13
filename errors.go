@@ -2,6 +2,21 @@ package flicker
 
 import "fmt"
 
+// PermanentError wraps an error to signal permanent failure — the workflow will
+// not be retried. Use Permanent(err) to construct.
+type PermanentError struct {
+	Err error
+}
+
+func (e *PermanentError) Error() string { return e.Err.Error() }
+func (e *PermanentError) Unwrap() error { return e.Err }
+
+// Permanent wraps an error to mark it as a permanent failure. The workflow
+// will transition to failed status without retrying.
+func Permanent(err error) *PermanentError {
+	return &PermanentError{Err: err}
+}
+
 // CancelledError is returned when a workflow is cancelled via SignalCancelRequested.
 // It is a terminal error — the workflow will not be retried.
 type CancelledError struct{}

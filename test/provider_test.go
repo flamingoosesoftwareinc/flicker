@@ -22,16 +22,18 @@ type hashWorkflow struct {
 	hash *flicker.Provider[string]
 }
 
-func (w *hashWorkflow) Execute(ctx context.Context, req hashRequest) error {
+func (w *hashWorkflow) Execute(ctx context.Context, req hashRequest) (struct{}, error) {
+	var zero struct{}
+
 	// Generate two durable hashes — deterministic on replay.
 	first, err := w.hash.Get(ctx)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	second, err := w.hash.Get(ctx)
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	_, err = flicker.Run(ctx, w.WorkflowContext, "use_hashes",
@@ -40,7 +42,7 @@ func (w *hashWorkflow) Execute(ctx context.Context, req hashRequest) error {
 		},
 	)
 
-	return err
+	return zero, err
 }
 
 func TestCustomProvider_SHA256(t *testing.T) {
@@ -54,8 +56,8 @@ func TestCustomProvider_SHA256(t *testing.T) {
 	// Counter to make each hash unique (simulates non-deterministic input).
 	counter := 0
 
-	def := flicker.Define[hashRequest]("hash_test", "v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[hashRequest] {
+	def := flicker.Define[hashRequest, struct{}]("hash_test", "v1",
+		func(wc *flicker.WorkflowContext) flicker.Workflow[hashRequest, struct{}] {
 			return &hashWorkflow{
 				WorkflowContext: wc,
 				hash: flicker.NewProvider(wc, "sha256", func() (string, error) {
@@ -98,7 +100,7 @@ func TestCustomProvider_SHA256(t *testing.T) {
 	record, err := store.Get(ctx, wf.ID())
 	require.NoError(t, err)
 
-	err = store.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, record.OCCVersion)
+	err = store.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, nil, record.OCCVersion)
 	require.NoError(t, err)
 
 	// Second run — counter keeps incrementing, but cached hashes are returned.

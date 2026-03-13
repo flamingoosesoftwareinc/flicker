@@ -2,6 +2,7 @@ package flicker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,7 +33,13 @@ func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 	}
 
 	// Transition to running.
-	if err := r.store.UpdateStatus(ctx, record.ID, StatusRunning, record.OCCVersion); err != nil {
+	if err := r.store.UpdateStatus(
+		ctx,
+		record.ID,
+		StatusRunning,
+		nil,
+		record.OCCVersion,
+	); err != nil {
 		return fmt.Errorf("set running: %w", err)
 	}
 
@@ -71,16 +78,19 @@ func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 		return fmt.Errorf("get signal: %w", sigErr)
 	}
 
+	var resultJSON json.RawMessage
 	var execErr error
 	if signal == SignalCancelRequested {
 		execErr = ErrCancelled
 	} else {
 		execErr = panicToError(func() error {
-			return entry.def.executeWorkflow(ctx, wc, record.Payload)
+			var err error
+			resultJSON, err = entry.def.executeWorkflow(ctx, wc, record.Payload)
+			return err
 		})
 	}
 
-	return r.resolveOutcome(ctx, record, entry, occAfterRunning, wc, execErr)
+	return r.resolveOutcome(ctx, record, entry, occAfterRunning, resultJSON, execErr)
 }
 
 func (r *LocalRunner) resolveOutcome(
@@ -88,23 +98,20 @@ func (r *LocalRunner) resolveOutcome(
 	record *WorkflowRecord,
 	entry registryEntry,
 	occVersion int,
-	wc *WorkflowContext,
+	resultJSON json.RawMessage,
 	execErr error,
 ) error {
-	// Check if Stop was called.
-	if wc.Stopped() {
-		if stopErr := wc.StopError(); stopErr != nil {
-			return r.store.SetError(ctx, record.ID, StatusFailed, stopErr.Error(), occVersion)
-		}
-
-		return r.store.UpdateStatus(ctx, record.ID, StatusCompleted, occVersion)
-	}
-
 	if execErr != nil {
 		// Cancellation is terminal — no retry.
 		var cancelledErr *CancelledError
 		if errors.As(execErr, &cancelledErr) {
-			return r.store.UpdateStatus(ctx, record.ID, StatusCancelled, occVersion)
+			return r.store.UpdateStatus(ctx, record.ID, StatusCancelled, nil, occVersion)
+		}
+
+		// Permanent failure — no retry.
+		var permErr *PermanentError
+		if errors.As(execErr, &permErr) {
+			return r.store.SetError(ctx, record.ID, StatusFailed, permErr.Err.Error(), occVersion)
 		}
 
 		if se, ok := IsSuspend(execErr); ok {
@@ -123,5 +130,6 @@ func (r *LocalRunner) resolveOutcome(
 		return r.store.SetRetry(ctx, record.ID, r.nowFunc().Add(delay), occVersion)
 	}
 
-	return r.store.UpdateStatus(ctx, record.ID, StatusCompleted, occVersion)
+	// Success — save result.
+	return r.store.UpdateStatus(ctx, record.ID, StatusCompleted, resultJSON, occVersion)
 }

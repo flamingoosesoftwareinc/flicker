@@ -2,6 +2,7 @@ package flicker
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type WorkflowRecord struct {
 	Status     Status
 	Signal     Signal
 	Payload    []byte
+	Result     json.RawMessage
 	Error      string
 	RetryAfter time.Time
 	Attempts   int
@@ -48,7 +50,13 @@ type Subscription struct {
 type WorkflowStore interface {
 	Create(ctx context.Context, record *WorkflowRecord) error
 	Get(ctx context.Context, id string) (*WorkflowRecord, error)
-	UpdateStatus(ctx context.Context, id string, status Status, occVersion int) error
+	UpdateStatus(
+		ctx context.Context,
+		id string,
+		status Status,
+		result json.RawMessage,
+		occVersion int,
+	) error
 	SetError(ctx context.Context, id string, status Status, errMsg string, occVersion int) error
 	SetRetry(ctx context.Context, id string, retryAfter time.Time, occVersion int) error
 	Suspend(ctx context.Context, id string, resumeAt time.Time, occVersion int) error

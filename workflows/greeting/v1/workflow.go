@@ -31,13 +31,13 @@ type Workflow struct {
 }
 
 // Definition is the workflow's identity and constructor.
-var Definition = flicker.Define[Request]("greeting", "v1",
-	func(wc *flicker.WorkflowContext) flicker.Workflow[Request] {
+var Definition = flicker.Define[Request, Greeting]("greeting", "v1",
+	func(wc *flicker.WorkflowContext) flicker.Workflow[Request, Greeting] {
 		return &Workflow{WorkflowContext: wc}
 	},
 )
 
-func (w *Workflow) Execute(ctx context.Context, req Request) error {
+func (w *Workflow) Execute(ctx context.Context, req Request) (Greeting, error) {
 	// Step 1: fetch user (durable read, returns struct).
 	user, err := flicker.Run(ctx, w.WorkflowContext, "fetch_user",
 		func(_ context.Context) (*User, error) {
@@ -47,26 +47,29 @@ func (w *Workflow) Execute(ctx context.Context, req Request) error {
 		},
 	)
 	if err != nil {
-		return err
+		return Greeting{}, err
 	}
 
 	// Step 2: get a durable timestamp.
 	now, err := w.Time.Now(ctx)
 	if err != nil {
-		return err
+		return Greeting{}, err
 	}
 
 	// Between steps: pure computation on cached data.
 	msg := fmt.Sprintf("Hello, %s! (%s)", user.Name, now.Format("2006-01-02T15:04:05Z"))
 
 	// Step 3: send greeting (durable write, returns struct).
-	_, err = flicker.Run(ctx, w.WorkflowContext, "send_greeting",
+	greeting, err := flicker.Run(ctx, w.WorkflowContext, "send_greeting",
 		func(_ context.Context) (*Greeting, error) {
 			w.Log("sending greeting", "greeting", msg)
 
 			return &Greeting{Message: msg, UserID: user.ID}, nil
 		},
 	)
+	if err != nil {
+		return Greeting{}, err
+	}
 
-	return err
+	return *greeting, nil
 }

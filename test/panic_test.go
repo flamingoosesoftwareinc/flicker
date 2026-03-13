@@ -17,18 +17,20 @@ type panicStepWorkflow struct {
 	wc *flicker.WorkflowContext
 }
 
-func (w *panicStepWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *panicStepWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "panic_step", func(ctx context.Context) (*string, error) {
 		panic("step function exploded")
 	})
 
-	return err
+	return zero, err
 }
 
 var panicStepDef = flicker.Define(
 	"panic_step",
 	"v1",
-	func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+	func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 		return &panicStepWorkflow{wc: wc}
 	},
 )
@@ -37,14 +39,14 @@ type panicExecuteWorkflow struct {
 	wc *flicker.WorkflowContext
 }
 
-func (w *panicExecuteWorkflow) Execute(_ context.Context, _ struct{}) error {
+func (w *panicExecuteWorkflow) Execute(_ context.Context, _ struct{}) (struct{}, error) {
 	panic("execute exploded")
 }
 
 var panicExecuteDef = flicker.Define(
 	"panic_execute",
 	"v1",
-	func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+	func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 		return &panicExecuteWorkflow{wc: wc}
 	},
 )

@@ -18,13 +18,15 @@ type cancelWorkflow struct {
 	stepRan *bool
 }
 
-func (w *cancelWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *cancelWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "step_one", func(ctx context.Context) (*string, error) {
 		*w.stepRan = true
 		return flicker.Val("done"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 // --- Tests ---
@@ -53,7 +55,7 @@ func TestCancel_SignalBeforeExecution(t *testing.T) {
 	cancelDef := flicker.Define(
 		"cancel_test",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &cancelWorkflow{wc: wc, stepRan: &stepRan}
 		},
 	)
@@ -105,7 +107,7 @@ func TestCancel_SignalDuringExecution(t *testing.T) {
 	multiStepDef := flicker.Define(
 		"cancel_multi",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &cancelMultiWorkflow{wc: wc, store: store, step2Ran: &step2Ran}
 		},
 	)
@@ -133,7 +135,9 @@ type cancelMultiWorkflow struct {
 	step2Ran *bool
 }
 
-func (w *cancelMultiWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *cancelMultiWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	// Step 1 runs and sets the cancel signal as a side effect.
 	_, err := flicker.Run(ctx, w.wc, "step_one", func(ctx context.Context) (*string, error) {
 		// Set cancel signal mid-execution.
@@ -141,7 +145,7 @@ func (w *cancelMultiWorkflow) Execute(ctx context.Context, _ struct{}) error {
 		return flicker.Val("step1_done"), nil
 	})
 	if err != nil {
-		return err
+		return zero, err
 	}
 
 	// Step 2 should detect the signal and return ErrCancelled.
@@ -150,7 +154,7 @@ func (w *cancelMultiWorkflow) Execute(ctx context.Context, _ struct{}) error {
 		return flicker.Val("step2_done"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 func TestCancel_ErrCancelledSentinel(t *testing.T) {
@@ -181,7 +185,7 @@ func TestCancel_NoRetryOnCancel(t *testing.T) {
 	cancelDef := flicker.Define(
 		"cancel_noretry",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			stepRan := false
 			return &cancelWorkflow{wc: wc, stepRan: &stepRan}
 		},

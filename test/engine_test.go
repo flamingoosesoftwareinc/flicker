@@ -94,7 +94,7 @@ func TestEngine_StartWithPoolAndTrigger(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for the workflow to suspend (steps 1-2 execute, SleepUntil fires).
-	awaitStatus(t, ctx, wf, flicker.StatusSuspended, 2*time.Second)
+	awaitStatus(t, ctx, wf.Instance, flicker.StatusSuspended, 2*time.Second)
 
 	// Verify steps 1-2 ran, step 3 did not.
 	require.Equal(t, 1, calls.Get("/users/cust-1"))
@@ -105,7 +105,7 @@ func TestEngine_StartWithPoolAndTrigger(t *testing.T) {
 	clock.Advance(2 * time.Hour)
 
 	// Wait for the workflow to complete (trigger promotes, scheduler re-executes).
-	awaitStatus(t, ctx, wf, flicker.StatusCompleted, 2*time.Second)
+	awaitStatus(t, ctx, wf.Instance, flicker.StatusCompleted, 2*time.Second)
 
 	// Steps 1-2 cached, steps 3-4 executed.
 	require.Equal(t, 1, calls.Get("/users/cust-1"), "fetch_user should still be 1 (cached)")

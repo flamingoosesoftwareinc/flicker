@@ -10,22 +10,26 @@ import (
 type definition interface {
 	defName() string
 	defVersion() string
-	executeWorkflow(ctx context.Context, wc *WorkflowContext, payload []byte) error
+	executeWorkflow(
+		ctx context.Context,
+		wc *WorkflowContext,
+		payload []byte,
+	) (json.RawMessage, error)
 }
 
 // WorkflowDef ties a workflow type to its identity and constructor.
-type WorkflowDef[R any] struct {
+type WorkflowDef[R, Resp any] struct {
 	name    string
 	version string
-	factory func(*WorkflowContext) Workflow[R]
+	factory func(*WorkflowContext) Workflow[R, Resp]
 }
 
 // Define creates a workflow definition with an explicit name and version.
-func Define[R any](
+func Define[R, Resp any](
 	name, version string,
-	factory func(*WorkflowContext) Workflow[R],
-) *WorkflowDef[R] {
-	return &WorkflowDef[R]{
+	factory func(*WorkflowContext) Workflow[R, Resp],
+) *WorkflowDef[R, Resp] {
+	return &WorkflowDef[R, Resp]{
 		name:    name,
 		version: version,
 		factory: factory,
@@ -35,7 +39,7 @@ func Define[R any](
 // Register adds this workflow definition to the engine and returns a
 // Factory that can submit new instances. This is the only way to submit
 // workflows — the engine and identity are bound at registration.
-func (d *WorkflowDef[R]) Register(e *Engine, policy ...RetryPolicy) *Factory[R] {
+func (d *WorkflowDef[R, Resp]) Register(e *Engine, policy ...RetryPolicy) *Factory[R, Resp] {
 	p := DefaultRetryPolicy()
 	if len(policy) > 0 {
 		p = policy[0]
@@ -43,44 +47,54 @@ func (d *WorkflowDef[R]) Register(e *Engine, policy ...RetryPolicy) *Factory[R] 
 
 	e.register(d, p)
 
-	return &Factory[R]{
+	return &Factory[R, Resp]{
 		def:    d,
 		engine: e,
 	}
 }
 
-func (d *WorkflowDef[R]) defName() string {
+func (d *WorkflowDef[R, Resp]) defName() string {
 	return d.name + ":" + d.version
 }
 
-func (d *WorkflowDef[R]) defVersion() string {
+func (d *WorkflowDef[R, Resp]) defVersion() string {
 	return d.version
 }
 
-func (d *WorkflowDef[R]) executeWorkflow(
+func (d *WorkflowDef[R, Resp]) executeWorkflow(
 	ctx context.Context,
 	wc *WorkflowContext,
 	payload []byte,
-) error {
+) (json.RawMessage, error) {
 	var req R
 	if err := json.Unmarshal(payload, &req); err != nil {
-		return fmt.Errorf("unmarshal request: %w", err)
+		return nil, fmt.Errorf("unmarshal request: %w", err)
 	}
 
 	wf := d.factory(wc)
 
-	return wf.Execute(ctx, req)
+	resp, err := wf.Execute(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	result, marshalErr := json.Marshal(resp)
+	if marshalErr != nil {
+		return nil, fmt.Errorf("marshal result: %w", marshalErr)
+	}
+
+	return result, nil
 }
 
 // Factory is a registered workflow type bound to an engine.
 // Use Submit to create new workflow instances.
-type Factory[R any] struct {
-	def    *WorkflowDef[R]
+type Factory[R, Resp any] struct {
+	def    *WorkflowDef[R, Resp]
 	engine *Engine
 }
 
-// Submit creates a new workflow instance and returns a handle to it.
-func (f *Factory[R]) Submit(ctx context.Context, request R) (*Instance, error) {
+// Submit creates a new workflow instance and returns a typed handle to it.
+func (f *Factory[R, Resp]) Submit(ctx context.Context, request R) (*TypedInstance[Resp], error) {
 	id := f.engine.generateID()
 
 	payload, err := json.Marshal(request)
@@ -98,13 +112,16 @@ func (f *Factory[R]) Submit(ctx context.Context, request R) (*Instance, error) {
 		return nil, fmt.Errorf("create workflow: %w", err)
 	}
 
-	return &Instance{
-		id:    id,
-		store: f.engine.store,
+	return &TypedInstance[Resp]{
+		Instance: &Instance{
+			id:    id,
+			store: f.engine.store,
+		},
 	}, nil
 }
 
-// Instance is a handle to a submitted workflow. Use it to query status.
+// Instance is a non-generic handle to a submitted workflow.
+// Use it for status checks, heterogeneous collections, and operational queries.
 type Instance struct {
 	id    string
 	store WorkflowStore
@@ -123,4 +140,55 @@ func (i *Instance) Status(ctx context.Context) (Status, error) {
 	}
 
 	return record.Status, nil
+}
+
+// RawResult returns the raw JSON result of the workflow, or nil if not completed.
+func (i *Instance) RawResult(ctx context.Context) (json.RawMessage, error) {
+	record, err := i.store.Get(ctx, i.id)
+	if err != nil {
+		return nil, fmt.Errorf("get workflow: %w", err)
+	}
+
+	return record.Result, nil
+}
+
+// WorkflowResult is a typed result container with workflow metadata.
+type WorkflowResult[Resp any] struct {
+	ID       string
+	Type     string
+	Version  string
+	Status   Status
+	Response Resp
+	Error    string
+}
+
+// TypedInstance is a generic handle to a submitted workflow that can
+// deserialize the result into the response type.
+type TypedInstance[Resp any] struct {
+	*Instance
+}
+
+// Result returns the full workflow result with metadata and typed response.
+// The Response field is only meaningful when Status is StatusCompleted.
+func (i *TypedInstance[Resp]) Result(ctx context.Context) (*WorkflowResult[Resp], error) {
+	record, err := i.store.Get(ctx, i.id)
+	if err != nil {
+		return nil, fmt.Errorf("get workflow: %w", err)
+	}
+
+	result := &WorkflowResult[Resp]{
+		ID:      record.ID,
+		Type:    record.Type,
+		Version: record.Version,
+		Status:  record.Status,
+		Error:   record.Error,
+	}
+
+	if record.Status == StatusCompleted && len(record.Result) > 0 {
+		if err := json.Unmarshal(record.Result, &result.Response); err != nil {
+			return nil, fmt.Errorf("unmarshal result: %w", err)
+		}
+	}
+
+	return result, nil
 }

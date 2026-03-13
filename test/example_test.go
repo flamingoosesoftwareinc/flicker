@@ -96,7 +96,7 @@ func TestGreetingWorkflow_StepCaching(t *testing.T) {
 	record, err := store.Get(ctx, wf.ID())
 	require.NoError(t, err)
 
-	err = store.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, record.OCCVersion)
+	err = store.UpdateStatus(ctx, wf.ID(), flicker.StatusPending, nil, record.OCCVersion)
 	require.NoError(t, err)
 
 	// Second run — steps should return cached results despite time advancing.

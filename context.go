@@ -6,34 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
-// StopOption is a functional option for Stop().
-type StopOption func(*stopConfig)
-
-type stopConfig struct {
-	err error
-}
-
-// WithError marks the stop as a permanent failure with the given error.
-func WithError(err error) StopOption {
-	return func(c *stopConfig) {
-		c.err = err
-	}
-}
-
 // WorkflowContext is the framework handle embedded by workflow structs.
-// Workflows see Stop(), Log(), Time, ID, SleepUntil, and Scope — nothing else.
+// Workflows see Log(), Time, ID, SleepUntil, and Scope — nothing else.
 type WorkflowContext struct {
 	id        string
 	wfType    string
 	version   string
 	store     WorkflowStore
 	logger    *slog.Logger
-	stopped   atomic.Bool
-	stopCfg   stopConfig
 	seenSteps map[string]struct{}
 	stepCache map[string]*StepResult
 	nowFn     func() time.Time
@@ -56,39 +39,6 @@ type WorkflowContext struct {
 // WorkflowID returns the workflow instance ID.
 func (wc *WorkflowContext) WorkflowID() string {
 	return wc.id
-}
-
-// Stop signals that the workflow should stop. Call return after Stop().
-// With no options: clean completion. With WithError: permanent failure.
-func (wc *WorkflowContext) Stop(opts ...StopOption) {
-	target := wc
-	if wc.root != nil {
-		target = wc.root
-	}
-
-	target.stopped.Store(true)
-
-	for _, opt := range opts {
-		opt(&target.stopCfg)
-	}
-}
-
-// Stopped returns true if Stop was called.
-func (wc *WorkflowContext) Stopped() bool {
-	if wc.root != nil {
-		return wc.root.stopped.Load()
-	}
-
-	return wc.stopped.Load()
-}
-
-// StopError returns the error passed to Stop via WithError, or nil.
-func (wc *WorkflowContext) StopError() error {
-	if wc.root != nil {
-		return wc.root.stopCfg.err
-	}
-
-	return wc.stopCfg.err
 }
 
 // Log writes a structured log message using slog key-value style.

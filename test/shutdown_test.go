@@ -44,7 +44,7 @@ func TestShutdown_InFlightWorkflowCompletes(t *testing.T) {
 	slowDef := flicker.Define(
 		"slow",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &slowWorkflow{wc: wc, executed: &stepExecuted, started: stepStarted}
 		},
 	)
@@ -116,7 +116,7 @@ func TestShutdown_DrainTimeoutForceKillsInFlight(t *testing.T) {
 	factory := flicker.Define(
 		"hanging",
 		"v1",
-		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}] {
+		func(wc *flicker.WorkflowContext) flicker.Workflow[struct{}, struct{}] {
 			return &hangingWorkflow{
 				wc:              wc,
 				started:         stepStarted,
@@ -165,7 +165,9 @@ type slowWorkflow struct {
 	started  chan struct{}
 }
 
-func (w *slowWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *slowWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "slow_step", func(_ context.Context) (*string, error) {
 		close(w.started)
 		time.Sleep(200 * time.Millisecond)
@@ -173,7 +175,7 @@ func (w *slowWorkflow) Execute(ctx context.Context, _ struct{}) error {
 		return flicker.Val("completed"), nil
 	})
 
-	return err
+	return zero, err
 }
 
 // hangingWorkflow simulates a step that blocks on the context (like an HTTP
@@ -184,7 +186,9 @@ type hangingWorkflow struct {
 	ctxWasCancelled *atomic.Bool
 }
 
-func (w *hangingWorkflow) Execute(ctx context.Context, _ struct{}) error {
+func (w *hangingWorkflow) Execute(ctx context.Context, _ struct{}) (struct{}, error) {
+	var zero struct{}
+
 	_, err := flicker.Run(ctx, w.wc, "hanging_step", func(ctx context.Context) (*string, error) {
 		close(w.started)
 		// Block until force-cancelled.
@@ -193,5 +197,5 @@ func (w *hangingWorkflow) Execute(ctx context.Context, _ struct{}) error {
 		return nil, ctx.Err()
 	})
 
-	return err
+	return zero, err
 }

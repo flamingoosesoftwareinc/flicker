@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -69,6 +70,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			status      TEXT NOT NULL DEFAULT 'pending',
 			signal      TEXT NOT NULL DEFAULT '',
 			payload     BLOB,
+			result      BLOB,
 			error       TEXT NOT NULL DEFAULT '',
 			retry_after TEXT NOT NULL DEFAULT '',
 			attempts    INTEGER NOT NULL DEFAULT 0,
@@ -126,14 +128,15 @@ func (s *Store) Create(ctx context.Context, record *flicker.WorkflowRecord) erro
 
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO workflows (id, type, version, status, signal, payload, error, retry_after, attempts, occ_version, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO workflows (id, type, version, status, signal, payload, result, error, retry_after, attempts, occ_version, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.ID,
 		record.Type,
 		record.Version,
 		record.Status,
 		record.Signal,
 		record.Payload,
+		record.Result,
 		record.Error,
 		formatTime(record.RetryAfter),
 		record.Attempts,
@@ -151,7 +154,7 @@ func (s *Store) Create(ctx context.Context, record *flicker.WorkflowRecord) erro
 func (s *Store) Get(ctx context.Context, id string) (*flicker.WorkflowRecord, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, type, version, status, signal, payload, error, retry_after, attempts, occ_version, created_at, updated_at
+		`SELECT id, type, version, status, signal, payload, result, error, retry_after, attempts, occ_version, created_at, updated_at
 		 FROM workflows WHERE id = ?`,
 		id,
 	)
@@ -163,12 +166,13 @@ func (s *Store) UpdateStatus(
 	ctx context.Context,
 	id string,
 	status flicker.Status,
+	result json.RawMessage,
 	occVersion int,
 ) error {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE workflows SET status = ?, occ_version = occ_version + 1, updated_at = ?
+		`UPDATE workflows SET status = ?, result = ?, occ_version = occ_version + 1, updated_at = ?
 		 WHERE id = ? AND occ_version = ?`,
-		status, formatTime(s.now()), id, occVersion,
+		status, result, formatTime(s.now()), id, occVersion,
 	)
 	if err != nil {
 		return fmt.Errorf("update status: %w", err)
@@ -267,7 +271,7 @@ func (s *Store) PromoteSuspended(ctx context.Context, now time.Time) (int, error
 func (s *Store) ListSchedulable(ctx context.Context, limit int) ([]*flicker.WorkflowRecord, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, type, version, status, signal, payload, error, retry_after, attempts, occ_version, created_at, updated_at
+		`SELECT id, type, version, status, signal, payload, result, error, retry_after, attempts, occ_version, created_at, updated_at
 		 FROM workflows
 		 WHERE status = ? AND (retry_after = '' OR retry_after <= ?)
 		 ORDER BY created_at ASC
@@ -644,6 +648,7 @@ type scannable interface {
 func scanWorkflow(row scannable) (*flicker.WorkflowRecord, error) {
 	var (
 		r          flicker.WorkflowRecord
+		result     sql.NullString
 		retryAfter string
 		createdAt  string
 		updatedAt  string
@@ -651,9 +656,12 @@ func scanWorkflow(row scannable) (*flicker.WorkflowRecord, error) {
 
 	err := row.Scan(
 		&r.ID, &r.Type, &r.Version, &r.Status, &r.Signal,
-		&r.Payload, &r.Error, &retryAfter, &r.Attempts,
+		&r.Payload, &result, &r.Error, &retryAfter, &r.Attempts,
 		&r.OCCVersion, &createdAt, &updatedAt,
 	)
+	if result.Valid {
+		r.Result = json.RawMessage(result.String)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("scan workflow: %w", err)
 	}
