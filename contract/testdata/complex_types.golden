@@ -1,0 +1,182 @@
+[
+  {
+    "name": "complex-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "ComplexRequest",
+      "pkg": "testdata/complex_types",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "UserID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "user_id"
+        },
+        {
+          "name": "Items",
+          "type": {
+            "name": "[]OrderItem",
+            "kind": "slice",
+            "elem": {
+              "name": "OrderItem",
+              "pkg": "testdata/complex_types",
+              "kind": "struct",
+              "fields": [
+                {
+                  "name": "SKU",
+                  "type": {
+                    "name": "string",
+                    "kind": "string"
+                  },
+                  "json_tag": "sku"
+                },
+                {
+                  "name": "Quantity",
+                  "type": {
+                    "name": "int",
+                    "kind": "int"
+                  },
+                  "json_tag": "quantity"
+                }
+              ]
+            }
+          },
+          "json_tag": "items"
+        },
+        {
+          "name": "Metadata",
+          "type": {
+            "name": "map[string]string",
+            "kind": "map",
+            "elem": {
+              "name": "string",
+              "kind": "string"
+            },
+            "key": {
+              "name": "string",
+              "kind": "string"
+            }
+          },
+          "json_tag": "metadata"
+        },
+        {
+          "name": "Address",
+          "type": {
+            "name": "*Address",
+            "kind": "pointer",
+            "elem": {
+              "name": "Address",
+              "pkg": "testdata/complex_types",
+              "kind": "struct",
+              "fields": [
+                {
+                  "name": "Street",
+                  "type": {
+                    "name": "string",
+                    "kind": "string"
+                  },
+                  "json_tag": "street"
+                },
+                {
+                  "name": "City",
+                  "type": {
+                    "name": "string",
+                    "kind": "string"
+                  },
+                  "json_tag": "city"
+                }
+              ]
+            }
+          },
+          "json_tag": "address"
+        },
+        {
+          "name": "CreatedAt",
+          "type": {
+            "name": "Time",
+            "pkg": "time",
+            "kind": "struct"
+          },
+          "json_tag": "created_at"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "ComplexResponse",
+      "pkg": "testdata/complex_types",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Results",
+          "type": {
+            "name": "[]string",
+            "kind": "slice",
+            "elem": {
+              "name": "string",
+              "kind": "string"
+            }
+          },
+          "json_tag": "results"
+        },
+        {
+          "name": "Total",
+          "type": {
+            "name": "int",
+            "kind": "int"
+          },
+          "json_tag": "total"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "process-items",
+        "kind": "literal",
+        "type": {
+          "name": "ItemResult",
+          "pkg": "testdata/complex_types",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "SKU",
+              "type": {
+                "name": "string",
+                "kind": "string"
+              },
+              "json_tag": "sku"
+            },
+            {
+              "name": "Status",
+              "type": {
+                "name": "string",
+                "kind": "string"
+              },
+              "json_tag": "status"
+            }
+          ]
+        },
+        "step_type": "run"
+      },
+      {
+        "name": "aggregate",
+        "kind": "literal",
+        "type": {
+          "name": "map[string]int",
+          "kind": "map",
+          "elem": {
+            "name": "int",
+            "kind": "int"
+          },
+          "key": {
+            "name": "string",
+            "kind": "string"
+          }
+        },
+        "step_type": "run"
+      }
+    ]
+  }
+]

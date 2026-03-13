@@ -1,0 +1,73 @@
+[
+  {
+    "name": "parallel-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/parallel",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "ID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/parallel",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OK",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "ok"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "_parallel",
+        "kind": "provider",
+        "step_type": "parallel",
+        "branches": [
+          {
+            "name": "fetch-user",
+            "steps": [
+              {
+                "name": "call-api",
+                "kind": "literal",
+                "type": {
+                  "name": "string",
+                  "kind": "string"
+                },
+                "step_type": "run"
+              }
+            ]
+          },
+          {
+            "name": "check-inventory",
+            "steps": [
+              {
+                "name": "query-db",
+                "kind": "literal",
+                "type": {
+                  "name": "int",
+                  "kind": "int"
+                },
+                "step_type": "run"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

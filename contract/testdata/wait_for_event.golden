@@ -1,0 +1,66 @@
+[
+  {
+    "name": "approval-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "ApprovalRequest",
+      "pkg": "testdata/wait_for_event",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "ItemID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "item_id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "ApprovalResponse",
+      "pkg": "testdata/wait_for_event",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Approved",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "approved"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "wait-approval",
+        "kind": "literal",
+        "type": {
+          "name": "ApprovalEvent",
+          "pkg": "testdata/wait_for_event",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "ApprovedBy",
+              "type": {
+                "name": "string",
+                "kind": "string"
+              },
+              "json_tag": "approved_by"
+            },
+            {
+              "name": "Decision",
+              "type": {
+                "name": "bool",
+                "kind": "bool"
+              },
+              "json_tag": "decision"
+            }
+          ]
+        },
+        "step_type": "wait_for_event"
+      }
+    ]
+  }
+]

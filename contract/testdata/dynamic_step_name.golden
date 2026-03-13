@@ -1,0 +1,50 @@
+[
+  {
+    "name": "dynamic-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/dynamic_step_name",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Name",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "name"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/dynamic_step_name",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OK",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "ok"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "\u003cdynamic\u003e",
+        "kind": "dynamic",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      }
+    ],
+    "errors": [
+      "step name is not a string literal or constant: \u003cdynamic\u003e"
+    ]
+  }
+]

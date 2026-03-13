@@ -1,0 +1,40 @@
+[
+  {
+    "name": "unresolved-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/unresolvable_factory",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "ID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/unresolvable_factory",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OK",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "ok"
+        }
+      ]
+    },
+    "steps": null,
+    "errors": [
+      "factory argument is not a function literal (got *ast.Ident)"
+    ]
+  }
+]

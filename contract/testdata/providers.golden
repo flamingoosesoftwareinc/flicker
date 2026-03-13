@@ -1,0 +1,59 @@
+[
+  {
+    "name": "provider-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/providers",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Name",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "name"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/providers",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "ID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "id"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "_id.new:*",
+        "kind": "provider",
+        "step_type": "provider"
+      }
+    ],
+    "providers": [
+      {
+        "prefix": "entropy",
+        "type": {
+          "name": "int",
+          "kind": "int"
+        }
+      },
+      {
+        "prefix": "request-id",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        }
+      }
+    ]
+  }
+]

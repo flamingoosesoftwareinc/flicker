@@ -1,0 +1,92 @@
+[
+  {
+    "name": "order-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "OrderRequest",
+      "pkg": "testdata/multiple_workflows",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OrderID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "order_id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "OrderResponse",
+      "pkg": "testdata/multiple_workflows",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Status",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "status"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "process-order",
+        "kind": "literal",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      }
+    ]
+  },
+  {
+    "name": "shipping-workflow",
+    "version": "v2",
+    "request_type": {
+      "name": "ShipRequest",
+      "pkg": "testdata/multiple_workflows",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "TrackingID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "tracking_id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "ShipResponse",
+      "pkg": "testdata/multiple_workflows",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Shipped",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "shipped"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "ship-item",
+        "kind": "literal",
+        "type": {
+          "name": "bool",
+          "kind": "bool"
+        },
+        "step_type": "run"
+      }
+    ]
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "name": "const-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/const_step_name",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Value",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "value"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/const_step_name",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Valid",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "valid"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "validate-input",
+        "kind": "constant",
+        "type": {
+          "name": "bool",
+          "kind": "bool"
+        },
+        "step_type": "run"
+      }
+    ]
+  }
+]

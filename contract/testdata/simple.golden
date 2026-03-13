@@ -1,0 +1,77 @@
+[
+  {
+    "name": "order-process",
+    "version": "v1",
+    "request_type": {
+      "name": "OrderRequest",
+      "pkg": "testdata/simple",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OrderID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "order_id"
+        },
+        {
+          "name": "Amount",
+          "type": {
+            "name": "int",
+            "kind": "int"
+          },
+          "json_tag": "amount"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "OrderResponse",
+      "pkg": "testdata/simple",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Confirmed",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "confirmed"
+        },
+        {
+          "name": "Message",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "message"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "_time.now:*",
+        "kind": "provider",
+        "step_type": "provider"
+      },
+      {
+        "name": "validate-order",
+        "kind": "literal",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      },
+      {
+        "name": "charge-payment",
+        "kind": "literal",
+        "type": {
+          "name": "bool",
+          "kind": "bool"
+        },
+        "step_type": "run"
+      }
+    ]
+  }
+]

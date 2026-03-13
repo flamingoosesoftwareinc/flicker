@@ -1,0 +1,58 @@
+[
+  {
+    "name": "sleep-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/sleep_until",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Delay",
+          "type": {
+            "name": "Duration",
+            "pkg": "time",
+            "kind": "int64"
+          },
+          "json_tag": "delay"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/sleep_until",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Done",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "done"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "_time.now:*",
+        "kind": "provider",
+        "step_type": "provider"
+      },
+      {
+        "name": "_sleep.until:*",
+        "kind": "provider",
+        "step_type": "sleep_until"
+      },
+      {
+        "name": "after-sleep",
+        "kind": "literal",
+        "type": {
+          "name": "bool",
+          "kind": "bool"
+        },
+        "step_type": "run"
+      }
+    ]
+  }
+]
