@@ -248,7 +248,7 @@ func (s *Store) PromoteSuspended(ctx context.Context, now time.Time) (int, error
 		`UPDATE workflows SET status = ?, retry_after = '', occ_version = occ_version + 1, updated_at = ?
 		 WHERE status = ? AND retry_after != '' AND retry_after <= ?`,
 		flicker.StatusPending,
-		formatTime(s.now()),
+		formatTime(now),
 		flicker.StatusSuspended,
 		formatTime(now),
 	)
@@ -539,7 +539,7 @@ func (s *Store) TimeOutSubscriptions(ctx context.Context, now time.Time) (int, e
 			sub.workflowID,
 			sub.stepName,
 			"event_timeout",
-			formatTime(s.now()),
+			formatTime(now),
 		)
 		if err != nil {
 			return 0, fmt.Errorf("save timeout marker: %w", err)
@@ -560,7 +560,7 @@ func (s *Store) TimeOutSubscriptions(ctx context.Context, now time.Time) (int, e
 			`UPDATE workflows SET status = ?, retry_after = '', occ_version = occ_version + 1, updated_at = ?
 			 WHERE id = ? AND status = ?`,
 			flicker.StatusPending,
-			formatTime(s.now()),
+			formatTime(now),
 			sub.workflowID,
 			flicker.StatusSuspended,
 		)
