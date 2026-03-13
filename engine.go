@@ -157,6 +157,22 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		}
 	}
 
+	// Default runner executes workflows in-process.
+	if e.runner == nil {
+		e.runner = &LocalRunner{
+			registry: e.registry,
+			store:    e.store,
+			logger:   e.logger,
+			nowFunc:  e.nowFunc,
+			idFunc:   e.idFunc,
+		}
+	}
+
+	// Default worker pool backed by pond.
+	if e.pool == nil {
+		e.pool = NewPondPool(e.workers)
+	}
+
 	return e
 }
 
@@ -171,30 +187,9 @@ func (e *Engine) register(def definition, policy RetryPolicy) {
 	}
 }
 
-// getRunner returns the configured runner, or builds a LocalRunner.
-func (e *Engine) getRunner() Runner {
-	if e.runner != nil {
-		return e.runner
-	}
-
-	return &LocalRunner{
-		registry: e.registry,
-		store:    e.store,
-		logger:   e.logger,
-		nowFunc:  e.nowFunc,
-		idFunc:   e.idFunc,
-	}
-}
-
 // Start begins the scheduler + worker pool. It blocks until ctx is cancelled.
 // On cancellation, it waits for in-flight workflows to finish (up to drain timeout).
 func (e *Engine) Start(ctx context.Context) error {
-	pool := e.pool
-	if pool == nil {
-		pool = NewPondPool(e.workers)
-	}
-	runner := e.getRunner()
-
 	ready := func() {
 		select {
 		case e.nudge <- struct{}{}:
@@ -225,9 +220,9 @@ func (e *Engine) Start(ctx context.Context) error {
 	dispatch := func(records []*WorkflowRecord) {
 		for _, record := range records {
 			e.wg.Add(1)
-			pool.Submit(func() {
+			e.pool.Submit(func() {
 				defer e.wg.Done()
-				if err := runner.Run(drainCtx, record); err != nil {
+				if err := e.runner.Run(drainCtx, record); err != nil {
 					e.logger.Info("workflow execution failed",
 						"workflow_id", record.ID, "error", err)
 				}
@@ -251,7 +246,7 @@ func (e *Engine) Start(ctx context.Context) error {
 	drainTimer.Stop()
 
 	// Clean up the pool.
-	pool.StopAndWait()
+	e.pool.StopAndWait()
 
 	return nil
 }
@@ -286,15 +281,13 @@ func (e *Engine) SendEvent(ctx context.Context, correlationKey string, payload a
 
 // RunOnce executes a single poll cycle — useful for testing.
 func (e *Engine) RunOnce(ctx context.Context) error {
-	runner := e.getRunner()
-
 	records, err := e.store.ListSchedulable(ctx, e.workers)
 	if err != nil {
 		return fmt.Errorf("list schedulable: %w", err)
 	}
 
 	for _, record := range records {
-		if err := runner.Run(ctx, record); err != nil {
+		if err := e.runner.Run(ctx, record); err != nil {
 			e.logger.Info("workflow execution failed", "workflow_id", record.ID, "error", err)
 		}
 	}
