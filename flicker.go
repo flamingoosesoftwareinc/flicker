@@ -2,6 +2,7 @@ package flicker
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -40,6 +41,10 @@ type RetryPolicy struct {
 	BaseDelay   time.Duration
 	MaxDelay    time.Duration
 }
+
+// ErrCancelled is returned when a workflow is cancelled via SignalCancelRequested.
+// It is a terminal error — the workflow will not be retried.
+var ErrCancelled = fmt.Errorf("workflow cancelled")
 
 // Val wraps a value in a pointer. Use in step functions that return
 // primitive types: return flicker.Val("hello"), nil

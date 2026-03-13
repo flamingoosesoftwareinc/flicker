@@ -1,0 +1,10 @@
+{
+  "workflow": {
+    "id": "wf-001",
+    "type": "cancel_test:v1",
+    "version": "v1",
+    "status": "cancelled",
+    "attempts": 0
+  },
+  "steps": null
+}

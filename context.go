@@ -34,6 +34,7 @@ type WorkflowContext struct {
 	stopped   atomic.Bool
 	stopCfg   stopConfig
 	seenSteps map[string]struct{}
+	stepCache map[string]*StepResult
 	nowFn     func() time.Time
 	sleep     *Provider[time.Time]
 
@@ -44,6 +45,11 @@ type WorkflowContext struct {
 	// ID provides durable ID generation. w.ID.New(ctx) returns a cached
 	// identifier that survives replay.
 	ID *IDProvider
+}
+
+// WorkflowID returns the workflow instance ID.
+func (wc *WorkflowContext) WorkflowID() string {
+	return wc.id
 }
 
 // Stop signals that the workflow should stop. Call return after Stop().

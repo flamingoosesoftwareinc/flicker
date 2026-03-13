@@ -66,6 +66,10 @@ type WorkflowStore interface {
 	) (*StepResult, error)
 	ListStepResults(ctx context.Context, wfType, version, workflowID string) ([]*StepResult, error)
 
+	// Signal management.
+	GetSignal(ctx context.Context, id string) (Signal, error)
+	SetSignal(ctx context.Context, id string, signal Signal) error
+
 	// Event subscriptions.
 	SaveSubscription(ctx context.Context, sub *Subscription) error
 	// ResumeSubscription delivers an event payload to the workflow waiting on

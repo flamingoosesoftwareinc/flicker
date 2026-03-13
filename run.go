@@ -26,10 +26,28 @@ func Run[T any](
 
 	wc.seenSteps[stepName] = struct{}{}
 
-	// Read-through: check cache.
-	cached, err := wc.store.GetStepResult(ctx, wc.wfType, wc.version, wc.id, stepName)
-	if err != nil && !errors.Is(err, ErrStepNotFound) {
-		return nil, fmt.Errorf("get step %q result: %w", stepName, err)
+	// Check cancellation signal before each step.
+	if wc.store != nil {
+		signal, sigErr := wc.store.GetSignal(ctx, wc.id)
+		if sigErr != nil {
+			return nil, fmt.Errorf("check signal for step %q: %w", stepName, sigErr)
+		}
+		if signal == SignalCancelRequested {
+			return nil, ErrCancelled
+		}
+	}
+
+	// Read-through: check prefetched cache first, then fall through to store.
+	var cached *StepResult
+	if wc.stepCache != nil {
+		cached = wc.stepCache[stepName]
+	}
+	if cached == nil {
+		var err error
+		cached, err = wc.store.GetStepResult(ctx, wc.wfType, wc.version, wc.id, stepName)
+		if err != nil && !errors.Is(err, ErrStepNotFound) {
+			return nil, fmt.Errorf("get step %q result: %w", stepName, err)
+		}
 	}
 	if cached != nil {
 		// Check for cached errors (e.g., event timeout markers).
@@ -44,8 +62,13 @@ func Run[T any](
 		return &dest, nil
 	}
 
-	// Cache miss — execute.
-	result, fnErr := fn(ctx)
+	// Cache miss — execute with panic recovery.
+	var result *T
+	fnErr := panicToError(func() error {
+		var innerErr error
+		result, innerErr = fn(ctx)
+		return innerErr
+	})
 	if fnErr != nil {
 		return nil, fnErr
 	}

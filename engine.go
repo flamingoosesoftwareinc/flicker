@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/alitto/pond/v2"
@@ -61,6 +62,30 @@ func WithNowFunc(fn func() time.Time) EngineOption {
 	}
 }
 
+// WithRunner sets a custom Runner for workflow execution.
+// Defaults to a LocalRunner created from the engine's configuration.
+func WithRunner(r Runner) EngineOption {
+	return func(e *Engine) {
+		e.runner = r
+	}
+}
+
+// WithScheduler sets a custom Scheduler for dispatching work.
+// Defaults to a PollingScheduler.
+func WithScheduler(s Scheduler) EngineOption {
+	return func(e *Engine) {
+		e.scheduler = s
+	}
+}
+
+// WithDrainTimeout sets the maximum time to wait for in-flight workflows
+// to complete during graceful shutdown. Defaults to 30 seconds.
+func WithDrainTimeout(d time.Duration) EngineOption {
+	return func(e *Engine) {
+		e.drainTimeout = d
+	}
+}
+
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
@@ -69,9 +94,13 @@ type Engine struct {
 	workers         int
 	pollInterval    time.Duration
 	promoteInterval time.Duration
+	drainTimeout    time.Duration
 	logger          *slog.Logger
 	idFunc          func() string
 	nowFunc         func() time.Time
+	runner          Runner
+	scheduler       Scheduler
+	wg              sync.WaitGroup
 }
 
 type registryEntry struct {
@@ -86,6 +115,7 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		registry:     make(map[string]registryEntry),
 		workers:      1,
 		pollInterval: time.Second,
+		drainTimeout: 30 * time.Second,
 		logger:       slog.Default(),
 		idFunc:       func() string { return uuid.New().String() },
 		nowFunc:      func() time.Time { return time.Now().UTC() },
@@ -102,10 +132,6 @@ func (e *Engine) generateID() string {
 	return e.idFunc()
 }
 
-func (e *Engine) now() time.Time {
-	return e.nowFunc()
-}
-
 func (e *Engine) register(def definition, policy RetryPolicy) {
 	e.registry[def.defName()] = registryEntry{
 		def:         def,
@@ -113,9 +139,26 @@ func (e *Engine) register(def definition, policy RetryPolicy) {
 	}
 }
 
+// getRunner returns the configured runner, or builds a LocalRunner.
+func (e *Engine) getRunner() Runner {
+	if e.runner != nil {
+		return e.runner
+	}
+
+	return &LocalRunner{
+		registry: e.registry,
+		store:    e.store,
+		logger:   e.logger,
+		nowFunc:  e.nowFunc,
+		idFunc:   e.idFunc,
+	}
+}
+
 // Start begins the scheduler + worker pool. It blocks until ctx is cancelled.
+// On cancellation, it waits for in-flight workflows to finish (up to drain timeout).
 func (e *Engine) Start(ctx context.Context) error {
 	pool := pond.NewPool(e.workers)
+	runner := e.getRunner()
 
 	// Launch built-in promotion loops as separate goroutines — they must
 	// not consume worker pool slots.
@@ -124,8 +167,48 @@ func (e *Engine) Start(ctx context.Context) error {
 		go subscriptionTimeoutLoop(ctx, e.promoteInterval, e.store, e.nowFunc, e.logger)
 	}
 
-	e.scheduler(ctx, pool)
+	// Build or use the configured scheduler.
+	sched := e.scheduler
+	if sched == nil {
+		sched = &PollingScheduler{
+			store:    e.store,
+			limit:    e.workers,
+			interval: e.pollInterval,
+		}
+	}
+
+	dispatch := func(records []*WorkflowRecord) {
+		for _, record := range records {
+			e.wg.Add(1)
+			pool.Submit(func() {
+				defer e.wg.Done()
+				if err := runner.Run(ctx, record); err != nil {
+					e.logger.Info("workflow execution failed",
+						"workflow_id", record.ID, "error", err)
+				}
+			})
+		}
+	}
+
+	_ = sched.Start(ctx, dispatch)
+
+	// Stop accepting new tasks.
 	pool.StopAndWait()
+
+	// Wait for in-flight workflows with drain timeout.
+	done := make(chan struct{})
+	go func() {
+		e.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// All in-flight workflows completed.
+	case <-time.After(e.drainTimeout):
+		e.logger.Info("drain timeout reached, some workflows may not have completed",
+			"timeout", e.drainTimeout)
+	}
 
 	return nil
 }
@@ -160,112 +243,18 @@ func (e *Engine) SendEvent(ctx context.Context, correlationKey string, payload a
 
 // RunOnce executes a single poll cycle — useful for testing.
 func (e *Engine) RunOnce(ctx context.Context) error {
+	runner := e.getRunner()
+
 	records, err := e.store.ListSchedulable(ctx, e.workers)
 	if err != nil {
 		return fmt.Errorf("list schedulable: %w", err)
 	}
 
 	for _, record := range records {
-		if err := e.executeWorkflow(ctx, record); err != nil {
+		if err := runner.Run(ctx, record); err != nil {
 			e.logger.Info("workflow execution failed", "workflow_id", record.ID, "error", err)
 		}
 	}
 
 	return nil
-}
-
-func (e *Engine) scheduler(ctx context.Context, pool pond.Pool) {
-	ticker := time.NewTicker(e.pollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			records, err := e.store.ListSchedulable(ctx, e.workers)
-			if err != nil {
-				e.logger.Info("poll failed", "error", err)
-
-				continue
-			}
-
-			for _, record := range records {
-				pool.Submit(func() {
-					if err := e.executeWorkflow(ctx, record); err != nil {
-						e.logger.Info("workflow execution failed",
-							"workflow_id", record.ID, "error", err)
-					}
-				})
-			}
-		}
-	}
-}
-
-func (e *Engine) executeWorkflow(ctx context.Context, record *WorkflowRecord) error {
-	entry, ok := e.registry[record.Type]
-	if !ok {
-		return fmt.Errorf("no definition registered for %q", record.Type)
-	}
-
-	// Transition to running.
-	if err := e.store.UpdateStatus(ctx, record.ID, StatusRunning, record.OCCVersion); err != nil {
-		return fmt.Errorf("set running: %w", err)
-	}
-
-	occAfterRunning := record.OCCVersion + 1
-
-	// Create the workflow context — fully initialized before the factory sees it.
-	wc := &WorkflowContext{
-		id:        record.ID,
-		wfType:    record.Type,
-		version:   record.Version,
-		store:     e.store,
-		logger:    e.logger,
-		nowFn:     e.nowFunc,
-		seenSteps: make(map[string]struct{}),
-	}
-	wc.Time = NewTimeProvider(wc, e.nowFunc)
-	wc.ID = NewIDProvider(wc, e.idFunc)
-
-	execErr := entry.def.executeWorkflow(ctx, wc, record.Payload)
-
-	return e.resolveOutcome(ctx, record, entry, occAfterRunning, wc, execErr)
-}
-
-func (e *Engine) resolveOutcome(
-	ctx context.Context,
-	record *WorkflowRecord,
-	entry registryEntry,
-	occVersion int,
-	wc *WorkflowContext,
-	execErr error,
-) error {
-	// Check if Stop was called.
-	if wc.Stopped() {
-		if stopErr := wc.StopError(); stopErr != nil {
-			return e.store.SetError(ctx, record.ID, StatusFailed, stopErr.Error(), occVersion)
-		}
-
-		return e.store.UpdateStatus(ctx, record.ID, StatusCompleted, occVersion)
-	}
-
-	if execErr != nil {
-		if se, ok := IsSuspend(execErr); ok {
-			return e.store.Suspend(ctx, record.ID, se.ResumeAt, occVersion)
-		}
-
-		if record.Attempts+1 >= entry.retryPolicy.MaxAttempts {
-			return e.store.SetError(ctx, record.ID, StatusFailed, execErr.Error(), occVersion)
-		}
-
-		delay := entry.retryPolicy.BaseDelay << record.Attempts
-		if delay > entry.retryPolicy.MaxDelay {
-			delay = entry.retryPolicy.MaxDelay
-		}
-
-		return e.store.SetRetry(ctx, record.ID, e.now().Add(delay), occVersion)
-	}
-
-	return e.store.UpdateStatus(ctx, record.ID, StatusCompleted, occVersion)
 }

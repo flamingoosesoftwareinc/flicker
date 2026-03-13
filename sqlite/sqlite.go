@@ -353,6 +353,41 @@ func (s *Store) ListStepResults(
 	return results, rows.Err()
 }
 
+// --- Signal management ---
+
+func (s *Store) GetSignal(ctx context.Context, id string) (flicker.Signal, error) {
+	var signal flicker.Signal
+	err := s.db.QueryRowContext(ctx,
+		`SELECT signal FROM workflows WHERE id = ?`, id,
+	).Scan(&signal)
+	if err != nil {
+		return "", fmt.Errorf("get signal: %w", err)
+	}
+
+	return signal, nil
+}
+
+func (s *Store) SetSignal(ctx context.Context, id string, signal flicker.Signal) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE workflows SET signal = ?, updated_at = ? WHERE id = ?`,
+		signal, formatTime(s.now()), id,
+	)
+	if err != nil {
+		return fmt.Errorf("set signal: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+
+	if n == 0 {
+		return fmt.Errorf("workflow %q not found", id)
+	}
+
+	return nil
+}
+
 // --- Event subscriptions ---
 
 // ErrSubscriptionNotFound is returned when no subscription exists for a
