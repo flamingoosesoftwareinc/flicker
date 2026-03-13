@@ -177,12 +177,18 @@ func (e *Engine) Start(ctx context.Context) error {
 		}
 	}
 
+	// drainCtx outlives the engine ctx — it gives in-flight workflows time
+	// to finish (e.g., complete HTTP calls) after the engine stops accepting
+	// new work. Force-cancelled when the drain timeout expires.
+	drainCtx, drainCancel := context.WithCancel(context.Background())
+	defer drainCancel()
+
 	dispatch := func(records []*WorkflowRecord) {
 		for _, record := range records {
 			e.wg.Add(1)
 			pool.Submit(func() {
 				defer e.wg.Done()
-				if err := runner.Run(ctx, record); err != nil {
+				if err := runner.Run(drainCtx, record); err != nil {
 					e.logger.Info("workflow execution failed",
 						"workflow_id", record.ID, "error", err)
 				}
@@ -192,23 +198,21 @@ func (e *Engine) Start(ctx context.Context) error {
 
 	_ = sched.Start(ctx, dispatch)
 
-	// Stop accepting new tasks.
-	pool.StopAndWait()
-
-	// Wait for in-flight workflows with drain timeout.
-	done := make(chan struct{})
-	go func() {
-		e.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// All in-flight workflows completed.
-	case <-time.After(e.drainTimeout):
-		e.logger.Info("drain timeout reached, some workflows may not have completed",
+	// Start drain timer — force-cancels in-flight workflows if they don't
+	// finish within the drain period.
+	drainTimer := time.AfterFunc(e.drainTimeout, func() {
+		e.logger.Info("drain timeout reached, force-cancelling in-flight workflows",
 			"timeout", e.drainTimeout)
-	}
+		drainCancel()
+	})
+
+	// Wait for all in-flight workflows to complete (either gracefully or
+	// because the drain timer force-cancelled their context).
+	e.wg.Wait()
+	drainTimer.Stop()
+
+	// Clean up the pool.
+	pool.StopAndWait()
 
 	return nil
 }
