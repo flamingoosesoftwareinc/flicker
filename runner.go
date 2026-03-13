@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -55,8 +56,10 @@ func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 		store:     r.store,
 		logger:    r.logger,
 		nowFn:     r.nowFunc,
+		idFn:      r.idFunc,
 		seenSteps: make(map[string]struct{}),
 		stepCache: stepCache,
+		mu:        &sync.Mutex{},
 	}
 	wc.Time = NewTimeProvider(wc, r.nowFunc)
 	wc.ID = NewIDProvider(wc, r.idFunc)

@@ -243,10 +243,14 @@ func (s *Store) Suspend(
 }
 
 func (s *Store) PromoteSuspended(ctx context.Context, now time.Time) (int, error) {
-	res, err := s.db.ExecContext(ctx,
-		`UPDATE workflows SET status = ?, occ_version = occ_version + 1, updated_at = ?
+	res, err := s.db.ExecContext(
+		ctx,
+		`UPDATE workflows SET status = ?, retry_after = '', occ_version = occ_version + 1, updated_at = ?
 		 WHERE status = ? AND retry_after != '' AND retry_after <= ?`,
-		flicker.StatusPending, formatTime(s.now()), flicker.StatusSuspended, formatTime(now),
+		flicker.StatusPending,
+		formatTime(s.now()),
+		flicker.StatusSuspended,
+		formatTime(now),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("promote suspended: %w", err)

@@ -16,15 +16,11 @@ func Run[T any](
 	stepName string,
 	fn func(context.Context) (*T, error),
 ) (*T, error) {
-	// Duplicate step name detection.
-	if _, seen := wc.seenSteps[stepName]; seen {
-		return nil, fmt.Errorf(
-			"duplicate step name %q: each step must have a unique name",
-			stepName,
-		)
-	}
+	stepName = wc.resolveStepName(stepName)
 
-	wc.seenSteps[stepName] = struct{}{}
+	if err := wc.trackStep(stepName); err != nil {
+		return nil, err
+	}
 
 	// Check cancellation signal before each step.
 	if wc.store != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -24,7 +25,7 @@ func WithError(err error) StopOption {
 }
 
 // WorkflowContext is the framework handle embedded by workflow structs.
-// Workflows see Stop(), Log(), Time, ID, and SleepUntil — nothing else.
+// Workflows see Stop(), Log(), Time, ID, SleepUntil, and Scope — nothing else.
 type WorkflowContext struct {
 	id        string
 	wfType    string
@@ -36,7 +37,12 @@ type WorkflowContext struct {
 	seenSteps map[string]struct{}
 	stepCache map[string]*StepResult
 	nowFn     func() time.Time
-	sleep     *Provider[time.Time]
+	idFn      func() string
+	prefix    string
+	root      *WorkflowContext // nil for root context, set for scoped children
+	mu        *sync.Mutex      // protects seenSteps during parallel execution
+
+	sleepCounter int // auto-incremented counter for SleepUntil step names
 
 	// Time provides durable time operations. w.Time.Now(ctx) returns a
 	// cached timestamp that survives replay.
@@ -55,20 +61,33 @@ func (wc *WorkflowContext) WorkflowID() string {
 // Stop signals that the workflow should stop. Call return after Stop().
 // With no options: clean completion. With WithError: permanent failure.
 func (wc *WorkflowContext) Stop(opts ...StopOption) {
-	wc.stopped.Store(true)
+	target := wc
+	if wc.root != nil {
+		target = wc.root
+	}
+
+	target.stopped.Store(true)
 
 	for _, opt := range opts {
-		opt(&wc.stopCfg)
+		opt(&target.stopCfg)
 	}
 }
 
 // Stopped returns true if Stop was called.
 func (wc *WorkflowContext) Stopped() bool {
+	if wc.root != nil {
+		return wc.root.stopped.Load()
+	}
+
 	return wc.stopped.Load()
 }
 
 // StopError returns the error passed to Stop via WithError, or nil.
 func (wc *WorkflowContext) StopError() error {
+	if wc.root != nil {
+		return wc.root.stopCfg.err
+	}
+
 	return wc.stopCfg.err
 }
 
@@ -79,31 +98,88 @@ func (wc *WorkflowContext) Log(msg string, args ...any) {
 	}
 }
 
+// resolveStepName prepends the scope prefix to a step name.
+func (wc *WorkflowContext) resolveStepName(name string) string {
+	if wc.prefix == "" {
+		return name
+	}
+
+	return wc.prefix + "/" + name
+}
+
+// trackStep records a step name and returns an error if it was already seen.
+// Thread-safe for use during parallel execution.
+func (wc *WorkflowContext) trackStep(name string) error {
+	wc.mu.Lock()
+	defer wc.mu.Unlock()
+
+	if _, seen := wc.seenSteps[name]; seen {
+		return fmt.Errorf(
+			"duplicate step name %q: each step must have a unique name",
+			name,
+		)
+	}
+
+	wc.seenSteps[name] = struct{}{}
+
+	return nil
+}
+
 // SleepUntil suspends the workflow until the given time. The resume time is
 // durably cached so it survives replay. On re-execution after promotion, if
 // the wall clock has passed the cached time, execution continues normally.
 func (wc *WorkflowContext) SleepUntil(ctx context.Context, resumeAt time.Time) error {
-	if wc.sleep == nil {
-		wc.sleep = NewProvider(
-			wc,
-			"_sleep.until",
-			func() (time.Time, error) { return resumeAt, nil },
-		)
-	}
+	wc.sleepCounter++
+	stepName := fmt.Sprintf("_sleep.until:%d", wc.sleepCounter)
 
-	// Update the generator to capture the current resumeAt value.
-	wc.sleep.gen = func() (time.Time, error) { return resumeAt, nil }
-
-	cached, err := wc.sleep.Get(ctx)
+	cached, err := Run(ctx, wc, stepName, func(_ context.Context) (*time.Time, error) {
+		return &resumeAt, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	if wc.nowFn().Before(cached) {
-		return &SuspendError{ResumeAt: cached}
+	if wc.nowFn().Before(*cached) {
+		return &SuspendError{ResumeAt: *cached}
 	}
 
 	return nil
+}
+
+// Scope creates a child WorkflowContext where all step names are prefixed
+// with the given name (e.g., "branch-a/step-name"). Use with Parallel for
+// deterministic parallel branches. The child shares seenSteps and stepCache
+// with the parent but has its own Time, ID, and sleep providers.
+func (wc *WorkflowContext) Scope(name string) *WorkflowContext {
+	prefix := name
+	if wc.prefix != "" {
+		prefix = wc.prefix + "/" + name
+	}
+
+	root := wc.root
+	if root == nil {
+		root = wc
+	}
+
+	child := &WorkflowContext{
+		id:        wc.id,
+		wfType:    wc.wfType,
+		version:   wc.version,
+		store:     wc.store,
+		logger:    wc.logger,
+		seenSteps: wc.seenSteps,
+		stepCache: wc.stepCache,
+		nowFn:     wc.nowFn,
+		idFn:      wc.idFn,
+		prefix:    prefix,
+		root:      root,
+		mu:        wc.mu,
+	}
+
+	child.Time = NewTimeProvider(child, wc.nowFn)
+	child.ID = NewIDProvider(child, wc.idFn)
+
+	return child
 }
 
 // WaitForEvent suspends the workflow until an external event with the given
@@ -121,6 +197,9 @@ func WaitForEvent[T any](
 	correlationKey string,
 	timeout time.Duration,
 ) (*T, error) {
+	// Resolve step name for the subscription — Run resolves separately.
+	resolvedName := wc.resolveStepName(stepName)
+
 	// Check if a result already exists (event delivered or timeout marker).
 	result, err := Run(ctx, wc, stepName, func(ctx context.Context) (*T, error) {
 		// No cached result — this is the first execution. Save a subscription
@@ -133,7 +212,7 @@ func WaitForEvent[T any](
 			WorkflowID:     wc.id,
 			Type:           wc.wfType,
 			Version:        wc.version,
-			StepName:       stepName,
+			StepName:       resolvedName,
 			CorrelationKey: correlationKey,
 			Deadline:       deadline,
 			CreatedAt:      wc.nowFn(),

@@ -1,0 +1,72 @@
+package flicker
+
+import (
+	"context"
+	"sync"
+)
+
+// Branch is a named parallel execution path within a workflow. The Name is
+// used as the scope prefix for all step names within the branch, ensuring
+// deterministic replay regardless of goroutine scheduling order.
+type Branch struct {
+	Name string
+	Run  func(ctx context.Context, wc *WorkflowContext) error
+}
+
+// Parallel executes branches concurrently, each in its own named scope.
+// All branches run to completion before Parallel returns.
+//
+// Error semantics:
+//   - If any branch returns a non-suspend error, the first such error is returned.
+//   - If all errors are SuspendErrors, the one with the latest ResumeAt is returned
+//     (so the workflow resumes after all branches can proceed).
+//   - If all branches succeed, returns nil.
+func Parallel(ctx context.Context, wc *WorkflowContext, branches ...Branch) error {
+	errs := make([]error, len(branches))
+
+	var wg sync.WaitGroup
+
+	for i, b := range branches {
+		wg.Add(1)
+
+		go func(idx int, branch Branch) {
+			defer wg.Done()
+
+			scope := wc.Scope(branch.Name)
+			errs[idx] = panicToError(func() error {
+				return branch.Run(ctx, scope)
+			})
+		}(i, b)
+	}
+
+	wg.Wait()
+
+	var latestSuspend *SuspendError
+	var firstErr error
+
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+
+		if se, ok := IsSuspend(err); ok {
+			if latestSuspend == nil || se.ResumeAt.After(latestSuspend.ResumeAt) {
+				latestSuspend = se
+			}
+		} else if firstErr == nil {
+			firstErr = err
+		}
+	}
+
+	// Non-suspend errors take priority — trigger retry.
+	if firstErr != nil {
+		return firstErr
+	}
+
+	// If any branch suspended, propagate the latest resume time.
+	if latestSuspend != nil {
+		return latestSuspend
+	}
+
+	return nil
+}
