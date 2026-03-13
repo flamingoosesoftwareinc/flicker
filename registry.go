@@ -112,6 +112,8 @@ func (f *Factory[R, Resp]) Submit(ctx context.Context, request R) (*TypedInstanc
 		return nil, fmt.Errorf("create workflow: %w", err)
 	}
 
+	f.engine.tel.recordSubmitted(ctx, f.def.defName(), f.def.version)
+
 	return &TypedInstance[Resp]{
 		Instance: &Instance{
 			id:    id,

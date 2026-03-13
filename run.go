@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Run executes a named durable step. On first execution, fn runs and
@@ -46,6 +47,15 @@ func Run[T any](
 		}
 	}
 	if cached != nil {
+		// Cache hit — record metric and optional span.
+		if wc.tel != nil {
+			wc.tel.recordStepExecuted(ctx, stepName, true)
+			if wc.tel.cacheHitSpans {
+				_, span := wc.tel.startStepSpan(ctx, stepName, true)
+				span.End()
+			}
+		}
+
 		// Check for cached errors (e.g., event timeout markers).
 		if cached.Error != "" {
 			return nil, cachedStepError(cached.Error)
@@ -58,16 +68,39 @@ func Run[T any](
 		return &dest, nil
 	}
 
-	// Cache miss — execute with panic recovery.
+	// Cache miss — execute with span and panic recovery.
+	start := time.Now()
+	stepCtx, span := ctx, noopSpan
+	if wc.tel != nil {
+		stepCtx, span = wc.tel.startStepSpan(ctx, stepName, false)
+	}
+
 	var result *T
 	fnErr := panicToError(func() error {
 		var innerErr error
-		result, innerErr = fn(ctx)
+		result, innerErr = fn(stepCtx)
 		return innerErr
 	})
+
+	if wc.tel != nil {
+		wc.tel.recordStepExecuted(ctx, stepName, false)
+		wc.tel.recordStepDuration(ctx, stepName, time.Since(start))
+	}
+
 	if fnErr != nil {
+		if _, ok := IsSuspend(fnErr); ok {
+			span.End()
+		} else {
+			if wc.tel != nil {
+				wc.tel.endSpanWithError(span, fnErr)
+			} else {
+				span.End()
+			}
+		}
 		return nil, fnErr
 	}
+
+	span.End()
 
 	// Write-through: cache successful result.
 	data, err := json.Marshal(result)

@@ -8,7 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flamingoosesoftwareinc/flicker/semconv"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // EngineOption configures the engine.
@@ -95,6 +98,42 @@ func WithPool(p WorkerPool) EngineOption {
 	}
 }
 
+// WithTracerProvider sets the OpenTelemetry TracerProvider used for workflow
+// and step spans. Defaults to the global provider (otel.GetTracerProvider),
+// which returns a noop if none is registered.
+func WithTracerProvider(tp trace.TracerProvider) EngineOption {
+	return func(e *Engine) {
+		e.tracerProvider = tp
+	}
+}
+
+// WithMeterProvider sets the OpenTelemetry MeterProvider used for workflow
+// and step metrics. Defaults to the global provider (otel.GetMeterProvider),
+// which returns a noop if none is registered.
+func WithMeterProvider(mp metric.MeterProvider) EngineOption {
+	return func(e *Engine) {
+		e.meterProvider = mp
+	}
+}
+
+// WithConventions sets custom semantic conventions (attribute keys and metric
+// names). Use semconv.New(semconv.WithPrefix("myapp")) to change the default
+// "flicker" prefix. Defaults to semconv.Default().
+func WithConventions(conv *semconv.Conventions) EngineOption {
+	return func(e *Engine) {
+		e.conventions = conv
+	}
+}
+
+// WithCacheHitSpans enables span creation for step cache hits during replay.
+// By default, cache-hit steps do not emit spans to reduce trace noise. Enable
+// this for full replay visibility at the cost of more spans per execution.
+func WithCacheHitSpans(enabled bool) EngineOption {
+	return func(e *Engine) {
+		e.cacheHitSpans = enabled
+	}
+}
+
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
@@ -112,6 +151,13 @@ type Engine struct {
 	promoters    []Promoter
 	nudge        chan struct{}
 	wg           sync.WaitGroup
+	tel          *telemetry
+
+	// Intermediate fields consumed during construction.
+	tracerProvider trace.TracerProvider
+	meterProvider  metric.MeterProvider
+	conventions    *semconv.Conventions
+	cacheHitSpans  bool
 }
 
 type registryEntry struct {
@@ -135,6 +181,9 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		opt(e)
 	}
 
+	// Initialize telemetry (noop if no providers registered).
+	e.tel = newTelemetry(e.tracerProvider, e.meterProvider, e.conventions, e.cacheHitSpans)
+
 	// Nudge channel — promoters signal here when workflows become schedulable,
 	// causing the default scheduler to poll immediately.
 	e.nudge = make(chan struct{}, 1)
@@ -145,6 +194,7 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 			Interval: time.Second,
 			NowFunc:  e.nowFunc,
 			Logger:   e.logger,
+			tel:      e.tel,
 		}
 	}
 
@@ -165,6 +215,7 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 			logger:   e.logger,
 			nowFunc:  e.nowFunc,
 			idFunc:   e.idFunc,
+			tel:      e.tel,
 		}
 	}
 
@@ -256,13 +307,21 @@ func (e *Engine) Start(ctx context.Context) error {
 // Promote runs one time-based promotion cycle. Use in tests with RunOnce
 // for explicit control over when suspended workflows get promoted.
 func (e *Engine) Promote(ctx context.Context) (int, error) {
-	return promote(ctx, e.store, e.nowFunc, e.logger)
+	n, err := promote(ctx, e.store, e.nowFunc, e.logger)
+	if err == nil && n > 0 {
+		e.tel.adjustSuspended(ctx, -int64(n))
+	}
+	return n, err
 }
 
 // TimeOutSubscriptions runs one subscription timeout cycle. Use in tests
 // with RunOnce for explicit control over when event subscriptions time out.
 func (e *Engine) TimeOutSubscriptions(ctx context.Context) (int, error) {
-	return timeOutSubscriptions(ctx, e.store, e.nowFunc, e.logger)
+	n, err := timeOutSubscriptions(ctx, e.store, e.nowFunc, e.logger)
+	if err == nil && n > 0 {
+		e.tel.adjustSuspended(ctx, -int64(n))
+	}
+	return n, err
 }
 
 // SendEvent delivers an event payload to a workflow waiting on the given

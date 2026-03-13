@@ -27,6 +27,8 @@ type WorkflowContext struct {
 
 	sleepCounter int // auto-incremented counter for SleepUntil step names
 
+	tel *telemetry // OpenTelemetry instrumentation (never nil when created by engine)
+
 	// Time provides durable time operations. w.Time.Now(ctx) returns a
 	// cached timestamp that survives replay.
 	Time *TimeProvider
@@ -124,6 +126,7 @@ func (wc *WorkflowContext) Scope(name string) *WorkflowContext {
 		prefix:    prefix,
 		root:      root,
 		mu:        wc.mu,
+		tel:       wc.tel,
 	}
 
 	child.Time = NewTimeProvider(child, wc.nowFn)

@@ -3,6 +3,8 @@ package flicker
 import (
 	"context"
 	"sync"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Branch is a named parallel execution path within a workflow. The Name is
@@ -32,10 +34,26 @@ func Parallel(ctx context.Context, wc *WorkflowContext, branches ...Branch) erro
 		go func(idx int, branch Branch) {
 			defer wg.Done()
 
+			branchCtx := ctx
+			var branchSpan trace.Span
+			if wc.tel != nil {
+				branchCtx, branchSpan = wc.tel.startBranchSpan(ctx, branch.Name)
+			}
+
 			scope := wc.Scope(branch.Name)
 			errs[idx] = panicToError(func() error {
-				return branch.Run(ctx, scope)
+				return branch.Run(branchCtx, scope)
 			})
+
+			if branchSpan != nil {
+				if branchErr := errs[idx]; branchErr != nil {
+					if _, ok := IsSuspend(branchErr); !ok {
+						wc.tel.endSpanWithError(branchSpan, branchErr)
+						return
+					}
+				}
+				branchSpan.End()
+			}
 		}(i, b)
 	}
 

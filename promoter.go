@@ -28,6 +28,8 @@ type PollingTimePromoter struct {
 
 	// Logger for promotion activity. Defaults to slog.Default().
 	Logger *slog.Logger
+
+	tel *telemetry // set by engine for suspended metric adjustment
 }
 
 func (p *PollingTimePromoter) Start(ctx context.Context, store WorkflowStore, ready func()) error {
@@ -57,6 +59,15 @@ func (p *PollingTimePromoter) Start(ctx context.Context, store WorkflowStore, re
 			timedOut, err := timeOutSubscriptions(ctx, store, nowFn, logger)
 			if err != nil {
 				logger.Error("subscription timeout cycle failed", "error", err)
+			}
+
+			if p.tel != nil {
+				if promoted > 0 {
+					p.tel.adjustSuspended(ctx, -int64(promoted))
+				}
+				if timedOut > 0 {
+					p.tel.adjustSuspended(ctx, -int64(timedOut))
+				}
 			}
 
 			if promoted > 0 || timedOut > 0 {
