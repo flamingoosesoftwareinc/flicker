@@ -110,6 +110,7 @@ type Engine struct {
 	pool         WorkerPool
 	timePromoter Promoter
 	promoters    []Promoter
+	nudge        chan struct{}
 	wg           sync.WaitGroup
 }
 
@@ -134,12 +135,25 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		opt(e)
 	}
 
+	// Nudge channel — promoters signal here when workflows become schedulable,
+	// causing the default scheduler to poll immediately.
+	e.nudge = make(chan struct{}, 1)
+
 	// Default time promoter uses the engine's (possibly overridden) clock and logger.
 	if e.timePromoter == nil {
 		e.timePromoter = &PollingTimePromoter{
 			Interval: time.Second,
 			NowFunc:  e.nowFunc,
 			Logger:   e.logger,
+		}
+	}
+
+	// Default scheduler uses the engine's store, worker count, and nudge channel.
+	if e.scheduler == nil {
+		e.scheduler = &PollingScheduler{
+			Store: e.store,
+			Limit: e.workers,
+			Nudge: e.nudge,
 		}
 	}
 
@@ -181,12 +195,9 @@ func (e *Engine) Start(ctx context.Context) error {
 	}
 	runner := e.getRunner()
 
-	// Nudge channel — promoters signal here when workflows become schedulable,
-	// causing the scheduler to poll immediately.
-	nudge := make(chan struct{}, 1)
 	ready := func() {
 		select {
-		case nudge <- struct{}{}:
+		case e.nudge <- struct{}{}:
 		default: // already signaled, don't block
 		}
 	}
@@ -203,16 +214,6 @@ func (e *Engine) Start(ctx context.Context) error {
 				e.logger.Info("promoter exited with error", "error", err)
 			}
 		}()
-	}
-
-	// Build or use the configured scheduler.
-	sched := e.scheduler
-	if sched == nil {
-		sched = &PollingScheduler{
-			Store: e.store,
-			Limit: e.workers,
-			Nudge: nudge,
-		}
 	}
 
 	// drainCtx outlives the engine ctx — it gives in-flight workflows time
@@ -234,7 +235,7 @@ func (e *Engine) Start(ctx context.Context) error {
 		}
 	}
 
-	_ = sched.Start(ctx, dispatch)
+	_ = e.scheduler.Start(ctx, dispatch)
 
 	// Start drain timer — force-cancels in-flight workflows if they don't
 	// finish within the drain period.
