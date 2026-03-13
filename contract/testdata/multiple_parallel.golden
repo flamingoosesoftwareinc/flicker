@@ -1,0 +1,131 @@
+[
+  {
+    "name": "multi-parallel",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/multiple_parallel",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "ID",
+          "type": {
+            "name": "string",
+            "kind": "string"
+          },
+          "json_tag": "id"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/multiple_parallel",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "OK",
+          "type": {
+            "name": "bool",
+            "kind": "bool"
+          },
+          "json_tag": "ok"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "setup",
+        "kind": "literal",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      },
+      {
+        "name": "_parallel",
+        "kind": "provider",
+        "step_type": "parallel",
+        "branches": [
+          {
+            "name": "fetch-users",
+            "steps": [
+              {
+                "name": "call-user-api",
+                "kind": "literal",
+                "type": {
+                  "name": "string",
+                  "kind": "string"
+                },
+                "step_type": "run"
+              }
+            ]
+          },
+          {
+            "name": "fetch-products",
+            "steps": [
+              {
+                "name": "call-product-api",
+                "kind": "literal",
+                "type": {
+                  "name": "string",
+                  "kind": "string"
+                },
+                "step_type": "run"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "_parallel",
+        "kind": "provider",
+        "step_type": "parallel",
+        "branches": [
+          {
+            "name": "notify-warehouse",
+            "steps": [
+              {
+                "name": "send-warehouse-event",
+                "kind": "literal",
+                "type": {
+                  "name": "bool",
+                  "kind": "bool"
+                },
+                "step_type": "run"
+              }
+            ]
+          },
+          {
+            "name": "notify-billing",
+            "steps": [
+              {
+                "name": "send-billing-event",
+                "kind": "literal",
+                "type": {
+                  "name": "bool",
+                  "kind": "bool"
+                },
+                "step_type": "run"
+              }
+            ]
+          },
+          {
+            "name": "notify-analytics",
+            "steps": [
+              {
+                "name": "send-analytics-event",
+                "kind": "literal",
+                "type": {
+                  "name": "int",
+                  "kind": "int"
+                },
+                "step_type": "run"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

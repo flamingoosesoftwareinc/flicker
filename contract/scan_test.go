@@ -25,6 +25,8 @@ func TestBuildContracts(t *testing.T) {
 		"multiple_workflows":   {dir: "testdata/multiple_workflows"},
 		"const_step_name":      {dir: "testdata/const_step_name"},
 		"complex_types":        {dir: "testdata/complex_types"},
+		"multiple_parallel":    {dir: "testdata/multiple_parallel"},
+		"multiple_providers":   {dir: "testdata/multiple_providers"},
 	}
 
 	g := goldie.New(t,

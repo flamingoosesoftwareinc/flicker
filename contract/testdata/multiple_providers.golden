@@ -1,0 +1,111 @@
+[
+  {
+    "name": "polling-workflow",
+    "version": "v1",
+    "request_type": {
+      "name": "Request",
+      "pkg": "testdata/multiple_providers",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Intervals",
+          "type": {
+            "name": "[]Duration",
+            "kind": "slice",
+            "elem": {
+              "name": "Duration",
+              "pkg": "time",
+              "kind": "int64"
+            }
+          },
+          "json_tag": "intervals"
+        }
+      ]
+    },
+    "response_type": {
+      "name": "Response",
+      "pkg": "testdata/multiple_providers",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "Cycles",
+          "type": {
+            "name": "int",
+            "kind": "int"
+          },
+          "json_tag": "cycles"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "name": "_time.now:*",
+        "kind": "provider",
+        "step_type": "provider"
+      },
+      {
+        "name": "poll-1",
+        "kind": "literal",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      },
+      {
+        "name": "_sleep.until:*",
+        "kind": "provider",
+        "step_type": "sleep_until"
+      },
+      {
+        "name": "_time.now:*",
+        "kind": "provider",
+        "step_type": "provider"
+      },
+      {
+        "name": "poll-2",
+        "kind": "literal",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        },
+        "step_type": "run"
+      },
+      {
+        "name": "_sleep.until:*",
+        "kind": "provider",
+        "step_type": "sleep_until"
+      },
+      {
+        "name": "_time.now:*",
+        "kind": "provider",
+        "step_type": "provider"
+      },
+      {
+        "name": "finalize",
+        "kind": "literal",
+        "type": {
+          "name": "bool",
+          "kind": "bool"
+        },
+        "step_type": "run"
+      }
+    ],
+    "providers": [
+      {
+        "prefix": "jitter",
+        "type": {
+          "name": "int",
+          "kind": "int"
+        }
+      },
+      {
+        "prefix": "nonce",
+        "type": {
+          "name": "string",
+          "kind": "string"
+        }
+      }
+    ]
+  }
+]
