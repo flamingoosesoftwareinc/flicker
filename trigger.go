@@ -28,54 +28,6 @@ func promote(
 	return n, nil
 }
 
-// promotionLoop runs a ticker that promotes suspended workflows at the
-// configured interval. Built into the engine — not a pluggable interface.
-func promotionLoop(
-	ctx context.Context,
-	interval time.Duration,
-	store WorkflowStore,
-	nowFn func() time.Time,
-	logger *slog.Logger,
-) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := promote(ctx, store, nowFn, logger); err != nil {
-				logger.Info("promotion loop: cycle failed", "error", err)
-			}
-		}
-	}
-}
-
-// subscriptionTimeoutLoop runs a ticker that times out expired event
-// subscriptions at the configured interval.
-func subscriptionTimeoutLoop(
-	ctx context.Context,
-	interval time.Duration,
-	store WorkflowStore,
-	nowFn func() time.Time,
-	logger *slog.Logger,
-) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := timeOutSubscriptions(ctx, store, nowFn, logger); err != nil {
-				logger.Info("subscription timeout loop: cycle failed", "error", err)
-			}
-		}
-	}
-}
-
 // timeOutSubscriptions runs one cycle of timing out expired event
 // subscriptions. Expired subscriptions get a timeout marker saved as
 // their step result and the workflow is promoted back to pending.

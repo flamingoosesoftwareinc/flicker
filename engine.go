@@ -28,12 +28,21 @@ func WithPollInterval(d time.Duration) EngineOption {
 	}
 }
 
-// WithPromoteInterval sets how often the engine promotes suspended workflows
-// whose resume time has passed and times out expired event subscriptions.
-// If not set, time-based promotion must be triggered manually via Promote().
-func WithPromoteInterval(d time.Duration) EngineOption {
+// WithTimePromoter sets the time-based promoter that handles SleepUntil
+// deadlines and subscription timeouts. Defaults to a PollingTimePromoter
+// with a 1-second interval. Cannot be nil.
+func WithTimePromoter(p Promoter) EngineOption {
 	return func(e *Engine) {
-		e.promoteInterval = d
+		e.timePromoter = p
+	}
+}
+
+// WithPromoter adds an additional promoter that runs alongside the time
+// promoter. Use for event-driven sources like message queues, webhooks,
+// or database notification channels.
+func WithPromoter(p Promoter) EngineOption {
+	return func(e *Engine) {
+		e.promoters = append(e.promoters, p)
 	}
 }
 
@@ -96,19 +105,20 @@ func WithPool(p WorkerPool) EngineOption {
 // Engine is the scheduler + runner combined. It polls the store for pending
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
-	store           WorkflowStore
-	registry        map[string]registryEntry
-	workers         int
-	pollInterval    time.Duration
-	promoteInterval time.Duration
-	drainTimeout    time.Duration
-	logger          *slog.Logger
-	idFunc          func() string
-	nowFunc         func() time.Time
-	runner          Runner
-	scheduler       Scheduler
-	pool            WorkerPool
-	wg              sync.WaitGroup
+	store        WorkflowStore
+	registry     map[string]registryEntry
+	workers      int
+	pollInterval time.Duration
+	drainTimeout time.Duration
+	logger       *slog.Logger
+	idFunc       func() string
+	nowFunc      func() time.Time
+	runner       Runner
+	scheduler    Scheduler
+	pool         WorkerPool
+	timePromoter Promoter
+	promoters    []Promoter
+	wg           sync.WaitGroup
 }
 
 type registryEntry struct {
@@ -131,6 +141,15 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 
 	for _, opt := range opts {
 		opt(e)
+	}
+
+	// Default time promoter uses the engine's (possibly overridden) clock and logger.
+	if e.timePromoter == nil {
+		e.timePromoter = &PollingTimePromoter{
+			Interval: time.Second,
+			NowFunc:  e.nowFunc,
+			Logger:   e.logger,
+		}
 	}
 
 	return e
@@ -171,11 +190,28 @@ func (e *Engine) Start(ctx context.Context) error {
 	}
 	runner := e.getRunner()
 
-	// Launch built-in promotion loops as separate goroutines — they must
-	// not consume worker pool slots.
-	if e.promoteInterval > 0 {
-		go promotionLoop(ctx, e.promoteInterval, e.store, e.nowFunc, e.logger)
-		go subscriptionTimeoutLoop(ctx, e.promoteInterval, e.store, e.nowFunc, e.logger)
+	// Nudge channel — promoters signal here when workflows become schedulable,
+	// causing the scheduler to poll immediately.
+	nudge := make(chan struct{}, 1)
+	ready := func() {
+		select {
+		case nudge <- struct{}{}:
+		default: // already signaled, don't block
+		}
+	}
+
+	// Start all promoters in separate goroutines.
+	go func() {
+		if err := e.timePromoter.Start(ctx, e.store, ready); err != nil {
+			e.logger.Info("time promoter exited with error", "error", err)
+		}
+	}()
+	for _, p := range e.promoters {
+		go func() {
+			if err := p.Start(ctx, e.store, ready); err != nil {
+				e.logger.Info("promoter exited with error", "error", err)
+			}
+		}()
 	}
 
 	// Build or use the configured scheduler.
@@ -185,6 +221,7 @@ func (e *Engine) Start(ctx context.Context) error {
 			store:    e.store,
 			limit:    e.workers,
 			interval: e.pollInterval,
+			nudge:    nudge,
 		}
 	}
 
