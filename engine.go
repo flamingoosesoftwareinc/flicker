@@ -230,7 +230,9 @@ func (e *Engine) Start(ctx context.Context) error {
 		}
 	}
 
-	_ = e.scheduler.Start(ctx, dispatch)
+	if err := e.scheduler.Start(ctx, dispatch); err != nil {
+		return fmt.Errorf("scheduler: %w", err)
+	}
 
 	// Start drain timer — force-cancels in-flight workflows if they don't
 	// finish within the drain period.
