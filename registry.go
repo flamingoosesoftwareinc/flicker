@@ -93,9 +93,38 @@ type Factory[R, Resp any] struct {
 	engine *Engine
 }
 
+// SubmitOption configures a single Submit call.
+type SubmitOption func(*submitConfig)
+
+type submitConfig struct {
+	id string
+}
+
+// WithID sets a deterministic workflow ID. If the ID already exists in the
+// store, Submit will return an error — use this for idempotent submission
+// where duplicate IDs are expected and the error can be safely ignored.
+func WithID(id string) SubmitOption {
+	return func(cfg *submitConfig) {
+		cfg.id = id
+	}
+}
+
 // Submit creates a new workflow instance and returns a typed handle to it.
-func (f *Factory[R, Resp]) Submit(ctx context.Context, request R) (*TypedInstance[Resp], error) {
-	id := f.engine.generateID()
+func (f *Factory[R, Resp]) Submit(
+	ctx context.Context,
+	request R,
+	opts ...SubmitOption,
+) (*TypedInstance[Resp], error) {
+	var cfg submitConfig
+
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	id := cfg.id
+	if id == "" {
+		id = f.engine.generateID()
+	}
 
 	payload, err := json.Marshal(request)
 	if err != nil {
