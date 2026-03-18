@@ -43,6 +43,19 @@ func NewStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, err
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
+	// Enable WAL mode for concurrent read access and set a busy timeout
+	// so readers wait instead of failing immediately during writes.
+	for _, pragma := range []string{
+		"PRAGMA journal_mode=WAL",
+		"PRAGMA busy_timeout=5000",
+	} {
+		if _, pragmaErr := db.ExecContext(ctx, pragma); pragmaErr != nil {
+			_ = db.Close()
+
+			return nil, fmt.Errorf("%s: %w", pragma, pragmaErr)
+		}
+	}
+
 	s := &Store{
 		db:    db,
 		nowFn: func() time.Time { return time.Now().UTC() },
