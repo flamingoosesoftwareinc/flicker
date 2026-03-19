@@ -19,6 +19,7 @@ type Runner interface {
 type LocalRunner struct {
 	registry map[string]registryEntry
 	store    WorkflowStore
+	leases   LeaseStore
 	logger   *slog.Logger
 	nowFunc  func() time.Time
 	idFunc   func() string
@@ -33,25 +34,20 @@ func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 		return &DefinitionNotFoundError{Type: record.Type}
 	}
 
+	// Acquire lease — another goroutine may already be executing this workflow.
+	acquired, err := r.leases.Acquire(ctx, record.ID)
+	if err != nil {
+		return fmt.Errorf("acquire lease: %w", err)
+	}
+	if !acquired {
+		return nil
+	}
+	defer func() { _ = r.leases.Release(ctx, record.ID) }()
+
 	// Start workflow span and active metric.
 	ctx, span := r.tel.startWorkflowSpan(ctx, record)
 	start := time.Now()
 	r.tel.adjustActive(ctx, 1, record.Type, record.Version)
-
-	// Transition to running.
-	if err := r.store.UpdateStatus(
-		ctx,
-		record.ID,
-		StatusRunning,
-		nil,
-		record.OCCVersion,
-	); err != nil {
-		r.tel.adjustActive(ctx, -1, record.Type, record.Version)
-		r.tel.endSpanWithError(span, err)
-		return fmt.Errorf("set running: %w", err)
-	}
-
-	occAfterRunning := record.OCCVersion + 1
 
 	// Prefetch step results into a cache map.
 	steps, err := r.store.ListStepResults(ctx, record.Type, record.Version, record.ID)
@@ -116,7 +112,7 @@ func (r *LocalRunner) Run(ctx context.Context, record *WorkflowRecord) error {
 		span.End()
 	}
 
-	return r.resolveOutcome(ctx, record, entry, occAfterRunning, resultJSON, execErr)
+	return r.resolveOutcome(ctx, record, entry, record.OCCVersion, resultJSON, execErr)
 }
 
 func (r *LocalRunner) resolveOutcome(

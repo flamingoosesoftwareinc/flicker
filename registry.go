@@ -145,8 +145,9 @@ func (f *Factory[R, Resp]) Submit(
 
 	return &TypedInstance[Resp]{
 		Instance: &Instance{
-			id:    id,
-			store: f.engine.store,
+			id:     id,
+			store:  f.engine.store,
+			leases: f.engine.leases,
 		},
 	}, nil
 }
@@ -154,8 +155,9 @@ func (f *Factory[R, Resp]) Submit(
 // Instance is a non-generic handle to a submitted workflow.
 // Use it for status checks, heterogeneous collections, and operational queries.
 type Instance struct {
-	id    string
-	store WorkflowStore
+	id     string
+	store  WorkflowStore
+	leases LeaseStore
 }
 
 // ID returns the workflow instance ID.
@@ -163,14 +165,34 @@ func (i *Instance) ID() string {
 	return i.id
 }
 
-// Status returns the current status of the workflow.
+// Status returns the current status of the workflow. If the durable status
+// is pending but a lease is held, the derived status is running.
 func (i *Instance) Status(ctx context.Context) (Status, error) {
 	record, err := i.store.Get(ctx, i.id)
 	if err != nil {
 		return "", fmt.Errorf("get workflow: %w", err)
 	}
 
-	return record.Status, nil
+	return i.deriveStatus(ctx, record.Status)
+}
+
+// deriveStatus checks the lease store to promote pending to running when
+// the workflow is actively being executed.
+func (i *Instance) deriveStatus(ctx context.Context, durable Status) (Status, error) {
+	if durable != StatusPending || i.leases == nil {
+		return durable, nil
+	}
+
+	held, err := i.leases.IsHeld(ctx, i.id)
+	if err != nil {
+		return "", fmt.Errorf("check lease: %w", err)
+	}
+
+	if held {
+		return StatusRunning, nil
+	}
+
+	return durable, nil
 }
 
 // RawResult returns the raw JSON result of the workflow, or nil if not completed.
@@ -207,11 +229,16 @@ func (i *TypedInstance[Resp]) Result(ctx context.Context) (*WorkflowResult[Resp]
 		return nil, fmt.Errorf("get workflow: %w", err)
 	}
 
+	status, err := i.deriveStatus(ctx, record.Status)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &WorkflowResult[Resp]{
 		ID:      record.ID,
 		Type:    record.Type,
 		Version: record.Version,
-		Status:  record.Status,
+		Status:  status,
 		Error:   record.Error,
 	}
 

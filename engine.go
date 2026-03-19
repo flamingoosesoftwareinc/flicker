@@ -125,6 +125,14 @@ func WithConventions(conv *semconv.Conventions) EngineOption {
 	}
 }
 
+// WithLeaseStore sets a custom LeaseStore for tracking in-flight workflows.
+// Defaults to NewMemoryLeaseStore().
+func WithLeaseStore(ls LeaseStore) EngineOption {
+	return func(e *Engine) {
+		e.leases = ls
+	}
+}
+
 // WithCacheHitSpans enables span creation for step cache hits during replay.
 // By default, cache-hit steps do not emit spans to reduce trace noise. Enable
 // this for full replay visibility at the cost of more spans per execution.
@@ -138,6 +146,7 @@ func WithCacheHitSpans(enabled bool) EngineOption {
 // workflows, dispatches them to a worker pool, and executes them.
 type Engine struct {
 	store        WorkflowStore
+	leases       LeaseStore
 	registry     map[string]registryEntry
 	workers      int
 	drainTimeout time.Duration
@@ -181,6 +190,11 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		opt(e)
 	}
 
+	// Default lease store — ephemeral, in-process.
+	if e.leases == nil {
+		e.leases = NewMemoryLeaseStore()
+	}
+
 	// Initialize telemetry (noop if no providers registered).
 	e.tel = newTelemetry(e.tracerProvider, e.meterProvider, e.conventions, e.cacheHitSpans)
 
@@ -212,6 +226,7 @@ func NewEngine(store WorkflowStore, opts ...EngineOption) *Engine {
 		e.runner = &LocalRunner{
 			registry: e.registry,
 			store:    e.store,
+			leases:   e.leases,
 			logger:   e.logger,
 			nowFunc:  e.nowFunc,
 			idFunc:   e.idFunc,
